@@ -98,3 +98,22 @@ export interface SearchResponse {
 export interface ApiError {
   error: string;
 }
+
+/** Modes proposés. Le guidage (étape 4) ne couvre pas les transports en commun. */
+export type TravelMode = 'walk' | 'bicycle' | 'drive' | 'transit';
+
+export interface RouteOption {
+  mode: TravelMode;
+  /** Faux si Google ne propose pas d'itinéraire pour ce mode (ex. pas de transport). */
+  available: boolean;
+  durationSeconds?: number;
+  distanceMeters?: number;
+  /** Tracé encodé (Encoded Polyline Algorithm), à décoder avec shared/polyline. */
+  polyline?: string;
+  /** Transports : lignes empruntées, ex. « Métro 1 », « Tram R ». */
+  transitLines?: string[];
+}
+
+export interface RouteResponse {
+  options: RouteOption[];
+}

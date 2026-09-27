@@ -1,11 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { type ComponentProps, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Linking,
   Pressable,
   ScrollView,
@@ -226,8 +225,15 @@ export default function PlaceScreen() {
         <Pressable
           style={({ pressed }) => [styles.goButton, pressed && { opacity: 0.85 }]}
           onPress={() =>
-            // Branché sur l'aperçu d'itinéraire à l'étape 3.
-            Alert.alert('Bientôt disponible', 'L’itinéraire intégré arrive à la prochaine étape.')
+            router.push({
+              pathname: '/route/[id]',
+              params: {
+                id: p.id,
+                name: p.name,
+                lat: String(p.location.lat),
+                lng: String(p.location.lng),
+              },
+            })
           }
           accessibilityRole="button"
           accessibilityLabel={`Y aller : ${p.name}`}

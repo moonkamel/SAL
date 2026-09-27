@@ -1,6 +1,13 @@
 import Constants from 'expo-constants';
 
-import type { ApiError, PlaceDetails, SearchRequest, SearchResponse } from '@/shared/types';
+import type {
+  ApiError,
+  LatLng,
+  PlaceDetails,
+  RouteResponse,
+  SearchRequest,
+  SearchResponse,
+} from '@/shared/types';
 
 /**
  * Origine du backend :
@@ -47,6 +54,11 @@ export function getPlace(
 ): Promise<PlaceDetails> {
   const query = mode === 'summary' ? '?fields=summary' : '';
   return request<PlaceDetails>(`/api/place/${encodeURIComponent(id)}${query}`, { signal });
+}
+
+export function getRoutes(from: LatLng, to: LatLng, signal?: AbortSignal): Promise<RouteResponse> {
+  const q = `from=${from.lat},${from.lng}&to=${to.lat},${to.lng}`;
+  return request<RouteResponse>(`/api/route?${q}`, { signal });
 }
 
 export function photoUrl(photoName: string, width = 400): string {

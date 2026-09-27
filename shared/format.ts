@@ -38,3 +38,18 @@ export function formatOpening(status: OpeningStatus): string {
     ? `Fermé · ouvre ${status.opensAt}`
     : `Fermé · ouvre à ${status.opensAt}`;
 }
+
+/** 45 s → « 1 min » · 720 s → « 12 min » · 3900 s → « 1 h 05 » */
+export function formatDuration(seconds: number): string {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h} h` : `${h} h ${String(m).padStart(2, '0')}`;
+}
+
+/** Heure d'arrivée estimée « 20:35 » à partir de maintenant. */
+export function formatArrival(seconds: number, now: Date = new Date()): string {
+  const arrival = new Date(now.getTime() + seconds * 1000);
+  return `${String(arrival.getHours()).padStart(2, '0')}:${String(arrival.getMinutes()).padStart(2, '0')}`;
+}

@@ -15,7 +15,7 @@ Stack : Expo SDK 57 (React Native 0.86, New Architecture) · TypeScript · Expo 
 | 0 | Socle : Expo Router, thème sombre, localisation, EAS | ✅ à tester sur téléphone |
 | 1 | Recherche + liste de résultats + filtres + historique | ✅ testé avec les vraies données Google, à tester sur téléphone |
 | 2 | Fiche lieu + carte (MapView du Navigation SDK) + favoris | ✅ à tester sur téléphone (nouveau build nécessaire) |
-| 3 | Aperçu d'itinéraire (Routes API) | ⏳ |
+| 3 | Aperçu d'itinéraire (Routes API) | ✅ testé avec les vraies données Google, à tester sur téléphone |
 | 4 | Navigation guidée intégrée (Google Navigation SDK) | ⏳ |
 | 5 | Publicité AdMob + consentement + lieux sponsorisés | ⏳ |
 
@@ -45,6 +45,8 @@ app/                 écrans (Expo Router) + routes API (*+api.ts)
   api/search+api.ts  POST /api/search → reformulation + Places Text Search + classement
   api/place/[id]+api.ts GET /api/place/:id → Place Details (avis) ou résumé (?fields=summary)
   api/photo+api.ts   GET  /api/photo  → photo Google sans exposer la clé
+  api/route+api.ts   GET  /api/route?from=lat,lng&to=lat,lng → marche, vélo, voiture, transports
+  route/[id].tsx     aperçu d'itinéraire : tracé, choix du mode, durée, « Démarrer »
 plugins/withGoogleNavigation.js  plugin Expo : clés Maps, désugarage Android, Jetifier
 server/              logique backend (testable seule)
   places.ts          client Places API (New)
@@ -194,6 +196,21 @@ Il faut **refaire un build** (`npm run build:dev:android`) : la carte ajoute du 
 - [ ] Le cœur en haut à droite ajoute le lieu aux favoris ; « Favoris » sur l'accueil le liste,
       y compris après redémarrage de l'app.
 - [ ] « Y aller » affiche « Bientôt disponible » (branché à l'étape 3).
+
+## 6. Checklist de test : étape 3
+
+Pas de nouveau build nécessaire : `git pull`, puis relancez `npm start`.
+La clé serveur doit avoir **Routes API** activée (Google Cloud → Bibliothèque → Routes API).
+
+- [ ] Sur une fiche lieu, « Y aller » ouvre l'aperçu d'itinéraire.
+- [ ] Le tracé (rouge) s'affiche sur la carte, cadré entre votre position et le lieu.
+- [ ] Les 4 modes affichent leur durée ; « À pied » est sélectionné par défaut.
+- [ ] Changer de mode change le tracé, la durée, la distance et l'heure d'arrivée.
+- [ ] « Transports » affiche les lignes (ex. « Métro M1 ») et indique que le guidage
+      n'est pas disponible dans ce mode.
+- [ ] « Démarrer » affiche « Bientôt disponible » (branché à l'étape 4).
+
+Coût : chaque aperçu interroge Routes API pour les 4 modes (mis en cache 5 minutes).
 
 ## Règles Google respectées
 
