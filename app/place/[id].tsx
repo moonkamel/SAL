@@ -20,6 +20,7 @@ import { GoogleAttribution } from '@/src/components/GoogleAttribution';
 import { GradientButton } from '@/src/components/GradientButton';
 import { AmbianceTags } from '@/src/features/lille/AmbianceTags';
 import { TransitCard } from '@/src/features/lille/TransitCard';
+import { PartnerLinks } from '@/src/features/partners/PartnerLinks';
 import { PhotoCarousel } from '@/src/components/PhotoCarousel';
 import { PlacesMap } from '@/src/components/PlacesMap';
 import { ReviewItem } from '@/src/components/ReviewItem';
@@ -256,6 +257,8 @@ export default function PlaceScreen() {
             showUserLocation={status === 'granted'}
             style={styles.map}
           />
+
+          <PartnerLinks links={p.partnerLinks} />
 
           {/* Pour rentrer : métro, tram et bus au plus près du lieu, en temps réel. */}
           <TransitCard near={p.location} title="Pour rentrer en transports" />

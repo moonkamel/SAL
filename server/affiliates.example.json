@@ -1,0 +1,28 @@
+[
+  {
+    "id": "reservation",
+    "kind": "booking",
+    "label": "Réserver une table",
+    "partner": "Partenaire de réservation",
+    "urlTemplate": "https://www.exemple-reservation.fr/lille/recherche?q={name}&affiliate=VOTRE_ID",
+    "placeTypes": ["restaurant", "brunch_restaurant", "french_restaurant", "japanese_restaurant"],
+    "places": {
+      "ChIJ6TCpdF3VwkcRoxvGy4l48vc": "https://www.exemple-reservation.fr/restaurant/12345?affiliate=VOTRE_ID"
+    }
+  },
+  {
+    "id": "billetterie",
+    "kind": "tickets",
+    "label": "Soirées et billets",
+    "partner": "Partenaire billetterie",
+    "urlTemplate": "https://www.exemple-billetterie.fr/lille/evenements?lieu={name}&ref=VOTRE_ID",
+    "placeTypes": ["night_club", "bar", "concert_hall", "event_venue"]
+  },
+  {
+    "id": "vtc",
+    "kind": "ride",
+    "label": "Commander un VTC",
+    "partner": "Uber",
+    "urlTemplate": "https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[latitude]={lat}&dropoff[longitude]={lng}&dropoff[nickname]={name}"
+  }
+]

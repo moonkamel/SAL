@@ -1,3 +1,4 @@
+import { linksFor } from '@/server/affiliates';
 import { TtlCache } from '@/server/cache';
 import { PlacesError, placeDetails } from '@/server/places';
 import type { PlaceDetails } from '@/shared/types';
@@ -16,7 +17,10 @@ export async function GET(request: Request, { id }: Record<string, string>): Pro
       details = await placeDetails(id ?? '', mode);
       cache.set(key, details);
     }
-    return Response.json(details);
+    // Liens partenaires calculés à chaque appel : un changement d'affiliates.json
+    // s'applique sans attendre l'expiration du cache.
+    const partnerLinks = mode === 'full' ? linksFor(details) : [];
+    return Response.json(partnerLinks.length ? { ...details, partnerLinks } : details);
   } catch (error) {
     if (error instanceof PlacesError) {
       return Response.json({ error: error.message }, { status: error.status });

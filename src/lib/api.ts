@@ -92,6 +92,11 @@ export function placeWebUrl(id: string): string | undefined {
   return configured ? `${configured.replace(/\/$/, '')}/place/${encodeURIComponent(id)}` : undefined;
 }
 
+/** URL complète d'un lien partenaire (passe par /api/go, qui compte le clic). */
+export function partnerLinkUrl(path: string): string {
+  return `${apiOrigin()}${path}`;
+}
+
 export function photoUrl(photoName: string, width = 400): string {
   return `${apiOrigin()}/api/photo?name=${encodeURIComponent(photoName)}&w=${width}`;
 }
