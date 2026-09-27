@@ -1,11 +1,1 @@
-[
-  {
-    "id": "exemple-2026-10",
-    "placeId": "ChIJ6TCpdF3VwkcRoxvGy4l48vc",
-    "label": "Exemple — restaurant japonais, octobre 2026",
-    "startDate": "2026-09-01",
-    "endDate": "2026-10-31",
-    "zone": { "lat": 50.6366, "lng": 3.0635, "radiusMeters": 3000 },
-    "keywords": ["brunch"]
-  }
-]
+[]
