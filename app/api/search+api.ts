@@ -1,7 +1,10 @@
+import { rateLimited } from '@/server/rateLimit';
 import { PlacesError } from '@/server/places';
 import { search, SearchRequestSchema } from '@/server/search';
 
 export async function POST(request: Request): Promise<Response> {
+  const limited = rateLimited('search', request);
+  if (limited) return limited;
   let body: unknown;
   try {
     body = await request.json();

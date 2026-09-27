@@ -152,6 +152,10 @@ export default function ResultsScreen() {
           data={withAdSlots(state.places, canRequestAds)}
           keyExtractor={(item) => (item.type === 'ad' ? item.key : item.place.id)}
           contentContainerStyle={styles.list}
+          // Photos facturées à l'affichage : seules les cartes proches de l'écran sont rendues.
+          initialNumToRender={4}
+          maxToRenderPerBatch={3}
+          windowSize={5}
           ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
           renderItem={({ item, index }) => (
             // Apparition en cascade des premières cartes, puis instantanée au défilement.

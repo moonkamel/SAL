@@ -1,9 +1,12 @@
+import { rateLimited } from '@/server/rateLimit';
 import { isNearLille, parseLatLng } from '@/server/params';
 import { PlacesError } from '@/server/places';
 import { surprise } from '@/server/surprise';
 
 /** GET /api/surprise?near=lat,lng → un lieu ouvert, bien noté et proche, tiré au sort. */
 export async function GET(request: Request): Promise<Response> {
+  const limited = rateLimited('surprise', request);
+  if (limited) return limited;
   const near = parseLatLng(new URL(request.url).searchParams.get('near'));
   if (!near) return Response.json({ error: 'Position invalide' }, { status: 400 });
   if (!isNearLille(near)) {

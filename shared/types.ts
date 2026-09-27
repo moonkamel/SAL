@@ -96,6 +96,8 @@ export interface PlaceDetails {
   types?: string[];
   /** Liens partenaires (réservation, billetterie, VTC), ajoutés par /api/place. */
   partnerLinks?: PartnerLink[];
+  /** Bons plans du jour chez ce lieu, ajoutés par /api/place. */
+  offers?: Offer[];
 }
 
 export type PartnerKind = 'booking' | 'tickets' | 'ride' | 'delivery';
@@ -231,4 +233,59 @@ export interface SurpriseResponse {
   place: PlaceSummary;
   /** Pourquoi ce lieu, ex. « Ouvert · 4,6 ★ · 6 min à pied ». */
   reason: string;
+}
+
+// --- Bons plans (offres des établissements partenaires) ---
+
+export interface Offer {
+  id: string;
+  placeId: string;
+  placeName: string;
+  location: LatLng;
+  title: string;
+  description?: string;
+  conditions?: string;
+  /** « Aujourd'hui de 18:00 à 20:00 », « Toute la journée »… */
+  schedule: string;
+  /** Vrai si l'offre est valable en ce moment. */
+  live: boolean;
+  distanceMeters?: number;
+  walkMinutes?: number;
+}
+
+export interface OffersResponse {
+  offers: Offer[];
+}
+
+// --- Agenda « Ce soir à Lille » ---
+
+export type EventCategory = 'concert' | 'soiree' | 'expo' | 'spectacle' | 'marche' | 'sport' | 'autre';
+
+export interface AgendaEvent {
+  id: string;
+  title: string;
+  description?: string;
+  category: EventCategory;
+  venueName: string;
+  placeId?: string;
+  location: LatLng;
+  address?: string;
+  /** ISO 8601. */
+  start: string;
+  end?: string;
+  /** Horaire lisible (heure de Lille), ex. « 21:00 – 23:30 » ou « sam. 21:00 ». */
+  timeLabel: string;
+  price?: string;
+  url?: string;
+  imageUrl?: string;
+  /** Événement mis en avant (sponsorisé). */
+  featured: boolean;
+  source: 'partner' | 'openagenda';
+  distanceMeters: number;
+}
+
+export type AgendaWhen = 'today' | 'tomorrow' | 'weekend';
+
+export interface AgendaResponse {
+  events: AgendaEvent[];
 }

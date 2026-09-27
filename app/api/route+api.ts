@@ -1,3 +1,4 @@
+import { rateLimited } from '@/server/rateLimit';
 import { TtlCache } from '@/server/cache';
 import { parseLatLng } from '@/server/params';
 import { PlacesError } from '@/server/places';
@@ -8,6 +9,8 @@ const cache = new TtlCache<RouteOption[]>(5 * 60 * 1000, 500);
 
 /** GET /api/route?from=lat,lng&to=lat,lng → itinéraires marche, vélo, voiture, transports. */
 export async function GET(request: Request): Promise<Response> {
+  const limited = rateLimited('route', request);
+  if (limited) return limited;
   const url = new URL(request.url);
   const from = parseLatLng(url.searchParams.get('from'));
   const to = parseLatLng(url.searchParams.get('to'));

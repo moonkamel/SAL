@@ -23,6 +23,7 @@ import { useAds } from '@/src/features/ads/AdsProvider';
 import { useSearchHistory } from '@/src/features/history/useSearchHistory';
 import { useLiveData } from '@/src/features/lille/useLiveData';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
+import { OffersRail, TonightRail } from '@/src/features/moment/HomeRails';
 import { SurpriseCard } from '@/src/features/moment/SurpriseCard';
 import { WeatherCard } from '@/src/features/moment/WeatherCard';
 import { weatherIcon } from '@/src/features/moment/weatherIcons';
@@ -150,6 +151,9 @@ export default function HomeScreen() {
               <WeatherCard data={weather} onPress={(s) => search(s.query, s.ambiance)} />
             )}
           </Animated.View>
+
+          <TonightRail near={coords} />
+          <OffersRail near={coords} />
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Envie de…</Text>

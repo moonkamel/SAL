@@ -54,6 +54,19 @@ AdMob (react-native-google-mobile-ads) · Claude (reformulation optionnelle).
 - **Partager un lieu** (bouton en haut de la fiche) : WhatsApp, SMS… avec le nom,
   l'adresse, la note et le lien Google Maps (ou le lien web de l'app si
   `EXPO_PUBLIC_API_URL` est défini).
+- **Ce soir à Lille** (accueil + écran « Agenda ») : concerts, soirées, expos… ce soir,
+  demain ou ce week-end. Sources : les événements saisis dans l'espace partenaires
+  (option **« À la une »**, payante, affichée en premier avec un badge) et, en option,
+  les agendas publics d'**OpenAgenda** (`OPENAGENDA_KEY`, `OPENAGENDA_AGENDAS`).
+- **Bons plans** (accueil, écran « Bons plans » et fiche du lieu) : offres des
+  établissements partenaires (« 2 bières pour le prix d'1 de 18 h à 20 h »), avec dates,
+  jours et créneau horaire.
+- **Espace partenaires** (`/admin`, dans un navigateur) : gérer bons plans, agenda,
+  lieux sponsorisés et liens partenaires sans toucher au code, et voir les clics sur les
+  liens partenaires. Voir « Espace partenaires » plus bas.
+- **Économies Google** : photos chargées seulement quand elles sont visibles (liste et
+  carrousel), fiches gardées 5 min dans l'app, cache de recherche partagé par quartier
+  (~500 m), et limite d'appels par appareil (429 au-delà de 30 recherches par minute).
 
 ### Choix techniques validés
 
@@ -98,13 +111,18 @@ server/              logique backend (testable seule)
   sponsored.ts       sélection des lieux sponsorisés (dates, zone, mots-clés)
   sponsored.json     campagnes actives (voir « Lieux sponsorisés »)
   affiliates.json    liens partenaires (voir « Liens d'affiliation »)
+  offers.json, events.json  bons plans et agenda sans base de données
+  content.ts         stockage (Supabase ou fichiers JSON), schemas.ts
   search.ts          orchestration
 shared/              types, géo et formatage communs à l'app et au serveur
 src/                 composants, localisation, historique, favoris, thème
   features/ads/      consentement UMP + ATT, bannière, pub native, interstitiel, règles
   features/navigation/  guidage (Navigation SDK), état « guidage actif »
   features/lille/    V’Lille, Ilévia, pastilles d’ambiance
-  features/moment/   Surprends-moi, carte météo
+  features/moment/   Surprends-moi, carte météo, rubriques de l'accueil
+  features/admin/    espace partenaires (/admin)
+  features/offers/, features/agenda/  bons plans et agenda
+supabase/            schéma de la base de l'espace partenaires
 tests/               tests unitaires (vitest)
 ```
 
@@ -129,6 +147,14 @@ tests/               tests unitaires (vitest)
    [conditions EEE de Google Maps Platform](https://cloud.google.com/terms/maps-platform/eea)
    s'appliquent. Le Navigation SDK est facturé à la destination, avec 1 000 destinations
    gratuites par mois.
+5. **Protégez votre budget** (fortement recommandé) :
+   - *Facturation → Budgets et alertes → Créer un budget* : par exemple 20 €/mois, avec
+     des alertes par e-mail à 50 %, 90 % et 100 %. Une alerte **ne coupe rien** : elle
+     prévient seulement.
+   - *API et services → Places API (New) → Quotas et limites du système* : baissez les
+     « requêtes par jour » (par exemple 1 000 pour Text Search et Place Details). C'est
+     la **vraie limite dure** : au-delà, Google refuse les appels au lieu de les facturer
+     (l'app affiche alors une erreur). Faites de même pour la Routes API.
 
 ### Anthropic (optionnel)
 
@@ -227,8 +253,8 @@ limite de **2 par recherche** et **seulement s'il respecte les filtres** choisis
 (ouvert maintenant, distance, prix, note). Pour trouver le `place_id` d'un lieu, utilisez le
 [Place ID Finder de Google](https://developers.google.com/maps/documentation/places/web-service/place-id).
 
-Modifier le fichier demande un redéploiement du backend ; une base de données
-(ex. Supabase) sera plus pratique quand il y aura plusieurs annonceurs.
+Sans base de données, modifier le fichier demande un redéploiement du backend : utilisez
+plutôt l'**espace partenaires** (ci-dessous).
 
 ### Liens d'affiliation (réservation, billetterie, VTC)
 
@@ -268,6 +294,65 @@ du serveur (partenaire, lieu, heure : aucune donnée personnelle) puis redirige 
 partenaire. Vous pouvez ainsi comparer vos clics avec les commissions du partenaire.
 L'adresse de destination est toujours reconstruite à partir de `affiliates.json` :
 personne ne peut détourner `/api/go` vers un autre site.
+
+### Espace partenaires (bons plans, agenda, sponsorisés, liens)
+
+L'espace partenaires est une page web protégée par mot de passe, à l'adresse de votre
+serveur suivie de **`/admin`** (en local : <http://localhost:8081/admin>). Sans base de
+données, il fonctionne en **lecture seule** : il montre le contenu des fichiers
+`server/offers.json`, `events.json`, `sponsored.json` et `affiliates.json` (vides par
+défaut ; modèles dans les fichiers `*.example.json`).
+
+**1. Choisir un mot de passe** d'au moins 12 caractères et l'ajouter côté serveur :
+`ADMIN_PASSWORD=…` dans `.env.local` (et dans les variables d'environnement EAS pour le
+serveur en ligne). Sans ce réglage, l'espace reste fermé.
+
+**2. Créer la base de données** (gratuite pour démarrer) pour pouvoir modifier en ligne :
+
+1. Créez un compte sur <https://supabase.com>, puis un projet (région Europe, par
+   exemple Paris ou Francfort).
+2. Menu *SQL Editor → New query* : collez le contenu de `supabase/schema.sql`, puis
+   **Run**.
+3. Menu *Project Settings → API* : copiez l'**URL du projet** et la clé
+   **`service_role`** (secrète).
+4. Ajoutez-les côté serveur, **jamais** avec le préfixe `EXPO_PUBLIC_` :
+
+```
+SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+```
+
+Relancez `npm start` : l'espace partenaires indique « Base de données connectée » et les
+boutons **Ajouter / Modifier / Supprimer** apparaissent. Les changements sont visibles
+dans l'app en moins d'une minute, sans redéploiement. Dès que la base est configurée,
+ce sont ses données qui comptent (les fichiers JSON sont ignorés).
+
+**Remplir un formulaire** : tapez le nom de l'établissement dans « Chercher le lieu » et
+choisissez-le dans la liste : le `place_id`, le nom et la position se remplissent seuls.
+Les dates sont au format `AAAA-MM-JJ`, les heures `HH:MM` (heure de Lille).
+
+**Statistiques** : l'onglet « Statistiques » montre les clics sur les liens partenaires
+des 30 derniers jours, par partenaire et par lieu. C'est utile pour montrer à un
+établissement ce que lui apporte l'app.
+
+### Agenda OpenAgenda (optionnel)
+
+[OpenAgenda](https://openagenda.com) publie les agendas de nombreuses structures
+culturelles. Pour les ajouter à « Ce soir à Lille » :
+
+1. Créez un compte OpenAgenda et récupérez votre **clé API** (paramètres du compte).
+2. Cherchez les agendas lillois qui vous intéressent et notez leur **identifiant**
+   (numéro visible dans l'adresse ou les réglages de l'agenda).
+3. Côté serveur :
+
+```
+OPENAGENDA_KEY=votre-cle
+OPENAGENDA_AGENDAS=12345678,87654321
+```
+
+Les réponses sont gardées 15 min en cache. Un événement présent à la fois chez un
+partenaire et dans OpenAgenda (même titre, même lieu) n'apparaît qu'une fois. Vérifiez les
+conditions de réutilisation de chaque agenda.
 
 ## 2. Configuration locale
 
@@ -428,6 +513,25 @@ Pas besoin de nouveau build (aucun module natif ajouté) : relancez simplement `
 - [ ] Remettez `[]` dans `server/affiliates.json` tant que vous n'avez pas de vrais
       identifiants partenaires (les liens d'exemple ne mènent nulle part).
 
+## 8 quater. Checklist : économies, bons plans, espace partenaires, agenda
+
+Pas de nouveau build nécessaire : relancez simplement `npm start`.
+
+- [ ] Ajoutez `ADMIN_PASSWORD=` (12 caractères minimum) dans `.env.local`, relancez, puis
+      ouvrez <http://localhost:8081/admin> sur l'ordinateur : le mot de passe ouvre
+      l'espace, un mauvais mot de passe est refusé.
+- [ ] Avec Supabase configuré : ajoutez un **bon plan** pour un bar proche (bouton
+      « Chercher le lieu »), valable aujourd'hui. Dans l'app : il apparaît dans « Bons
+      plans » sur l'accueil et sur la fiche du lieu.
+- [ ] Ajoutez un **événement** ce soir, coché « À la une » : il apparaît en premier dans
+      « Ce soir à Lille » avec le badge ; un appui ouvre la fiche du lieu.
+- [ ] Onglet « Statistiques » : après un clic sur un lien partenaire dans l'app, il est
+      compté.
+- [ ] Économies : en faisant défiler les résultats, les photos se chargent au fur et à
+      mesure ; revenir sur une fiche déjà vue est instantané.
+- [ ] Dans Google Cloud : budget et quotas par jour réglés (voir « Protégez votre
+      budget »).
+
 ## 9. Avant la publication sur les stores
 
 - [ ] Clés Google **séparées** : clé serveur (Places + Routes, sans restriction d'app) et
@@ -435,8 +539,10 @@ Pas besoin de nouveau build (aucun module natif ajouté) : relancez simplement `
       Régénérez toute clé qui a été partagée.
 - [ ] Backend déployé (`eas deploy`) avec `GOOGLE_PLACES_API_KEY` en variable d'environnement
       EAS, puis `EXPO_PUBLIC_API_URL` renseignée pour les builds preview et production.
-- [ ] Limitation du nombre de requêtes par utilisateur sur `/api/*` (protège votre quota
-      Google).
+- [ ] Quotas par jour et budget Google Cloud réglés (la limite par appareil de l'app
+      n'est qu'un garde-fou).
+- [ ] Espace partenaires : `ADMIN_PASSWORD` long et unique, variables Supabase définies
+      dans EAS (environnement production).
 - [ ] Vrais IDs AdMob, message RGPD publié, app-ads.txt en ligne.
 - [ ] Justification de la localisation écran verrouillé dans les fiches App Store / Google Play.
 - [ ] Politique de confidentialité (position, publicité, identifiant publicitaire).

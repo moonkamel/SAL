@@ -2,8 +2,11 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import type {
+  AgendaResponse,
+  AgendaWhen,
   ApiError,
   LatLng,
+  OffersResponse,
   PlaceDetails,
   RouteResponse,
   SearchRequest,
@@ -54,13 +57,36 @@ export function searchPlaces(body: SearchRequest, signal?: AbortSignal): Promise
   });
 }
 
-export function getPlace(
+// Fiches déjà chargées pendant la session (quelques minutes, en mémoire seulement) :
+// revenir sur un lieu ou rouvrir les favoris ne redéclenche pas d'appel Google.
+const PLACE_TTL_MS = 5 * 60_000;
+const placeCache = new Map<string, { value: PlaceDetails; expiresAt: number }>();
+
+function cachedPlace(key: string): PlaceDetails | undefined {
+  const hit = placeCache.get(key);
+  if (!hit) return undefined;
+  if (hit.expiresAt <= Date.now()) {
+    placeCache.delete(key);
+    return undefined;
+  }
+  return hit.value;
+}
+
+export async function getPlace(
   id: string,
   mode: 'full' | 'summary' = 'full',
   signal?: AbortSignal,
 ): Promise<PlaceDetails> {
+  // Une fiche complète sert aussi de résumé.
+  const hit = cachedPlace(`full|${id}`) ?? (mode === 'summary' ? cachedPlace(`summary|${id}`) : undefined);
+  if (hit) return hit;
   const query = mode === 'summary' ? '?fields=summary' : '';
-  return request<PlaceDetails>(`/api/place/${encodeURIComponent(id)}${query}`, { signal });
+  const value = await request<PlaceDetails>(`/api/place/${encodeURIComponent(id)}${query}`, {
+    signal,
+  });
+  if (placeCache.size > 200) placeCache.clear();
+  placeCache.set(`${mode}|${id}`, { value, expiresAt: Date.now() + PLACE_TTL_MS });
+  return value;
 }
 
 export function getRoutes(from: LatLng, to: LatLng, signal?: AbortSignal): Promise<RouteResponse> {
@@ -90,6 +116,37 @@ export function getSurprise(near: LatLng, signal?: AbortSignal): Promise<Surpris
 export function placeWebUrl(id: string): string | undefined {
   const configured = process.env.EXPO_PUBLIC_API_URL;
   return configured ? `${configured.replace(/\/$/, '')}/place/${encodeURIComponent(id)}` : undefined;
+}
+
+export function getOffers(near: LatLng, signal?: AbortSignal): Promise<OffersResponse> {
+  return request<OffersResponse>(`/api/offers?near=${near.lat},${near.lng}`, { signal });
+}
+
+export function getAgenda(
+  near: LatLng,
+  when: AgendaWhen,
+  signal?: AbortSignal,
+): Promise<AgendaResponse> {
+  return request<AgendaResponse>(`/api/agenda?near=${near.lat},${near.lng}&when=${when}`, {
+    signal,
+  });
+}
+
+// --- Espace partenaires ---
+
+export function adminRequest<T>(
+  password: string,
+  path: string,
+  init: { method?: string; body?: unknown } = {},
+): Promise<T> {
+  return request<T>(path, {
+    method: init.method ?? 'GET',
+    headers: {
+      Authorization: `Bearer ${password}`,
+      ...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+  });
 }
 
 /** URL complète d'un lien partenaire (passe par /api/go, qui compte le clic). */

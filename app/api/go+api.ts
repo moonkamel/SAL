@@ -1,4 +1,5 @@
-import { findPartner, partnerUrl } from '@/server/affiliates';
+import { activePartners, findPartner, partnerUrl } from '@/server/affiliates';
+import { recordClick } from '@/server/content';
 import { parseLatLng } from '@/server/params';
 import { PLACE_ID_PATTERN } from '@/server/places';
 
@@ -10,7 +11,7 @@ import { PLACE_ID_PATTERN } from '@/server/places';
  */
 export async function GET(request: Request): Promise<Response> {
   const q = new URL(request.url).searchParams;
-  const partner = findPartner(q.get('p') ?? '');
+  const partner = findPartner(q.get('p') ?? '', await activePartners());
   const placeId = q.get('place') ?? '';
   const name = (q.get('name') ?? '').slice(0, 200);
   const address = (q.get('address') ?? '').slice(0, 300);
@@ -29,6 +30,7 @@ export async function GET(request: Request): Promise<Response> {
     '[affiliate-click]',
     JSON.stringify({ partner: partner.id, place: placeId, at: new Date().toISOString() }),
   );
+  await recordClick({ partner: partner.id, placeId });
   return new Response(null, {
     status: 302,
     headers: { Location: url, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' },

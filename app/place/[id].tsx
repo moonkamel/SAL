@@ -20,6 +20,7 @@ import { GoogleAttribution } from '@/src/components/GoogleAttribution';
 import { GradientButton } from '@/src/components/GradientButton';
 import { AmbianceTags } from '@/src/features/lille/AmbianceTags';
 import { TransitCard } from '@/src/features/lille/TransitCard';
+import { OfferCard } from '@/src/features/offers/OfferCard';
 import { PartnerLinks } from '@/src/features/partners/PartnerLinks';
 import { PhotoCarousel } from '@/src/components/PhotoCarousel';
 import { PlacesMap } from '@/src/components/PlacesMap';
@@ -230,6 +231,8 @@ export default function PlaceScreen() {
           )}
 
           <AmbianceTags ambiance={p.ambiance} />
+
+          {p.offers?.map((offer) => <OfferCard key={offer.id} offer={offer} />)}
 
           <View style={styles.infoCard}>
             <InfoRow icon="walk" text={`${formatDistance(distance)} · ${formatWalk(estimateWalkMinutes(distance))}`} />

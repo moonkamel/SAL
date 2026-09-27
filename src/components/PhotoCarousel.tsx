@@ -29,6 +29,11 @@ export function PhotoCarousel({ photos }: { photos: PhotoRef[] }) {
         keyExtractor={(p) => p.name}
         horizontal
         pagingEnabled
+        // Chaque photo affichée est facturée par Google : on ne charge que la photo
+        // visible et ses voisines, pas les 6 d'un coup.
+        initialNumToRender={1}
+        maxToRenderPerBatch={1}
+        windowSize={3}
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={(e) =>
           setIndex(Math.round(e.nativeEvent.contentOffset.x / width))

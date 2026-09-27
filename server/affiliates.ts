@@ -1,40 +1,23 @@
 // Liens d'affiliation : réservation de table, billetterie, VTC… Chaque clic passe par
 // /api/go, qui le compte puis redirige vers le partenaire avec votre identifiant.
-// Stockage : server/affiliates.json (versionné, vide par défaut ; modèle dans
-// server/affiliates.example.json).
-
-import { z } from 'zod';
+// Stockage : espace partenaires (Supabase) ou, à défaut, server/affiliates.json
+// (vide par défaut ; modèle dans server/affiliates.example.json).
 
 import type { PartnerKind, PartnerLink, PlaceDetails } from '@/shared/types';
 
-import rawPartners from './affiliates.json';
+import { getContent } from './content';
+import { type Partner, validItems } from './schemas';
 
-const PartnerSchema = z.object({
-  id: z.string().regex(/^[a-z0-9-]{2,40}$/),
-  kind: z.enum(['booking', 'tickets', 'ride', 'delivery']),
-  label: z.string().min(2).max(40),
-  partner: z.string().min(2).max(40),
-  /** Modèle d'URL : {name}, {address}, {lat}, {lng}, {placeId}, {city}. */
-  urlTemplate: z.string().url().startsWith('https://').optional(),
-  /** Types Google concernés (ex. « restaurant »). Absent = tous les lieux. */
-  placeTypes: z.array(z.string()).optional(),
-  /** Liens directs par place_id (prioritaires sur le modèle). */
-  places: z.record(z.string(), z.string().url().startsWith('https://')).optional(),
-  active: z.boolean().default(true),
-});
-
-export type Partner = z.infer<typeof PartnerSchema>;
+export type { Partner };
 
 export function loadPartners(raw: unknown): Partner[] {
-  const parsed = z.array(PartnerSchema).safeParse(raw);
-  if (!parsed.success) {
-    console.error('[affiliates] affiliates.json invalide, aucun lien partenaire', parsed.error);
-    return [];
-  }
-  return parsed.data.filter((p) => p.active && (p.urlTemplate || p.places));
+  return validItems('affiliates', raw).filter((p) => p.active && (p.urlTemplate || p.places));
 }
 
-const PARTNERS = loadPartners(rawPartners);
+/** Partenaires actifs (espace partenaires ou server/affiliates.json). */
+export async function activePartners(): Promise<Partner[]> {
+  return loadPartners(await getContent('affiliates'));
+}
 
 /** Ordre d'affichage : réserver, puis sortir, puis rentrer. */
 const KIND_ORDER: PartnerKind[] = ['booking', 'tickets', 'delivery', 'ride'];
@@ -86,7 +69,7 @@ export function goPath(partnerId: string, place: LinkTarget): string {
 /** Au plus un lien par type (réservation, billetterie…), 3 au total. */
 export function linksFor(
   place: LinkTarget & { types?: string[] },
-  partners: Partner[] = PARTNERS,
+  partners: Partner[],
 ): PartnerLink[] {
   const seen = new Set<PartnerKind>();
   return partners
@@ -103,6 +86,6 @@ export function linksFor(
     }));
 }
 
-export function findPartner(id: string, partners: Partner[] = PARTNERS): Partner | undefined {
+export function findPartner(id: string, partners: Partner[]): Partner | undefined {
   return partners.find((p) => p.id === id);
 }

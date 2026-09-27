@@ -69,9 +69,12 @@ export function withAmbianceHints(query: string, ambiance: Ambiance[]): string {
 const ttlSeconds = Number(process.env.SEARCH_CACHE_TTL_SECONDS ?? 300);
 const cache = new TtlCache<CachedSearch>(ttlSeconds * 1000);
 
-/** ~110 m de précision : deux utilisateurs voisins partagent le même cache. */
-function roundCoord(value: number): string {
-  return value.toFixed(3);
+/**
+ * Pas de 0,005° (~550 m) : les utilisateurs d'un même quartier partagent le cache.
+ * Les distances restent calculées depuis la position exacte de chacun.
+ */
+export function roundCoord(value: number): string {
+  return (Math.round(value / 0.005) * 0.005).toFixed(3);
 }
 
 export function cacheKey(req: SearchRequest): string {
@@ -202,7 +205,7 @@ async function resolveSponsored(
 export async function search(req: SearchRequest): Promise<SearchResponse> {
   const { places, effectiveQuery, rewritten, ambiance } = await fetchPlaces(req);
   const organic = rankPlaces(places, req, ambiance);
-  const campaigns = activeCampaigns({
+  const campaigns = await activeCampaigns({
     queries: [req.query, effectiveQuery],
     location: req.location,
   });
