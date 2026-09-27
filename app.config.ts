@@ -19,6 +19,7 @@ const LOCATION_WHEN_IN_USE =
 const config: ExpoConfig = {
   name: 'Sortir à Lille',
   slug: 'sortir-a-lille',
+  owner: 'farouk12',
   scheme: 'sortiralille',
   version: '0.1.0',
   orientation: 'portrait',
@@ -80,7 +81,7 @@ const config: ExpoConfig = {
   },
   extra: {
     eas: {
-      projectId: process.env.EAS_PROJECT_ID,
+      projectId: '224dbc02-f270-4412-8998-fcd116ac8320',
     },
   },
 };

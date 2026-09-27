@@ -135,8 +135,7 @@ L'app utilise des modules natifs : **Expo Go ne suffit pas**, il faut un *develo
 ```bash
 npm install -g eas-cli
 eas login
-eas init                              # crée le projet EAS et renseigne son ID
-# Mettez l'ID affiché dans EAS_PROJECT_ID (ou laissez eas init modifier la config).
+eas init                              # déjà fait : projet @farouk12/sortir-a-lille
 
 npm run build:dev:android             # APK de développement
 npm run build:dev:ios                 # nécessite un compte Apple Developer ;
