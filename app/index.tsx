@@ -14,6 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Chip } from '@/src/components/Chip';
 import { LocationBanner } from '@/src/components/LocationBanner';
 import { SearchBar } from '@/src/components/SearchBar';
+import { AdBanner } from '@/src/features/ads/AdBanner';
+import { useAds } from '@/src/features/ads/AdsProvider';
 import { useSearchHistory } from '@/src/features/history/useSearchHistory';
 import { colors, font, spacing, TOUCH_TARGET } from '@/src/theme';
 
@@ -21,10 +23,13 @@ const SUGGESTIONS = ['Resto japonais', 'Afterwork', 'Boîte de nuit', 'Brunch', 
 
 export default function HomeScreen() {
   const { history, add, clear } = useSearchHistory();
+  const { onSearch, privacyOptionsRequired, showPrivacyOptions } = useAds();
 
   const search = (query: string) => {
     add(query);
     router.push({ pathname: '/results', params: { q: query } });
+    // Peut afficher l'interstitiel (au plus une fois par session, jamais à la 1re recherche).
+    onSearch();
   };
 
   return (
@@ -88,7 +93,17 @@ export default function HomeScreen() {
           )}
         </ScrollView>
 
-        {/* Emplacement réservé à la bannière AdMob (étape 5). */}
+        {privacyOptionsRequired && (
+          <Pressable
+            onPress={() => void showPrivacyOptions()}
+            style={styles.privacy}
+            hitSlop={8}
+            accessibilityRole="button"
+          >
+            <Text style={styles.privacyText}>Confidentialité et publicité</Text>
+          </Pressable>
+        )}
+        <AdBanner />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -130,5 +145,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     minHeight: TOUCH_TARGET,
   },
+  privacy: { alignItems: 'center', paddingVertical: spacing.sm },
+  privacyText: { color: colors.textFaint, fontSize: font.tiny, textDecorationLine: 'underline' },
   historyText: { flex: 1, color: colors.text, fontSize: font.body },
 });

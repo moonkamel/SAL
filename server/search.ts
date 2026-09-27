@@ -3,12 +3,21 @@
 import { z } from 'zod';
 
 import { estimateWalkMinutes, haversineMeters, SEARCH_RADIUS_METERS } from '@/shared/geo';
-import type { PlaceSummary, PriceLevel, SearchRequest, SearchResponse } from '@/shared/types';
+import { detailsToSummary } from '@/shared/summary';
+import type {
+  PlaceDetails,
+  PlaceSummary,
+  PriceLevel,
+  SearchFilters,
+  SearchRequest,
+  SearchResponse,
+} from '@/shared/types';
 
 import { TtlCache } from './cache';
-import { type RawPlace, textSearch } from './places';
+import { placeDetails, type RawPlace, textSearch } from './places';
 import { scorePlace } from './ranking';
 import { rewriteQuery } from './rewrite';
+import { activeCampaigns, type SponsoredCampaign } from './sponsored';
 
 export const SearchRequestSchema = z.object({
   query: z.string().trim().min(1).max(120),
@@ -109,7 +118,57 @@ export function rankPlaces(
     .sort((a, b) => b.score - a.score);
 }
 
+/** Un lieu sponsorisé doit respecter les filtres choisis par l'utilisateur. */
+export function passesFilters(p: PlaceSummary, f: SearchFilters = {}): boolean {
+  if (f.openNow && !p.opening?.openNow) return false;
+  if (f.maxDistanceMeters !== undefined && p.distanceMeters > f.maxDistanceMeters) return false;
+  if (f.priceLevels?.length && (p.priceLevel === undefined || !f.priceLevels.includes(p.priceLevel)))
+    return false;
+  if (f.minRating && (p.rating ?? 0) < f.minRating) return false;
+  return true;
+}
+
+/** Lieux sponsorisés en tête (badge visible), puis les résultats sans doublon. */
+export function mergeSponsored(sponsored: PlaceSummary[], organic: PlaceSummary[]): PlaceSummary[] {
+  const ids = new Set(sponsored.map((p) => p.id));
+  return [...sponsored, ...organic.filter((p) => !ids.has(p.id))];
+}
+
+const sponsoredDetailsCache = new TtlCache<PlaceDetails>(ttlSeconds * 1000, 200);
+
+async function resolveSponsored(
+  campaigns: SponsoredCampaign[],
+  organic: PlaceSummary[],
+  req: SearchRequest,
+): Promise<PlaceSummary[]> {
+  const resolved = await Promise.all(
+    campaigns.map(async (c): Promise<PlaceSummary | null> => {
+      const inResults = organic.find((p) => p.id === c.placeId);
+      if (inResults) return { ...inResults, sponsored: true };
+      try {
+        // Absent des résultats Google : on charge sa fiche (sans avis, donc moins cher).
+        let details = sponsoredDetailsCache.get(c.placeId);
+        if (!details) {
+          details = await placeDetails(c.placeId, 'summary');
+          sponsoredDetailsCache.set(c.placeId, details);
+        }
+        return detailsToSummary(details, req.location, true);
+      } catch (error) {
+        console.warn(`[sponsored] campagne ${c.id} ignorée`, error);
+        return null;
+      }
+    }),
+  );
+  return resolved.filter((p): p is PlaceSummary => p !== null && passesFilters(p, req.filters));
+}
+
 export async function search(req: SearchRequest): Promise<SearchResponse> {
   const { places, effectiveQuery, rewritten } = await fetchPlaces(req);
-  return { places: rankPlaces(places, req), effectiveQuery, rewritten };
+  const organic = rankPlaces(places, req);
+  const campaigns = activeCampaigns({
+    queries: [req.query, effectiveQuery],
+    location: req.location,
+  });
+  const sponsored = campaigns.length ? await resolveSponsored(campaigns, organic, req) : [];
+  return { places: mergeSponsored(sponsored, organic), effectiveQuery, rewritten };
 }

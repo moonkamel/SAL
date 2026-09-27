@@ -13,6 +13,14 @@ const API_ORIGIN = process.env.EXPO_PUBLIC_API_URL;
 const GOOGLE_MAPS_IOS_API_KEY = process.env.GOOGLE_MAPS_IOS_API_KEY;
 const GOOGLE_MAPS_ANDROID_API_KEY = process.env.GOOGLE_MAPS_ANDROID_API_KEY;
 
+// AdMob : IDs d'application (pas des blocs d'annonces). Par défaut, les IDs de test Google.
+const ADMOB_ANDROID_APP_ID =
+  process.env.ADMOB_ANDROID_APP_ID ?? 'ca-app-pub-3940256099942544~3347511713';
+const ADMOB_IOS_APP_ID = process.env.ADMOB_IOS_APP_ID ?? 'ca-app-pub-3940256099942544~1458002511';
+
+const TRACKING_USAGE =
+  'Votre identifiant publicitaire permet d’afficher des annonces plus pertinentes et de financer l’application. Vous pouvez refuser sans perdre aucune fonctionnalité.';
+
 const LOCATION_WHEN_IN_USE =
   'Sortir à Lille utilise votre position pour vous proposer les lieux les plus proches et calculer le trajet pour y aller.';
 const LOCATION_ALWAYS =
@@ -80,6 +88,19 @@ const config: ExpoConfig = {
     ],
     'expo-system-ui',
     'expo-web-browser',
+    [
+      'react-native-google-mobile-ads',
+      {
+        androidAppId: ADMOB_ANDROID_APP_ID,
+        iosAppId: ADMOB_IOS_APP_ID,
+        // Aucune collecte avant le consentement RGPD (UMP).
+        delayAppMeasurementInit: true,
+        userTrackingUsageDescription: TRACKING_USAGE,
+        // Attribution publicitaire iOS (identifiant SKAdNetwork de Google).
+        skAdNetworkItems: ['cstr6suwn9.skadnetwork'],
+      },
+    ],
+    ['expo-tracking-transparency', { userTrackingPermission: TRACKING_USAGE }],
     [
       './plugins/withGoogleNavigation',
       { iosApiKey: GOOGLE_MAPS_IOS_API_KEY, androidApiKey: GOOGLE_MAPS_ANDROID_API_KEY },

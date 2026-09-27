@@ -6,7 +6,8 @@ proches et les plus pertinents de la métropole lilloise, puis guide l'utilisate
 jusqu'au lieu **sans quitter l'app**.
 
 Stack : Expo SDK 57 (React Native 0.86, New Architecture) · TypeScript · Expo Router
-(écrans + routes API) · Google Places API (New) · Claude (reformulation optionnelle).
+(écrans + routes API) · Google Places API (New) · Routes API · Google Navigation SDK ·
+AdMob (react-native-google-mobile-ads) · Claude (reformulation optionnelle).
 
 ## État d'avancement
 
@@ -17,7 +18,7 @@ Stack : Expo SDK 57 (React Native 0.86, New Architecture) · TypeScript · Expo 
 | 2 | Fiche lieu + carte (MapView du Navigation SDK) + favoris | ✅ à tester sur téléphone (nouveau build nécessaire) |
 | 3 | Aperçu d'itinéraire (Routes API) | ✅ testé avec les vraies données Google, à tester sur téléphone |
 | 4 | Navigation guidée intégrée (Google Navigation SDK) | ✅ à tester sur téléphone (nouveau build nécessaire) |
-| 5 | Publicité AdMob + consentement + lieux sponsorisés | ⏳ |
+| 5 | Publicité AdMob + consentement + lieux sponsorisés | ✅ à tester sur téléphone (nouveau build nécessaire) |
 
 ### Choix techniques validés
 
@@ -49,15 +50,21 @@ app/                 écrans (Expo Router) + routes API (*+api.ts)
   route/[id].tsx     aperçu d'itinéraire : tracé, choix du mode, durée, « Démarrer »
   navigate/[id].tsx  guidage plein écran (Navigation SDK), « Arrêter », aucune publicité
   arrived/[id].tsx   « Vous êtes arrivé » : noter le lieu, nouvelle recherche
-plugins/withGoogleNavigation.js  plugin Expo : clés Maps, désugarage Android, Jetifier
+plugins/withGoogleNavigation.js  plugin Expo : clés Maps, désugarage Android, Jetifier,
+                     modes d'arrière-plan iOS (location, audio)
 server/              logique backend (testable seule)
   places.ts          client Places API (New)
   rewrite.ts         reformulation par Claude (optionnelle)
   ranking.ts         score note / nombre d'avis / distance / pertinence : tous les réglages ici
   cache.ts           cache mémoire court (5 min)
+  routes.ts          client Routes API (aperçu d'itinéraire)
+  sponsored.ts       sélection des lieux sponsorisés (dates, zone, mots-clés)
+  sponsored.json     campagnes actives (voir « Lieux sponsorisés »)
   search.ts          orchestration
 shared/              types, géo et formatage communs à l'app et au serveur
-src/                 composants, localisation, historique, thème
+src/                 composants, localisation, historique, favoris, thème
+  features/ads/      consentement UMP + ATT, bannière, pub native, interstitiel, règles
+  features/navigation/  guidage (Navigation SDK), état « guidage actif »
 tests/               tests unitaires (vitest)
 ```
 
@@ -96,10 +103,46 @@ requête Places plus des filtres (type, ouvert maintenant, prix).
    Pour une latence et un coût plus bas, vous pouvez essayer `claude-haiku-4-5`.
    Si Claude ne répond pas en 6 s ou échoue, l'app utilise la requête brute.
 
-### AdMob (étape 5)
+### AdMob (publicité)
 
-La procédure (application AdMob, blocs d'annonces, IDs de test, consentement UMP) sera
-détaillée à l'étape 5.
+**En développement, rien à faire** : l'app utilise automatiquement les IDs de test de
+Google (annonces marquées « Test Ad »). Ne cliquez jamais sur vos propres annonces réelles :
+AdMob peut suspendre le compte.
+
+Pour la production :
+
+1. Créez un compte sur <https://admob.google.com/> et ajoutez **deux applications**
+   (Android et iOS) « Sortir à Lille ». Notez leurs **IDs d'application**
+   (`ca-app-pub-XXXX~YYYY`).
+2. Pour chaque application, créez trois **blocs d'annonces** : *Bannière adaptative*,
+   *Native avancée* et *Interstitiel*. Notez leurs IDs (`ca-app-pub-XXXX/ZZZZ`).
+3. **Consentement RGPD** : *Confidentialité et messages → RGPD → Créer un message*,
+   sélectionnez les deux applications, langue **français**, puis **Publier**. C'est ce
+   formulaire (Google UMP) que l'app affiche avant toute publicité. Sur iOS, activez
+   aussi le message *IDFA / ATT* dans la même section.
+4. Publiez un fichier **app-ads.txt** sur le site web déclaré dans les fiches des stores
+   (AdMob vous donne son contenu).
+5. Déclarez les IDs dans EAS (environnement `production`) :
+   ```bash
+   eas env:create --environment production --name ADMOB_ANDROID_APP_ID --value "ca-app-pub-XXXX~YYYY" --visibility plaintext
+   eas env:create --environment production --name ADMOB_IOS_APP_ID --value "ca-app-pub-XXXX~YYYY" --visibility plaintext
+   eas env:create --environment production --name EXPO_PUBLIC_ADMOB_ANDROID_BANNER --value "ca-app-pub-XXXX/ZZZZ" --visibility plaintext
+   # … idem pour EXPO_PUBLIC_ADMOB_ANDROID_NATIVE, EXPO_PUBLIC_ADMOB_ANDROID_INTERSTITIAL
+   # et EXPO_PUBLIC_ADMOB_IOS_BANNER / _NATIVE / _INTERSTITIAL
+   ```
+   Même avec ces variables, un build de développement garde les IDs de test.
+
+**Règles appliquées par l'app** (`src/features/ads/policy.ts`) :
+
+| Format | Où | Règle |
+| --- | --- | --- |
+| Bannière | bas de l'accueil | seulement après consentement |
+| Native | liste des résultats | une tous les 5 lieux, badge « Annonce » |
+| Interstitiel | entre deux recherches | au plus 1 par session, jamais au lancement (pas avant la 2e recherche) |
+| — | guidage | **aucune publicité** pendant la navigation active |
+
+Le lien « Confidentialité et publicité » de l'accueil permet de modifier ses choix
+(obligatoire dans l'UE).
 
 ### Clés Maps de l'application (étape 2+)
 
@@ -119,6 +162,33 @@ la clé serveur.
    eas env:create --environment development --name GOOGLE_MAPS_IOS_API_KEY --value "AIza..." --visibility sensitive
    ```
    Refaites la même chose pour `preview` et `production` le moment venu.
+
+### Lieux sponsorisés
+
+Les campagnes sont dans `server/sponsored.json` (vide par défaut ; modèle dans
+`server/sponsored.example.json`). Chaque campagne (commentaires à retirer dans le vrai fichier) :
+
+```jsonc
+{
+  "id": "wood-food-2026-10",
+  "placeId": "ChIJ…",                         // place_id Google du lieu
+  "label": "Wood Food & Coffee, octobre",    // pour vous, jamais affiché
+  "startDate": "2026-10-01",                 // inclus, heure de Lille
+  "endDate": "2026-10-31",                   // inclus
+  "zone": { "lat": 50.6366, "lng": 3.0635, "radiusMeters": 3000 },
+  "keywords": ["brunch", "cafe", "coffee"]   // mots entiers, accents ignorés
+}
+```
+
+Une campagne s'affiche si la date est dans la période, si l'utilisateur est dans la zone
+et si un mot-clé apparaît dans sa recherche (ou dans la requête reformulée par Claude).
+Le lieu passe alors **en tête**, avec le badge **« Sponsorisé »** bien visible, dans la
+limite de **2 par recherche** et **seulement s'il respecte les filtres** choisis
+(ouvert maintenant, distance, prix, note). Pour trouver le `place_id` d'un lieu, utilisez le
+[Place ID Finder de Google](https://developers.google.com/maps/documentation/places/web-service/place-id).
+
+Modifier le fichier demande un redéploiement du backend ; une base de données
+(ex. Supabase) sera plus pratique quand il y aura plusieurs annonceurs.
 
 ## 2. Configuration locale
 
@@ -237,6 +307,36 @@ Testez dehors, à pied, vers un lieu proche (quelques centaines de mètres).
 Coût : chaque guidage appelle une fois `setDestinations` (facturé à la destination,
 1 000 gratuites par mois) ; les recalculs en cours de route ne sont pas refacturés.
 
+## 8. Checklist de test : étape 5
+
+Il faut **refaire un build** (`npm run build:dev:android`) : AdMob ajoute du code natif.
+
+- [ ] Au premier lancement, en France : le **formulaire de consentement Google** s'affiche
+      (seulement si un message RGPD est publié dans AdMob ; sinon les pubs de test
+      s'affichent directement). Sur iPhone, la demande de suivi Apple vient ensuite.
+- [ ] Accueil : une **bannière « Test Ad »** en bas de l'écran.
+- [ ] Résultats en liste : une **annonce native** (badge « Annonce ») après le 5e et le 10e lieu.
+- [ ] La 1re recherche n'affiche pas d'interstitiel ; la 2e en affiche un (test),
+      les suivantes plus jamais pendant la session.
+- [ ] Pendant le guidage : aucune publicité.
+- [ ] « Confidentialité et publicité » (accueil) rouvre le formulaire de consentement.
+- [ ] Sponsorisé : copiez `server/sponsored.example.json` dans `server/sponsored.json`,
+      mettez des dates qui incluent aujourd'hui, relancez `npm start` et cherchez
+      « sushi » : le lieu apparaît en tête avec le badge « Sponsorisé ».
+
+## 9. Avant la publication sur les stores
+
+- [ ] Clés Google **séparées** : clé serveur (Places + Routes, sans restriction d'app) et
+      clés mobiles (Navigation SDK + Maps SDK, restreintes au package / bundle ID).
+      Régénérez toute clé qui a été partagée.
+- [ ] Backend déployé (`eas deploy`) avec `GOOGLE_PLACES_API_KEY` en variable d'environnement
+      EAS, puis `EXPO_PUBLIC_API_URL` renseignée pour les builds preview et production.
+- [ ] Limitation du nombre de requêtes par utilisateur sur `/api/*` (protège votre quota
+      Google).
+- [ ] Vrais IDs AdMob, message RGPD publié, app-ads.txt en ligne.
+- [ ] Justification de la localisation écran verrouillé dans les fiches App Store / Google Play.
+- [ ] Politique de confidentialité (position, publicité, identifiant publicitaire).
+
 ## Règles Google respectées
 
 - Clé Places uniquement côté serveur ; photos servies via `/api/photo` (URL temporaire).
@@ -249,3 +349,5 @@ Coût : chaque guidage appelle une fois `setDestinations` (facturé à la destin
 - Favoris : seul le `place_id` est stocké ; les infos sont rechargées depuis Google.
 - Guidage : conditions d'utilisation du Navigation SDK affichées avant le premier guidage,
   aucune publicité pendant la navigation (`src/features/navigation/guidanceState.ts`).
+- Publicité : consentement UMP avant toute annonce, mesure AdMob retardée jusqu'au
+  consentement, IDs de test en développement, lieux sponsorisés toujours signalés.

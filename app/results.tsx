@@ -17,6 +17,9 @@ import { GoogleAttribution } from '@/src/components/GoogleAttribution';
 import { LocationBanner } from '@/src/components/LocationBanner';
 import { PlaceCard } from '@/src/components/PlaceCard';
 import { ResultsMap } from '@/src/components/ResultsMap';
+import { useAds } from '@/src/features/ads/AdsProvider';
+import { NativeAdCard } from '@/src/features/ads/NativeAdCard';
+import { withAdSlots } from '@/src/features/ads/policy';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { ApiRequestError, searchPlaces } from '@/src/lib/api';
 import { colors, font, radius, spacing, TOUCH_TARGET } from '@/src/theme';
@@ -31,6 +34,7 @@ export default function ResultsScreen() {
   const { q } = useLocalSearchParams<{ q: string }>();
   const query = (q ?? '').trim();
   const { refresh } = useUserLocation();
+  const { canRequestAds } = useAds();
 
   const [filters, setFilters] = useState<SearchFilters>({});
   const [filtersVisible, setFiltersVisible] = useState(false);
@@ -135,11 +139,17 @@ export default function ResultsScreen() {
 
       {state.kind === 'done' && view === 'list' && (
         <FlatList
-          data={state.places}
-          keyExtractor={(p) => p.id}
+          data={withAdSlots(state.places, canRequestAds)}
+          keyExtractor={(item) => (item.type === 'ad' ? item.key : item.place.id)}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
-          renderItem={({ item }) => <PlaceCard place={item} onPress={() => openPlace(item.id)} />}
+          renderItem={({ item }) =>
+            item.type === 'ad' ? (
+              <NativeAdCard />
+            ) : (
+              <PlaceCard place={item.place} onPress={() => openPlace(item.place.id)} />
+            )
+          }
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
           }

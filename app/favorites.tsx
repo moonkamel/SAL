@@ -9,27 +9,8 @@ import { useFavorites } from '@/src/features/favorites/FavoritesProvider';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { getPlace } from '@/src/lib/api';
 import { colors, font, spacing } from '@/src/theme';
-import { estimateWalkMinutes, haversineMeters } from '@/shared/geo';
-import type { LatLng, PlaceDetails, PlaceSummary } from '@/shared/types';
-
-function toSummary(p: PlaceDetails, from: LatLng): PlaceSummary {
-  const distanceMeters = Math.round(haversineMeters(from, p.location));
-  return {
-    id: p.id,
-    name: p.name,
-    address: p.address,
-    location: p.location,
-    rating: p.rating,
-    userRatingCount: p.userRatingCount,
-    priceLevel: p.priceLevel,
-    opening: p.opening,
-    photo: p.photos[0],
-    distanceMeters,
-    walkMinutes: estimateWalkMinutes(distanceMeters),
-    sponsored: false,
-    score: 0,
-  };
-}
+import { detailsToSummary } from '@/shared/summary';
+import type { PlaceDetails } from '@/shared/types';
 
 export default function FavoritesScreen() {
   const { ids } = useFavorites();
@@ -65,7 +46,7 @@ export default function FavoritesScreen() {
   const places = ids
     .map((id) => details[id])
     .filter((p): p is PlaceDetails => p !== undefined)
-    .map((p) => toSummary(p, coords));
+    .map((p) => detailsToSummary(p, coords));
 
   if (ids.length === 0) {
     return (
