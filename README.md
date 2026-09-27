@@ -16,7 +16,7 @@ Stack : Expo SDK 57 (React Native 0.86, New Architecture) · TypeScript · Expo 
 | 1 | Recherche + liste de résultats + filtres + historique | ✅ testé avec les vraies données Google, à tester sur téléphone |
 | 2 | Fiche lieu + carte (MapView du Navigation SDK) + favoris | ✅ à tester sur téléphone (nouveau build nécessaire) |
 | 3 | Aperçu d'itinéraire (Routes API) | ✅ testé avec les vraies données Google, à tester sur téléphone |
-| 4 | Navigation guidée intégrée (Google Navigation SDK) | ⏳ |
+| 4 | Navigation guidée intégrée (Google Navigation SDK) | ✅ à tester sur téléphone (nouveau build nécessaire) |
 | 5 | Publicité AdMob + consentement + lieux sponsorisés | ⏳ |
 
 ### Choix techniques validés
@@ -47,6 +47,8 @@ app/                 écrans (Expo Router) + routes API (*+api.ts)
   api/photo+api.ts   GET  /api/photo  → photo Google sans exposer la clé
   api/route+api.ts   GET  /api/route?from=lat,lng&to=lat,lng → marche, vélo, voiture, transports
   route/[id].tsx     aperçu d'itinéraire : tracé, choix du mode, durée, « Démarrer »
+  navigate/[id].tsx  guidage plein écran (Navigation SDK), « Arrêter », aucune publicité
+  arrived/[id].tsx   « Vous êtes arrivé » : noter le lieu, nouvelle recherche
 plugins/withGoogleNavigation.js  plugin Expo : clés Maps, désugarage Android, Jetifier
 server/              logique backend (testable seule)
   places.ts          client Places API (New)
@@ -212,6 +214,29 @@ La clé serveur doit avoir **Routes API** activée (Google Cloud → Bibliothèq
 
 Coût : chaque aperçu interroge Routes API pour les 4 modes (mis en cache 5 minutes).
 
+## 7. Checklist de test : étape 4
+
+Il faut **refaire un build** (`npm run build:dev:android`) : localisation en arrière-plan,
+guidage vocal et nouvelles autorisations. La clé Maps de l'app doit avoir **Navigation SDK**
+activé.
+
+Testez dehors, à pied, vers un lieu proche (quelques centaines de mètres).
+
+- [ ] « Démarrer » affiche d'abord (une seule fois) l'explication de l'utilisation de la position
+      pendant le guidage, puis les **conditions d'utilisation Google** à accepter.
+- [ ] Android 13+ : l'app demande l'autorisation d'afficher des notifications.
+- [ ] Le guidage démarre en plein écran : instructions en haut, voix en français, barre en bas
+      avec temps restant, distance et heure d'arrivée.
+- [ ] Écran verrouillé, les instructions vocales continuent (iOS : pastille bleue ;
+      Android : notification « guidage en cours »).
+- [ ] « Arrêter » (ou le bouton retour Android) demande confirmation puis revient à l'aperçu.
+- [ ] À l'arrivée : écran « Vous êtes arrivé ! », notation en étoiles, « Publier un avis sur
+      Google » (ouvert dans l'app), « Nouvelle recherche » revient à l'accueil.
+- [ ] Mode vélo et voiture : le guidage démarre aussi ; « Transports » n'a pas de bouton Démarrer.
+
+Coût : chaque guidage appelle une fois `setDestinations` (facturé à la destination,
+1 000 gratuites par mois) ; les recalculs en cours de route ne sont pas refacturés.
+
 ## Règles Google respectées
 
 - Clé Places uniquement côté serveur ; photos servies via `/api/photo` (URL temporaire).
@@ -222,3 +247,5 @@ Coût : chaque aperçu interroge Routes API pour les 4 modes (mis en cache 5 min
   chaque avis (lien vers son profil Google).
 - Données Places affichées uniquement sur une carte Google (Navigation SDK).
 - Favoris : seul le `place_id` est stocké ; les infos sont rechargées depuis Google.
+- Guidage : conditions d'utilisation du Navigation SDK affichées avant le premier guidage,
+  aucune publicité pendant la navigation (`src/features/navigation/guidanceState.ts`).

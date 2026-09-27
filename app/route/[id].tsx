@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { type ComponentProps, useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlacesMap } from '@/src/components/PlacesMap';
@@ -84,8 +84,10 @@ export default function RoutePreviewScreen() {
 
   const onStart = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Branché sur le guidage intégré (Navigation SDK) à l'étape 4.
-    Alert.alert('Bientôt disponible', 'Le guidage vocal intégré arrive à la prochaine étape.');
+    router.push({
+      pathname: '/navigate/[id]',
+      params: { id: params.id, name: params.name, lat: params.lat, lng: params.lng, mode },
+    });
   };
 
   return (

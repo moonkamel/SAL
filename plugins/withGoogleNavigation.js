@@ -17,6 +17,11 @@ const DESUGAR_MARKER = '// @generated withGoogleNavigation desugaring';
 function withIosApiKey(config, apiKey) {
   config = withInfoPlist(config, (cfg) => {
     cfg.modResults[INFO_PLIST_KEY] = apiKey;
+    // Guidage vocal écran verrouillé : modes d'arrière-plan « location » et « audio ».
+    const modes = new Set(cfg.modResults.UIBackgroundModes ?? []);
+    modes.add('location');
+    modes.add('audio');
+    cfg.modResults.UIBackgroundModes = [...modes];
     return cfg;
   });
 
