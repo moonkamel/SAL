@@ -116,6 +116,16 @@ describe('ambiances', () => {
     expect(hasAmbiance({}, [])).toBe(true);
   });
 
+  it('lit l’accès fauteuil dans accessibilityOptions', () => {
+    expect(textSearchFieldMask(['accessible'])).toContain('places.accessibilityOptions');
+    expect(
+      ambianceOf({ id: 'x', accessibilityOptions: { wheelchairAccessibleEntrance: true } }),
+    ).toEqual(['accessible']);
+    expect(
+      ambianceOf({ id: 'x', accessibilityOptions: { wheelchairAccessibleEntrance: false } }),
+    ).toEqual([]);
+  });
+
   it('oriente la requête sans répéter un mot déjà présent', () => {
     expect(withAmbianceHints('bar calme', ['terrace', 'groups'])).toBe('bar calme terrasse');
     expect(withAmbianceHints('bar avec terrasse', ['terrace'])).toBe('bar avec terrasse');

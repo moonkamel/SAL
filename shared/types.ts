@@ -126,7 +126,14 @@ export interface RouteResponse {
 
 // --- Filtres d'ambiance (Google Places : champs « Atmosphere ») ---
 
-export type Ambiance = 'terrace' | 'liveMusic' | 'groups' | 'kids' | 'cocktails' | 'vegetarian';
+export type Ambiance =
+  | 'terrace'
+  | 'liveMusic'
+  | 'groups'
+  | 'kids'
+  | 'cocktails'
+  | 'vegetarian'
+  | 'accessible';
 
 export const AMBIANCE_LABELS: Record<Ambiance, string> = {
   terrace: 'Terrasse',
@@ -135,6 +142,7 @@ export const AMBIANCE_LABELS: Record<Ambiance, string> = {
   kids: 'Avec enfants',
   cocktails: 'Cocktails',
   vegetarian: 'Végétarien',
+  accessible: 'Accès fauteuil',
 };
 
 // --- V'Lille (vélos en libre-service, temps réel GBFS) ---
@@ -176,4 +184,33 @@ export interface TransitStop {
 
 export interface TransitResponse {
   stops: TransitStop[];
+}
+
+// --- Météo (Open-Meteo) et suggestions ---
+
+export type WeatherCondition = 'clear' | 'cloudy' | 'fog' | 'rain' | 'snow' | 'storm';
+
+export interface Weather {
+  temperature: number;
+  condition: WeatherCondition;
+  isDay: boolean;
+}
+
+/** Idée de sortie adaptée au temps qu'il fait, à lancer comme une recherche. */
+export interface Suggestion {
+  title: string;
+  subtitle: string;
+  query: string;
+  ambiance?: Ambiance[];
+}
+
+export interface WeatherResponse {
+  weather: Weather;
+  suggestion: Suggestion;
+}
+
+export interface SurpriseResponse {
+  place: PlaceSummary;
+  /** Pourquoi ce lieu, ex. « Ouvert · 4,6 ★ · 6 min à pied ». */
+  reason: string;
 }

@@ -8,8 +8,10 @@ import type {
   RouteResponse,
   SearchRequest,
   SearchResponse,
+  SurpriseResponse,
   TransitResponse,
   VlilleResponse,
+  WeatherResponse,
 } from '@/shared/types';
 
 /**
@@ -74,6 +76,20 @@ export function getVlille(near: LatLng, limit = 3, signal?: AbortSignal): Promis
 
 export function getTransit(near: LatLng, signal?: AbortSignal): Promise<TransitResponse> {
   return request<TransitResponse>(`/api/transit?near=${near.lat},${near.lng}`, { signal });
+}
+
+export function getWeather(near: LatLng, signal?: AbortSignal): Promise<WeatherResponse> {
+  return request<WeatherResponse>(`/api/weather?near=${near.lat},${near.lng}`, { signal });
+}
+
+export function getSurprise(near: LatLng, signal?: AbortSignal): Promise<SurpriseResponse> {
+  return request<SurpriseResponse>(`/api/surprise?near=${near.lat},${near.lng}`, { signal });
+}
+
+/** Lien public vers la fiche d'un lieu (web), si le backend est déployé. */
+export function placeWebUrl(id: string): string | undefined {
+  const configured = process.env.EXPO_PUBLIC_API_URL;
+  return configured ? `${configured.replace(/\/$/, '')}/place/${encodeURIComponent(id)}` : undefined;
 }
 
 export function photoUrl(photoName: string, width = 400): string {

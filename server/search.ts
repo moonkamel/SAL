@@ -35,8 +35,8 @@ export const SearchRequestSchema = z.object({
         .optional(),
       minRating: z.number().min(0).max(5).optional(),
       ambiance: z
-        .array(z.enum(['terrace', 'liveMusic', 'groups', 'kids', 'cocktails', 'vegetarian']))
-        .max(6)
+        .array(z.enum(['terrace', 'liveMusic', 'groups', 'kids', 'cocktails', 'vegetarian', 'accessible']))
+        .max(7)
         .optional(),
     })
     .optional(),

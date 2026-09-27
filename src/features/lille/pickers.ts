@@ -29,4 +29,5 @@ export const AMBIANCE_ICONS: Record<Ambiance, string> = {
   kids: 'happy',
   cocktails: 'wine',
   vegetarian: 'leaf',
+  accessible: 'accessibility',
 };

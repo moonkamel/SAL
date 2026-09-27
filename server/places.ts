@@ -50,6 +50,7 @@ const DETAILS_FIELD_MASK = [
   'goodForChildren',
   'servesCocktails',
   'servesVegetarianFood',
+  'accessibilityOptions',
 ].join(',');
 
 // Résumé pour la liste des favoris : pas d'avis, donc moins cher.
@@ -73,7 +74,14 @@ export const AMBIANCE_FIELDS: Record<Ambiance, keyof GooglePlace> = {
   kids: 'goodForChildren',
   cocktails: 'servesCocktails',
   vegetarian: 'servesVegetarianFood',
+  accessible: 'accessibilityOptions',
 };
+
+/** Lecture de la valeur Google pour une ambiance (l'accessibilité est un objet imbriqué). */
+function ambianceValue(place: GooglePlace, a: Ambiance): boolean | undefined {
+  if (a === 'accessible') return place.accessibilityOptions?.wheelchairAccessibleEntrance;
+  return place[AMBIANCE_FIELDS[a]] as boolean | undefined;
+}
 
 /** Masque Text Search : les champs d'ambiance ne sont demandés que s'ils sont filtrés. */
 export function textSearchFieldMask(ambiance: Ambiance[] = []): string {
@@ -141,12 +149,17 @@ interface GooglePlace {
   goodForChildren?: boolean;
   servesCocktails?: boolean;
   servesVegetarianFood?: boolean;
+  accessibilityOptions?: {
+    wheelchairAccessibleEntrance?: boolean;
+    wheelchairAccessibleSeating?: boolean;
+    wheelchairAccessibleRestroom?: boolean;
+  };
 }
 
 /** Ambiances que Google confirme (valeur `true`) pour ce lieu. */
 export function ambianceOf(place: GooglePlace): Ambiance[] {
   return (Object.keys(AMBIANCE_FIELDS) as Ambiance[]).filter(
-    (a) => place[AMBIANCE_FIELDS[a]] === true,
+    (a) => ambianceValue(place, a) === true,
   );
 }
 

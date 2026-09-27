@@ -6,8 +6,10 @@ import { type ComponentProps, useCallback, useEffect, useMemo, useState } from '
 import {
   ActivityIndicator,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -23,7 +25,7 @@ import { PlacesMap } from '@/src/components/PlacesMap';
 import { ReviewItem } from '@/src/components/ReviewItem';
 import { useFavorites } from '@/src/features/favorites/FavoritesProvider';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
-import { ApiRequestError, getPlace } from '@/src/lib/api';
+import { ApiRequestError, getPlace, placeWebUrl } from '@/src/lib/api';
 import { colors, font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import {
   formatDistance,
@@ -34,7 +36,24 @@ import {
   formatWalk,
 } from '@/shared/format';
 import { estimateWalkMinutes, haversineMeters } from '@/shared/geo';
+import { shareMessage } from '@/shared/share';
 import type { PlaceDetails } from '@/shared/types';
+
+/** Feuille de partage native (WhatsApp, SMS, Messenger…). */
+async function sharePlace(place: PlaceDetails) {
+  const url = placeWebUrl(place.id) ?? place.googleMapsUri;
+  try {
+    await Share.share(
+      // iOS affiche l'aperçu du lien à part ; Android n'utilise que le message.
+      Platform.OS === 'ios' && url
+        ? { message: shareMessage({ ...place, googleMapsUri: undefined }), url }
+        : { message: shareMessage(place, placeWebUrl(place.id)) },
+      { dialogTitle: `Partager ${place.name}` },
+    );
+  } catch {
+    // Partage annulé ou indisponible : rien à faire.
+  }
+}
 
 type State =
   | { kind: 'loading' }
@@ -42,7 +61,7 @@ type State =
   | { kind: 'done'; place: PlaceDetails };
 
 export default function PlaceScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, surprise } = useLocalSearchParams<{ id: string; surprise?: string }>();
   const insets = useSafeAreaInsets();
   const { coords, status } = useUserLocation();
   const { isFavorite, toggle } = useFavorites();
@@ -89,6 +108,22 @@ export default function PlaceScreen() {
         title: '',
         headerTransparent: true,
         headerRight: () => (
+          <View style={styles.headerActions}>
+            {state.kind === 'done' && (
+              <Pressable
+                onPress={() => void sharePlace(state.place)}
+                hitSlop={12}
+                style={styles.headerButton}
+                accessibilityRole="button"
+                accessibilityLabel="Partager ce lieu"
+              >
+                <Ionicons
+                  name={Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'}
+                  size={24}
+                  color={colors.text}
+                />
+              </Pressable>
+            )}
           <Pressable
             onPress={onToggleFavorite}
             hitSlop={12}
@@ -102,6 +137,7 @@ export default function PlaceScreen() {
               color={favorite ? colors.accent : colors.text}
             />
           </Pressable>
+          </View>
         ),
       }}
     />
@@ -135,6 +171,14 @@ export default function PlaceScreen() {
         <PhotoCarousel photos={p.photos} />
 
         <View style={styles.body}>
+          {surprise && (
+            <View style={styles.surprise} accessible accessibilityLabel={`Surprise : ${surprise}`}>
+              <Ionicons name="dice" size={16} color={colors.gold} />
+              <Text style={styles.surpriseText}>
+                Surprise ! <Text style={styles.surpriseReason}>{surprise}</Text>
+              </Text>
+            </View>
+          )}
           <Text style={styles.name}>{p.name}</Text>
 
           <View style={styles.row}>
@@ -280,6 +324,19 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   center: { alignItems: 'center', justifyContent: 'center', gap: spacing.lg, padding: spacing.xl },
   message: { color: colors.text, fontSize: font.body, textAlign: 'center' },
+  headerActions: { flexDirection: 'row', gap: spacing.sm },
+  surprise: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(230, 180, 90, 0.12)',
+  },
+  surpriseText: { color: colors.gold, fontSize: font.small, fontWeight: '800' },
+  surpriseReason: { color: colors.text, fontWeight: '600' },
   headerButton: {
     width: 44,
     height: 44,

@@ -41,9 +41,19 @@ AdMob (react-native-google-mobile-ads) · Claude (reformulation optionnelle).
   exige une clé, créez un compte sur <https://data.lillemetropole.fr> et renseignez
   `MEL_API_KEY` côté serveur.
 - **Filtres d'ambiance** : terrasse, musique live, en groupe, avec enfants, cocktails,
-  végétarien (panneau « Filtres », ou déduits de la phrase par Claude). Seuls les lieux
+  végétarien, **accès fauteuil** (entrée accessible en fauteuil roulant) (panneau « Filtres », ou déduits de la phrase par Claude). Seuls les lieux
   pour lesquels Google confirme l'ambiance sont gardés. Ces champs Google ne sont demandés
   **que** lorsqu'un filtre d'ambiance est actif (tranche Places plus chère).
+- **Surprends-moi** (accueil) : tire au sort un lieu **ouvert**, noté au moins 4,2 ★
+  (30 avis minimum), à moins de 1,5 km (puis 3 km), choisi selon l'heure de Lille
+  (café le matin, estaminet le soir, bar la nuit…) et la météo. Jamais un lieu sponsorisé.
+  Au plus 4 recherches Google par tirage (mises en cache 5 min).
+- **Suggestions météo** (accueil) : température et idée de sortie selon le temps
+  (pluie → estaminet ou salon de thé, soleil et 17 °C ou plus → bars en terrasse).
+  Données Open-Meteo, gratuites et sans clé, mises en cache 10 min (`OPEN_METEO_URL`).
+- **Partager un lieu** (bouton en haut de la fiche) : WhatsApp, SMS… avec le nom,
+  l'adresse, la note et le lien Google Maps (ou le lien web de l'app si
+  `EXPO_PUBLIC_API_URL` est défini).
 
 ### Choix techniques validés
 
@@ -92,6 +102,8 @@ shared/              types, géo et formatage communs à l'app et au serveur
 src/                 composants, localisation, historique, favoris, thème
   features/ads/      consentement UMP + ATT, bannière, pub native, interstitiel, règles
   features/navigation/  guidage (Navigation SDK), état « guidage actif »
+  features/lille/    V’Lille, Ilévia, pastilles d’ambiance
+  features/moment/   Surprends-moi, carte météo
 tests/               tests unitaires (vitest)
 ```
 
@@ -350,6 +362,20 @@ Il faut **refaire un build** (`npm run build:dev:android`) : AdMob ajoute du cod
 - [ ] Sponsorisé : copiez `server/sponsored.example.json` dans `server/sponsored.json`,
       mettez des dates qui incluent aujourd'hui, relancez `npm start` et cherchez
       « sushi » : le lieu apparaît en tête avec le badge « Sponsorisé ».
+
+## 8 bis. Checklist : Surprends-moi, météo, accessibilité, partage
+
+Pas besoin de nouveau build (aucun module natif ajouté) : relancez simplement `npm start`.
+
+- [ ] Accueil : la température s'affiche à côté de « … SOIR · LILLE », et une carte
+      météo propose une idée ; un appui lance la recherche (avec le filtre « Terrasse »
+      s'il fait beau).
+- [ ] « Surprends-moi » : ouvre la fiche d'un lieu ouvert et bien noté, avec la pastille
+      « Surprise ! Ouvert · 4,5 ★ · ~8 min à pied ». Un 2e appui donne souvent un autre lieu.
+- [ ] Filtres → « Accès fauteuil » : seuls les lieux dont l'entrée est accessible restent.
+      La phrase « resto accessible en fauteuil » active aussi ce filtre (si Claude est actif).
+- [ ] Fiche d'un lieu → icône partage : la feuille de partage s'ouvre, le message contient
+      le nom, l'adresse et un lien qui ouvre Google Maps.
 
 ## 9. Avant la publication sur les stores
 
