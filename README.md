@@ -13,8 +13,8 @@ Stack : Expo SDK 57 (React Native 0.86, New Architecture) · TypeScript · Expo 
 | Étape | Contenu | État |
 | --- | --- | --- |
 | 0 | Socle : Expo Router, thème sombre, localisation, EAS | ✅ à tester sur téléphone |
-| 1 | Recherche + liste de résultats + filtres + historique | ✅ à tester sur téléphone |
-| 2 | Fiche lieu + carte (MapView du Navigation SDK) + favoris | ⏳ |
+| 1 | Recherche + liste de résultats + filtres + historique | ✅ testé avec les vraies données Google, à tester sur téléphone |
+| 2 | Fiche lieu + carte (MapView du Navigation SDK) + favoris | ✅ à tester sur téléphone (nouveau build nécessaire) |
 | 3 | Aperçu d'itinéraire (Routes API) | ⏳ |
 | 4 | Navigation guidée intégrée (Google Navigation SDK) | ⏳ |
 | 5 | Publicité AdMob + consentement + lieux sponsorisés | ⏳ |
@@ -39,9 +39,13 @@ Stack : Expo SDK 57 (React Native 0.86, New Architecture) · TypeScript · Expo 
 ```
 app/                 écrans (Expo Router) + routes API (*+api.ts)
   index.tsx          accueil : accroche, recherche, suggestions, historique
-  results.tsx        résultats : liste, filtres
+  results.tsx        résultats : liste / carte, filtres
+  place/[id].tsx     fiche lieu : photos, infos, horaires, avis, favori, « Y aller »
+  favorites.tsx      favoris (seuls les place_id sont stockés)
   api/search+api.ts  POST /api/search → reformulation + Places Text Search + classement
+  api/place/[id]+api.ts GET /api/place/:id → Place Details (avis) ou résumé (?fields=summary)
   api/photo+api.ts   GET  /api/photo  → photo Google sans exposer la clé
+plugins/withGoogleNavigation.js  plugin Expo : clés Maps, désugarage Android, Jetifier
 server/              logique backend (testable seule)
   places.ts          client Places API (New)
   rewrite.ts         reformulation par Claude (optionnelle)
@@ -92,6 +96,25 @@ requête Places plus des filtres (type, ouvert maintenant, prix).
 
 La procédure (application AdMob, blocs d'annonces, IDs de test, consentement UMP) sera
 détaillée à l'étape 5.
+
+### Clés Maps de l'application (étape 2+)
+
+La carte utilise le Navigation SDK : il faut une clé **embarquée dans l'app**, distincte de
+la clé serveur.
+
+1. Dans Google Cloud, activez aussi **Navigation SDK**, **Maps SDK for Android** et
+   **Maps SDK for iOS**.
+2. Créez une clé **Android** : restriction d'application « Applications Android », package
+   `fr.sortiralille.app` + empreinte SHA-1 (affichée par `eas credentials` → Android →
+   development → Keystore). Restriction d'API : Navigation SDK + Maps SDK for Android.
+3. (iPhone) Créez une clé **iOS** : restriction « Applications iOS », bundle ID
+   `fr.sortiralille.app`. Restriction d'API : Navigation SDK + Maps SDK for iOS.
+4. Déclarez-les dans EAS (elles sont lues au moment du build, dans le cloud) :
+   ```bash
+   eas env:create --environment development --name GOOGLE_MAPS_ANDROID_API_KEY --value "AIza..." --visibility sensitive
+   eas env:create --environment development --name GOOGLE_MAPS_IOS_API_KEY --value "AIza..." --visibility sensitive
+   ```
+   Refaites la même chose pour `preview` et `production` le moment venu.
 
 ## 2. Configuration locale
 
@@ -158,11 +181,28 @@ production.
       cohérents. Le bandeau ramène aux réglages.
 - [ ] En mode avion : message d'erreur en français et bouton « Réessayer ».
 
+## 5. Checklist de test : étape 2
+
+Il faut **refaire un build** (`npm run build:dev:android`) : la carte ajoute du code natif.
+
+- [ ] Dans les résultats, le bouton « Carte » affiche une carte Google sombre avec une épingle
+      par lieu et votre position (point bleu).
+- [ ] Toucher une épingle affiche le nom, puis la carte du lieu en bas ; la toucher ouvre la fiche.
+- [ ] La fiche affiche les photos (glisser pour les faire défiler, crédit du photographe),
+      la note, le prix, Ouvert/Fermé (toucher pour voir les horaires de la semaine),
+      la distance, l'adresse, le téléphone, le site web (ouvert dans l'app), une petite carte.
+- [ ] 2 à 3 avis récents avec auteur, note, date relative ; « Lire la suite » déplie les longs avis.
+- [ ] Le cœur en haut à droite ajoute le lieu aux favoris ; « Favoris » sur l'accueil le liste,
+      y compris après redémarrage de l'app.
+- [ ] « Y aller » affiche « Bientôt disponible » (branché à l'étape 3).
+
 ## Règles Google respectées
 
 - Clé Places uniquement côté serveur ; photos servies via `/api/photo` (URL temporaire).
 - Aucune donnée Places stockée durablement : cache mémoire de 5 minutes côté serveur,
   historique local limité aux requêtes tapées. Les favoris (étape 2) ne conserveront que
   le `place_id`.
-- Attribution « Google Maps » sous les listes et crédit des auteurs des photos.
-- Données Places affichées sur une carte Google uniquement (étape 2).
+- Attribution « Google Maps » sous les listes, crédit des auteurs des photos, auteur de
+  chaque avis (lien vers son profil Google).
+- Données Places affichées uniquement sur une carte Google (Navigation SDK).
+- Favoris : seul le `place_id` est stocké ; les infos sont rechargées depuis Google.

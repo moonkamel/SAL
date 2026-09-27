@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 
-import type { ApiError, SearchRequest, SearchResponse } from '@/shared/types';
+import type { ApiError, PlaceDetails, SearchRequest, SearchResponse } from '@/shared/types';
 
 /**
  * Origine du backend :
@@ -38,6 +38,15 @@ export function searchPlaces(body: SearchRequest, signal?: AbortSignal): Promise
     body: JSON.stringify(body),
     signal,
   });
+}
+
+export function getPlace(
+  id: string,
+  mode: 'full' | 'summary' = 'full',
+  signal?: AbortSignal,
+): Promise<PlaceDetails> {
+  const query = mode === 'summary' ? '?fields=summary' : '';
+  return request<PlaceDetails>(`/api/place/${encodeURIComponent(id)}${query}`, { signal });
 }
 
 export function photoUrl(photoName: string, width = 400): string {

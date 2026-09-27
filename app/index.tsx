@@ -37,6 +37,18 @@ export default function HomeScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
+          <View style={styles.topBar}>
+            <Pressable
+              onPress={() => router.push('/favorites')}
+              style={({ pressed }) => [styles.favButton, pressed && { opacity: 0.75 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Mes favoris"
+            >
+              <Ionicons name="heart" size={20} color={colors.accent} />
+              <Text style={styles.favText}>Favoris</Text>
+            </Pressable>
+          </View>
+
           <Text style={styles.hero}>Qu’est-ce qu’on fait ce soir à Lille ?</Text>
 
           <SearchBar onSubmit={search} />
@@ -84,7 +96,18 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.xl, paddingTop: spacing.xxl * 2, gap: spacing.xl },
+  content: { padding: spacing.xl, paddingTop: spacing.lg, gap: spacing.xl },
+  topBar: { flexDirection: 'row', justifyContent: 'flex-end' },
+  favButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    minHeight: TOUCH_TARGET,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 999,
+    backgroundColor: colors.surface,
+  },
+  favText: { color: colors.text, fontSize: font.small + 1, fontWeight: '600' },
   hero: {
     color: colors.text,
     fontSize: font.hero,

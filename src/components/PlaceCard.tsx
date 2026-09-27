@@ -17,9 +17,11 @@ import type { PlaceSummary } from '@/shared/types';
 interface Props {
   place: PlaceSummary;
   onPress?: () => void;
+  /** Version réduite (photo plus basse), pour la carte. */
+  compact?: boolean;
 }
 
-export function PlaceCard({ place, onPress }: Props) {
+export function PlaceCard({ place, onPress, compact }: Props) {
   const photoAuthor = place.photo?.attributions[0]?.displayName;
 
   return (
@@ -34,14 +36,14 @@ export function PlaceCard({ place, onPress }: Props) {
         {place.photo ? (
           <Image
             source={{ uri: photoUrl(place.photo.name, 800) }}
-            style={styles.photo}
+            style={[styles.photo, compact && styles.photoCompact]}
             contentFit="cover"
             transition={150}
             cachePolicy="memory"
             accessibilityIgnoresInvertColors
           />
         ) : (
-          <View style={[styles.photo, styles.photoPlaceholder]}>
+          <View style={[styles.photo, compact && styles.photoCompact, styles.photoPlaceholder]}>
             <Ionicons name="image-outline" size={32} color={colors.textFaint} />
           </View>
         )}
@@ -112,6 +114,7 @@ const styles = StyleSheet.create({
   },
   photoWrap: { position: 'relative' },
   photo: { width: '100%', height: 160, backgroundColor: colors.surfaceRaised },
+  photoCompact: { height: 100 },
   photoPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   photoCredit: {
     position: 'absolute',

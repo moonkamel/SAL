@@ -8,6 +8,11 @@ const ANDROID_PACKAGE = process.env.ANDROID_PACKAGE ?? 'fr.sortiralille.app';
 // En développement, l'app interroge directement le serveur Metro.
 const API_ORIGIN = process.env.EXPO_PUBLIC_API_URL;
 
+// Clés Maps / Navigation SDK embarquées dans l'app, restreintes au bundle ID / package.
+// À définir dans les variables d'environnement EAS (voir README).
+const GOOGLE_MAPS_IOS_API_KEY = process.env.GOOGLE_MAPS_IOS_API_KEY;
+const GOOGLE_MAPS_ANDROID_API_KEY = process.env.GOOGLE_MAPS_ANDROID_API_KEY;
+
 const LOCATION_WHEN_IN_USE =
   'Sortir à Lille utilise votre position pour vous proposer les lieux les plus proches et calculer le trajet pour y aller.';
 
@@ -55,6 +60,11 @@ const config: ExpoConfig = {
       },
     ],
     'expo-system-ui',
+    'expo-web-browser',
+    [
+      './plugins/withGoogleNavigation',
+      { iosApiKey: GOOGLE_MAPS_IOS_API_KEY, androidApiKey: GOOGLE_MAPS_ANDROID_API_KEY },
+    ],
     [
       'expo-splash-screen',
       {
