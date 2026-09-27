@@ -51,6 +51,7 @@ const DETAILS_FIELD_MASK = [
   'servesCocktails',
   'servesVegetarianFood',
   'accessibilityOptions',
+  'types',
 ].join(',');
 
 // Résumé pour la liste des favoris : pas d'avis, donc moins cher.
@@ -154,6 +155,7 @@ interface GooglePlace {
     wheelchairAccessibleSeating?: boolean;
     wheelchairAccessibleRestroom?: boolean;
   };
+  types?: string[];
 }
 
 /** Ambiances que Google confirme (valeur `true`) pour ce lieu. */
@@ -302,6 +304,7 @@ export function mapDetails(place: GooglePlace, now: Date = new Date()): PlaceDet
     website: place.websiteUri,
     googleMapsUri: place.googleMapsUri,
     reviews: pickRecentReviews(place.reviews),
+    types: place.types,
   };
 }
 

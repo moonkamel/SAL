@@ -92,6 +92,24 @@ export interface PlaceDetails {
   reviews: Review[];
   /** Ambiances confirmées par Google (fiche complète). */
   ambiance?: Ambiance[];
+  /** Types Google (restaurant, bar, night_club…), fiche complète. */
+  types?: string[];
+  /** Liens partenaires (réservation, billetterie, VTC), ajoutés par /api/place. */
+  partnerLinks?: PartnerLink[];
+}
+
+export type PartnerKind = 'booking' | 'tickets' | 'ride' | 'delivery';
+
+/** Lien d'affiliation, toujours signalé comme « lien partenaire » dans l'app. */
+export interface PartnerLink {
+  id: string;
+  kind: PartnerKind;
+  /** Libellé du bouton, ex. « Réserver une table ». */
+  label: string;
+  /** Nom du partenaire affiché sous le bouton. */
+  partner: string;
+  /** Chemin relatif vers /api/go (compte le clic puis redirige). */
+  path: string;
 }
 
 export interface SearchResponse {

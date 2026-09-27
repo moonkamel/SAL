@@ -97,6 +97,7 @@ server/              logique backend (testable seule)
   routes.ts          client Routes API (aperçu d'itinéraire)
   sponsored.ts       sélection des lieux sponsorisés (dates, zone, mots-clés)
   sponsored.json     campagnes actives (voir « Lieux sponsorisés »)
+  affiliates.json    liens partenaires (voir « Liens d'affiliation »)
   search.ts          orchestration
 shared/              types, géo et formatage communs à l'app et au serveur
 src/                 composants, localisation, historique, favoris, thème
@@ -228,6 +229,45 @@ limite de **2 par recherche** et **seulement s'il respecte les filtres** choisis
 
 Modifier le fichier demande un redéploiement du backend ; une base de données
 (ex. Supabase) sera plus pratique quand il y aura plusieurs annonceurs.
+
+### Liens d'affiliation (réservation, billetterie, VTC)
+
+La fiche d'un lieu peut afficher une carte **« Réserver et y aller »** avec jusqu'à
+3 liens partenaires (un par type : réservation, billets, livraison, VTC), toujours suivis
+de la mention « Liens partenaires : Sortir à Lille peut toucher une commission ».
+
+1. **Inscrivez-vous** aux programmes d'affiliation qui vous intéressent : réservation de
+   restaurant, billetterie de soirées ou concerts, VTC. Certains ont leur propre programme,
+   d'autres passent par des plateformes d'affiliation. Chaque programme vous donne un
+   **identifiant** et un **format de lien** (lisez leurs conditions : certains interdisent
+   les liens dans une app, ou exigent un lien direct par établissement).
+2. Copiez `server/affiliates.example.json` dans `server/affiliates.json` et remplacez les
+   exemples par les vrais liens :
+
+```jsonc
+{
+  "id": "reservation",                 // minuscules, chiffres, tirets
+  "kind": "booking",                   // booking | tickets | ride | delivery
+  "label": "Réserver une table",       // texte du bouton
+  "partner": "Nom du partenaire",      // affiché sous le bouton
+  // Modèle d'URL (https obligatoire). Variables : {name} {address} {lat} {lng} {placeId} {city}
+  "urlTemplate": "https://partenaire.fr/recherche?q={name}&aff=VOTRE_ID",
+  "placeTypes": ["restaurant"],        // types Google concernés ; absent = tous les lieux
+  "places": {                          // liens directs par place_id (prioritaires)
+    "ChIJ…": "https://partenaire.fr/restaurant/123?aff=VOTRE_ID"
+  },
+  "active": true                       // false pour couper sans supprimer
+}
+```
+
+Sans `urlTemplate`, le partenaire n'apparaît que pour les lieux listés dans `places`
+(pratique pour ne proposer la réservation que chez les restaurants inscrits).
+
+Chaque clic passe par `/api/go`, qui écrit une ligne `[affiliate-click]` dans les journaux
+du serveur (partenaire, lieu, heure : aucune donnée personnelle) puis redirige vers le
+partenaire. Vous pouvez ainsi comparer vos clics avec les commissions du partenaire.
+L'adresse de destination est toujours reconstruite à partir de `affiliates.json` :
+personne ne peut détourner `/api/go` vers un autre site.
 
 ## 2. Configuration locale
 
@@ -377,6 +417,17 @@ Pas besoin de nouveau build (aucun module natif ajouté) : relancez simplement `
 - [ ] Fiche d'un lieu → icône partage : la feuille de partage s'ouvre, le message contient
       le nom, l'adresse et un lien qui ouvre Google Maps.
 
+## 8 ter. Checklist : liens d'affiliation
+
+- [ ] Copiez `server/affiliates.example.json` dans `server/affiliates.json` et relancez
+      `npm start`.
+- [ ] Fiche d'un restaurant : la carte « Réserver et y aller » affiche « Réserver une
+      table » et « Commander un VTC », avec la mention « Liens partenaires ».
+- [ ] Fiche d'un bar ou d'une boîte : « Soirées et billets » apparaît.
+- [ ] « Commander un VTC » ouvre Uber (ou son site) avec le lieu comme destination.
+- [ ] Remettez `[]` dans `server/affiliates.json` tant que vous n'avez pas de vrais
+      identifiants partenaires (les liens d'exemple ne mènent nulle part).
+
 ## 9. Avant la publication sur les stores
 
 - [ ] Clés Google **séparées** : clé serveur (Places + Routes, sans restriction d'app) et
@@ -389,6 +440,8 @@ Pas besoin de nouveau build (aucun module natif ajouté) : relancez simplement `
 - [ ] Vrais IDs AdMob, message RGPD publié, app-ads.txt en ligne.
 - [ ] Justification de la localisation écran verrouillé dans les fiches App Store / Google Play.
 - [ ] Politique de confidentialité (position, publicité, identifiant publicitaire).
+- [ ] Liens d'affiliation : vrais identifiants partenaires, conditions de chaque programme
+      respectées, mention des commissions dans les CGU et la fiche store.
 
 ## Règles Google respectées
 
