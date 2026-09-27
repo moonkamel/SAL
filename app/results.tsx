@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,6 +16,10 @@ import { countActiveFilters, FilterSheet } from '@/src/components/FilterSheet';
 import { GoogleAttribution } from '@/src/components/GoogleAttribution';
 import { LocationBanner } from '@/src/components/LocationBanner';
 import { PlaceCard } from '@/src/components/PlaceCard';
+import { ResultsMap } from '@/src/components/ResultsMap';
+import { useAds } from '@/src/features/ads/AdsProvider';
+import { NativeAdCard } from '@/src/features/ads/NativeAdCard';
+import { withAdSlots } from '@/src/features/ads/policy';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { ApiRequestError, searchPlaces } from '@/src/lib/api';
 import { colors, font, radius, spacing, TOUCH_TARGET } from '@/src/theme';
@@ -30,11 +34,15 @@ export default function ResultsScreen() {
   const { q } = useLocalSearchParams<{ q: string }>();
   const query = (q ?? '').trim();
   const { refresh } = useUserLocation();
+  const { canRequestAds } = useAds();
 
   const [filters, setFilters] = useState<SearchFilters>({});
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
+  const [view, setView] = useState<'list' | 'map'>('list');
+
+  const openPlace = (id: string) => router.push({ pathname: '/place/[id]', params: { id } });
   const abortRef = useRef<AbortController | null>(null);
 
   const run = useCallback(async () => {
@@ -85,6 +93,20 @@ export default function ResultsScreen() {
           selected={activeCount > 0}
           onPress={() => setFiltersVisible(true)}
         />
+        <View style={{ flex: 1 }} />
+        <Pressable
+          onPress={() => setView(view === 'list' ? 'map' : 'list')}
+          style={({ pressed }) => [styles.toggle, pressed && { opacity: 0.75 }]}
+          accessibilityRole="button"
+          accessibilityLabel={view === 'list' ? 'Afficher la carte' : 'Afficher la liste'}
+        >
+          <Ionicons
+            name={view === 'list' ? 'map-outline' : 'list-outline'}
+            size={20}
+            color={colors.text}
+          />
+          <Text style={styles.toggleText}>{view === 'list' ? 'Carte' : 'Liste'}</Text>
+        </Pressable>
       </View>
 
       {state.kind === 'loading' && (
@@ -111,13 +133,23 @@ export default function ResultsScreen() {
         </View>
       )}
 
-      {state.kind === 'done' && (
+      {state.kind === 'done' && view === 'map' && (
+        <ResultsMap places={state.places} onOpen={openPlace} />
+      )}
+
+      {state.kind === 'done' && view === 'list' && (
         <FlatList
-          data={state.places}
-          keyExtractor={(p) => p.id}
+          data={withAdSlots(state.places, canRequestAds)}
+          keyExtractor={(item) => (item.type === 'ad' ? item.key : item.place.id)}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
-          renderItem={({ item }) => <PlaceCard place={item} />}
+          renderItem={({ item }) =>
+            item.type === 'ad' ? (
+              <NativeAdCard />
+            ) : (
+              <PlaceCard place={item.place} onPress={() => openPlace(item.place.id)} />
+            )
+          }
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
           }
@@ -160,6 +192,16 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   list: { padding: spacing.lg, paddingTop: 0 },
+  toggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    minHeight: TOUCH_TARGET - 4,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceRaised,
+  },
+  toggleText: { color: colors.text, fontSize: font.small + 1, fontWeight: '600' },
   center: {
     flex: 1,
     alignItems: 'center',

@@ -56,6 +56,38 @@ export interface PlaceSummary {
   score: number;
 }
 
+export interface Review {
+  authorName: string;
+  /** Profil Google Maps de l'auteur (à lier depuis son nom). */
+  authorUri?: string;
+  authorPhotoUri?: string;
+  rating: number;
+  /** « il y a 2 semaines », fourni par Google. */
+  relativeTime: string;
+  publishTime?: string;
+  text: string;
+}
+
+/** Fiche lieu complète (Place Details), jamais stockée durablement. */
+export interface PlaceDetails {
+  id: string;
+  name: string;
+  address: string;
+  location: LatLng;
+  rating?: number;
+  userRatingCount?: number;
+  priceLevel?: PriceLevel;
+  opening?: OpeningStatus;
+  /** Horaires de la semaine, ex. « lundi: 12:00 – 14:00, 19:00 – 22:30 ». */
+  weekdayHours?: string[];
+  photos: PhotoRef[];
+  phone?: string;
+  website?: string;
+  googleMapsUri?: string;
+  /** Les 3 avis les plus récents (vide en mode résumé). */
+  reviews: Review[];
+}
+
 export interface SearchResponse {
   places: PlaceSummary[];
   /** Requête réellement envoyée à Google (après reformulation éventuelle). */
@@ -65,4 +97,23 @@ export interface SearchResponse {
 
 export interface ApiError {
   error: string;
+}
+
+/** Modes proposés. Le guidage (étape 4) ne couvre pas les transports en commun. */
+export type TravelMode = 'walk' | 'bicycle' | 'drive' | 'transit';
+
+export interface RouteOption {
+  mode: TravelMode;
+  /** Faux si Google ne propose pas d'itinéraire pour ce mode (ex. pas de transport). */
+  available: boolean;
+  durationSeconds?: number;
+  distanceMeters?: number;
+  /** Tracé encodé (Encoded Polyline Algorithm), à décoder avec shared/polyline. */
+  polyline?: string;
+  /** Transports : lignes empruntées, ex. « Métro 1 », « Tram R ». */
+  transitLines?: string[];
+}
+
+export interface RouteResponse {
+  options: RouteOption[];
 }

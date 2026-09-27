@@ -1,7 +1,14 @@
 // Client minimal pour Google Places API (New). Utilisé uniquement côté serveur :
 // la clé GOOGLE_PLACES_API_KEY n'est jamais envoyée à l'application.
 
-import type { LatLng, OpeningStatus, PhotoRef, PriceLevel } from '@/shared/types';
+import type {
+  LatLng,
+  OpeningStatus,
+  PhotoRef,
+  PlaceDetails,
+  PriceLevel,
+  Review,
+} from '@/shared/types';
 
 const PLACES_BASE = 'https://places.googleapis.com/v1';
 
@@ -19,6 +26,40 @@ const TEXT_SEARCH_FIELD_MASK = [
   'places.currentOpeningHours',
   'places.photos',
 ].join(',');
+
+// Fiche lieu : ajoute les avis (tranche « Atmosphere »), les horaires de la semaine
+// et les contacts. Appelé seulement quand l'utilisateur ouvre une fiche.
+const DETAILS_FIELD_MASK = [
+  'id',
+  'displayName',
+  'formattedAddress',
+  'location',
+  'rating',
+  'userRatingCount',
+  'priceLevel',
+  'currentOpeningHours',
+  'photos',
+  'reviews',
+  'nationalPhoneNumber',
+  'websiteUri',
+  'googleMapsUri',
+].join(',');
+
+// Résumé pour la liste des favoris : pas d'avis, donc moins cher.
+const SUMMARY_FIELD_MASK = [
+  'id',
+  'displayName',
+  'formattedAddress',
+  'location',
+  'rating',
+  'userRatingCount',
+  'priceLevel',
+  'currentOpeningHours',
+  'photos',
+].join(',');
+
+const MAX_DETAIL_PHOTOS = 6;
+const MAX_REVIEWS = 3;
 
 export class PlacesError extends Error {
   constructor(
@@ -42,6 +83,15 @@ interface GooglePhoto {
   authorAttributions?: { displayName?: string; uri?: string }[];
 }
 
+interface GoogleReview {
+  rating?: number;
+  relativePublishTimeDescription?: string;
+  publishTime?: string;
+  text?: { text?: string };
+  originalText?: { text?: string };
+  authorAttribution?: { displayName?: string; uri?: string; photoUri?: string };
+}
+
 interface GooglePlace {
   id: string;
   displayName?: { text: string };
@@ -54,8 +104,13 @@ interface GooglePlace {
     openNow?: boolean;
     nextOpenTime?: string;
     nextCloseTime?: string;
+    weekdayDescriptions?: string[];
   };
   photos?: GooglePhoto[];
+  reviews?: GoogleReview[];
+  nationalPhoneNumber?: string;
+  websiteUri?: string;
+  googleMapsUri?: string;
 }
 
 export interface RawPlace {
@@ -140,6 +195,32 @@ export function toOpeningStatus(
   };
 }
 
+function mapPhoto(photo: GooglePhoto): PhotoRef {
+  return {
+    name: photo.name,
+    attributions: (photo.authorAttributions ?? [])
+      .filter((a) => a.displayName)
+      .map((a) => ({ displayName: a.displayName!, uri: a.uri })),
+  };
+}
+
+/** Les avis les plus récents d'abord, limités à MAX_REVIEWS, sans avis vides. */
+export function pickRecentReviews(reviews: GoogleReview[] | undefined): Review[] {
+  return (reviews ?? [])
+    .filter((r) => r.authorAttribution?.displayName && (r.text?.text || r.originalText?.text))
+    .sort((a, b) => (b.publishTime ?? '').localeCompare(a.publishTime ?? ''))
+    .slice(0, MAX_REVIEWS)
+    .map((r) => ({
+      authorName: r.authorAttribution!.displayName!,
+      authorUri: r.authorAttribution!.uri,
+      authorPhotoUri: r.authorAttribution!.photoUri,
+      rating: r.rating ?? 0,
+      relativeTime: r.relativePublishTimeDescription ?? '',
+      publishTime: r.publishTime,
+      text: (r.text?.text ?? r.originalText?.text)!,
+    }));
+}
+
 export function mapPlace(place: GooglePlace, now: Date = new Date()): RawPlace | null {
   if (!place.location || !place.displayName?.text) return null;
   const photo = place.photos?.[0];
@@ -152,14 +233,22 @@ export function mapPlace(place: GooglePlace, now: Date = new Date()): RawPlace |
     userRatingCount: place.userRatingCount,
     priceLevel: place.priceLevel ? PRICE_FROM_GOOGLE[place.priceLevel] : undefined,
     opening: toOpeningStatus(place.currentOpeningHours, now),
-    photo: photo
-      ? {
-          name: photo.name,
-          attributions: (photo.authorAttributions ?? [])
-            .filter((a) => a.displayName)
-            .map((a) => ({ displayName: a.displayName!, uri: a.uri })),
-        }
-      : undefined,
+    photo: photo ? mapPhoto(photo) : undefined,
+  };
+}
+
+export function mapDetails(place: GooglePlace, now: Date = new Date()): PlaceDetails | null {
+  const base = mapPlace(place, now);
+  if (!base) return null;
+  const { photo: _photo, ...rest } = base;
+  return {
+    ...rest,
+    weekdayHours: place.currentOpeningHours?.weekdayDescriptions,
+    photos: (place.photos ?? []).slice(0, MAX_DETAIL_PHOTOS).map(mapPhoto),
+    phone: place.nationalPhoneNumber,
+    website: place.websiteUri,
+    googleMapsUri: place.googleMapsUri,
+    reviews: pickRecentReviews(place.reviews),
   };
 }
 
@@ -207,6 +296,34 @@ export async function textSearch(params: TextSearchParams): Promise<RawPlace[]> 
   const json = (await res.json()) as { places?: GooglePlace[] };
   const now = new Date();
   return (json.places ?? []).map((p) => mapPlace(p, now)).filter((p): p is RawPlace => p !== null);
+}
+
+export const PLACE_ID_PATTERN = /^[A-Za-z0-9_-]{10,300}$/;
+
+export async function placeDetails(
+  id: string,
+  mode: 'full' | 'summary',
+): Promise<PlaceDetails> {
+  if (!PLACE_ID_PATTERN.test(id)) throw new PlacesError('Identifiant de lieu invalide', 400);
+
+  const url = new URL(`${PLACES_BASE}/places/${id}`);
+  url.searchParams.set('languageCode', 'fr');
+  url.searchParams.set('regionCode', 'FR');
+
+  const res = await fetch(url, {
+    headers: {
+      'X-Goog-Api-Key': apiKey(),
+      'X-Goog-FieldMask': mode === 'full' ? DETAILS_FIELD_MASK : SUMMARY_FIELD_MASK,
+    },
+  });
+  if (res.status === 404) throw new PlacesError('Lieu introuvable', 404);
+  if (!res.ok) {
+    console.error('[places] Place Details a échoué', res.status, await res.text());
+    throw new PlacesError('Impossible de charger ce lieu', 502);
+  }
+  const details = mapDetails((await res.json()) as GooglePlace);
+  if (!details) throw new PlacesError('Lieu introuvable', 404);
+  return details;
 }
 
 /**

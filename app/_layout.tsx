@@ -2,7 +2,10 @@ import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AdsProvider } from '@/src/features/ads/AdsProvider';
+import { FavoritesProvider } from '@/src/features/favorites/FavoritesProvider';
 import { LocationProvider } from '@/src/features/location/LocationProvider';
+import { AppNavigationProvider } from '@/src/features/navigation/AppNavigationProvider';
 import { colors } from '@/src/theme';
 
 const theme = {
@@ -21,21 +24,38 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider value={theme}>
-        <LocationProvider>
-          <StatusBar style="light" />
-          <Stack
-            screenOptions={{
-              headerTintColor: colors.text,
-              headerStyle: { backgroundColor: colors.background },
-              headerShadowVisible: false,
-              headerBackButtonDisplayMode: 'minimal',
-              contentStyle: { backgroundColor: colors.background },
-            }}
-          >
-            <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="results" options={{ title: 'Résultats' }} />
-          </Stack>
-        </LocationProvider>
+        <AppNavigationProvider>
+          <LocationProvider>
+            <FavoritesProvider>
+              <AdsProvider>
+                <StatusBar style="light" />
+                <Stack
+                  screenOptions={{
+                    headerTintColor: colors.text,
+                    headerStyle: { backgroundColor: colors.background },
+                    headerShadowVisible: false,
+                    headerBackButtonDisplayMode: 'minimal',
+                    contentStyle: { backgroundColor: colors.background },
+                  }}
+                >
+                  <Stack.Screen name="index" options={{ headerShown: false }} />
+                  <Stack.Screen name="results" options={{ title: 'Résultats' }} />
+                  <Stack.Screen name="place/[id]" options={{ title: '' }} />
+                  <Stack.Screen name="favorites" options={{ title: 'Favoris' }} />
+                  <Stack.Screen name="route/[id]" options={{ title: 'Itinéraire' }} />
+                  <Stack.Screen
+                    name="navigate/[id]"
+                    options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }}
+                  />
+                  <Stack.Screen
+                    name="arrived/[id]"
+                    options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }}
+                  />
+                </Stack>
+              </AdsProvider>
+            </FavoritesProvider>
+          </LocationProvider>
+        </AppNavigationProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
