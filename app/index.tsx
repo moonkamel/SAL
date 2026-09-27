@@ -1,5 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import type { ComponentProps } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,19 +11,46 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Chip } from '@/src/components/Chip';
+import { LilleSkyline } from '@/src/components/LilleSkyline';
 import { LocationBanner } from '@/src/components/LocationBanner';
+import { PressableScale } from '@/src/components/PressableScale';
 import { SearchBar } from '@/src/components/SearchBar';
 import { AdBanner } from '@/src/features/ads/AdBanner';
 import { useAds } from '@/src/features/ads/AdsProvider';
 import { useSearchHistory } from '@/src/features/history/useSearchHistory';
-import { colors, font, spacing, TOUCH_TARGET } from '@/src/theme';
+import { momentLabel } from '@/src/lib/moment';
+import {
+  colors,
+  font,
+  fonts,
+  gradients,
+  motion,
+  palette,
+  radius,
+  shadows,
+  spacing,
+  TOUCH_TARGET,
+} from '@/src/theme';
 
-const SUGGESTIONS = ['Resto japonais', 'Afterwork', 'Boîte de nuit', 'Brunch', 'Bar à cocktails'];
+type IconName = ComponentProps<typeof Ionicons>['name'];
+
+// Suggestions : celles du cahier des charges + l'estaminet, incontournable lillois.
+const CATEGORIES: { label: string; query: string; icon: IconName; tint: string }[] = [
+  { label: 'Estaminet', query: 'estaminet', icon: 'beer', tint: palette.gold },
+  { label: 'Resto japonais', query: 'Resto japonais', icon: 'restaurant', tint: palette.brick },
+  { label: 'Afterwork', query: 'Afterwork', icon: 'people', tint: palette.gold },
+  { label: 'Boîte de nuit', query: 'Boîte de nuit', icon: 'musical-notes', tint: palette.brick },
+  { label: 'Brunch', query: 'Brunch', icon: 'cafe', tint: palette.gold },
+  { label: 'Bar à cocktails', query: 'Bar à cocktails', icon: 'wine', tint: palette.brick },
+];
+
+const SKY_HEIGHT = 280;
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const { history, add, clear } = useSearchHistory();
   const { onSearch, privacyOptionsRequired, showPrivacyOptions } = useAds();
 
@@ -33,63 +62,118 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <View style={styles.screen}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={{ paddingBottom: spacing.xxl }}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <View style={styles.topBar}>
-            <Pressable
-              onPress={() => router.push('/favorites')}
-              style={({ pressed }) => [styles.favButton, pressed && { opacity: 0.75 }]}
-              accessibilityRole="button"
-              accessibilityLabel="Mes favoris"
+          {/* Ciel nocturne et silhouette de Lille. */}
+          <LinearGradient
+            colors={gradients.sky}
+            style={[styles.sky, { paddingTop: insets.top + spacing.md }]}
+          >
+            <LilleSkyline style={styles.skyline} />
+
+            <Animated.View entering={FadeInDown.duration(motion.slow)} style={styles.topBar}>
+              <Text style={styles.moment}>{momentLabel()}</Text>
+              <PressableScale
+                onPress={() => router.push('/favorites')}
+                style={styles.favButton}
+                accessibilityRole="button"
+                accessibilityLabel="Mes favoris"
+              >
+                <Ionicons name="heart" size={18} color={colors.accent} />
+                <Text style={styles.favText}>Favoris</Text>
+              </PressableScale>
+            </Animated.View>
+
+            <Animated.Text
+              entering={FadeInDown.delay(motion.stagger).duration(motion.slow)}
+              style={styles.hero}
             >
-              <Ionicons name="heart" size={20} color={colors.accent} />
-              <Text style={styles.favText}>Favoris</Text>
-            </Pressable>
+              Qu’est-ce qu’on fait ce soir <Text style={styles.heroAccent}>à Lille</Text> ?
+            </Animated.Text>
+          </LinearGradient>
+
+          <Animated.View
+            entering={FadeInDown.delay(motion.stagger * 2).duration(motion.slow)}
+            style={styles.searchWrap}
+          >
+            <SearchBar onSubmit={search} />
+          </Animated.View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Envie de…</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categories}
+            >
+              {CATEGORIES.map((c, i) => (
+                <Animated.View
+                  key={c.label}
+                  entering={FadeInRight.delay(motion.stagger * (3 + i)).duration(motion.slow)}
+                >
+                  <PressableScale
+                    onPress={() => search(c.query)}
+                    style={styles.category}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Rechercher : ${c.label}`}
+                  >
+                    <View style={[styles.categoryIcon, { backgroundColor: `${c.tint}26` }]}>
+                      <Ionicons name={c.icon} size={24} color={c.tint} />
+                    </View>
+                    <Text style={styles.categoryLabel} numberOfLines={2}>
+                      {c.label}
+                    </Text>
+                  </PressableScale>
+                </Animated.View>
+              ))}
+            </ScrollView>
           </View>
 
-          <Text style={styles.hero}>Qu’est-ce qu’on fait ce soir à Lille ?</Text>
-
-          <SearchBar onSubmit={search} />
-
-          <View style={styles.chips}>
-            {SUGGESTIONS.map((s) => (
-              <Chip key={s} label={s} onPress={() => search(s)} />
-            ))}
+          <View style={styles.padded}>
+            <LocationBanner />
           </View>
-
-          <LocationBanner />
 
           {history.length > 0 && (
-            <View style={styles.history}>
+            <Animated.View
+              entering={FadeInDown.delay(motion.stagger * 4).duration(motion.slow)}
+              style={[styles.section, styles.padded]}
+            >
               <View style={styles.historyHeader}>
-                <Text style={styles.sectionTitle}>Recherches récentes</Text>
+                <Text style={styles.sectionTitleInline}>Recherches récentes</Text>
                 <Pressable onPress={clear} hitSlop={12} accessibilityRole="button">
                   <Text style={styles.clear}>Effacer</Text>
                 </Pressable>
               </View>
-              {history.map((q) => (
-                <Pressable
-                  key={q}
-                  onPress={() => search(q)}
-                  style={({ pressed }) => [styles.historyItem, pressed && { opacity: 0.7 }]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Relancer la recherche ${q}`}
-                >
-                  <Ionicons name="time-outline" size={20} color={colors.textMuted} />
-                  <Text style={styles.historyText} numberOfLines={1}>
-                    {q}
-                  </Text>
-                  <Ionicons name="arrow-forward" size={18} color={colors.textFaint} />
-                </Pressable>
-              ))}
-            </View>
+              <View style={styles.historyCard}>
+                {history.map((q, i) => (
+                  <Pressable
+                    key={q}
+                    onPress={() => search(q)}
+                    style={({ pressed }) => [
+                      styles.historyItem,
+                      i > 0 && styles.historySeparator,
+                      pressed && { backgroundColor: colors.surfaceRaised },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Relancer la recherche ${q}`}
+                  >
+                    <Ionicons name="time-outline" size={20} color={colors.textFaint} />
+                    <Text style={styles.historyText} numberOfLines={1}>
+                      {q}
+                    </Text>
+                    <Ionicons name="arrow-forward" size={18} color={colors.textFaint} />
+                  </Pressable>
+                ))}
+              </View>
+            </Animated.View>
           )}
         </ScrollView>
 
@@ -103,49 +187,98 @@ export default function HomeScreen() {
             <Text style={styles.privacyText}>Confidentialité et publicité</Text>
           </Pressable>
         )}
-        <AdBanner />
+        <View style={{ paddingBottom: insets.bottom }}>
+          <AdBanner />
+        </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.xl, paddingTop: spacing.lg, gap: spacing.xl },
-  topBar: { flexDirection: 'row', justifyContent: 'flex-end' },
+  screen: { flex: 1, backgroundColor: colors.background },
+  sky: {
+    minHeight: SKY_HEIGHT,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl * 2,
+    overflow: 'hidden',
+  },
+  skyline: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 150 },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xl,
+  },
+  moment: { color: colors.gold, fontSize: font.tiny, fontWeight: '800', letterSpacing: 1.6 },
   favButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    minHeight: TOUCH_TARGET,
+    minHeight: TOUCH_TARGET - 4,
     paddingHorizontal: spacing.lg,
-    borderRadius: 999,
-    backgroundColor: colors.surface,
+    borderRadius: radius.pill,
+    backgroundColor: colors.glass,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(245, 238, 226, 0.18)',
   },
-  favText: { color: colors.text, fontSize: font.small + 1, fontWeight: '600' },
+  favText: { color: colors.text, fontSize: font.small, fontWeight: '700' },
   hero: {
     color: colors.text,
+    fontFamily: fonts.display,
     fontSize: font.hero,
-    fontWeight: '800',
-    lineHeight: font.hero * 1.2,
+    lineHeight: font.hero * 1.15,
+    maxWidth: 340,
   },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  history: { gap: spacing.xs },
-  historyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  heroAccent: { color: colors.gold, fontFamily: fonts.displayItalic },
+  searchWrap: { marginTop: -spacing.xxl, paddingHorizontal: spacing.lg },
+  section: { marginTop: spacing.xl, gap: spacing.md },
+  padded: { paddingHorizontal: spacing.lg },
+  sectionTitle: {
+    color: colors.text,
+    fontFamily: fonts.displayMedium,
+    fontSize: font.title - 2,
+    paddingHorizontal: spacing.lg,
+  },
+  sectionTitleInline: { color: colors.text, fontFamily: fonts.displayMedium, fontSize: font.title - 2 },
+  categories: { paddingHorizontal: spacing.lg, gap: spacing.md },
+  category: {
+    width: 104,
+    minHeight: 112,
+    padding: spacing.md,
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    boxShadow: shadows.card,
+  },
+  categoryIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    justifyContent: 'center',
   },
-  sectionTitle: { color: colors.textMuted, fontSize: font.small, fontWeight: '700' },
-  clear: { color: colors.accent, fontSize: font.small, fontWeight: '600' },
+  categoryLabel: { color: colors.text, fontSize: font.small, fontWeight: '700', lineHeight: 18 },
+  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  clear: { color: colors.accent, fontSize: font.small, fontWeight: '700' },
+  historyCard: {
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
   historyItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    minHeight: TOUCH_TARGET,
+    minHeight: TOUCH_TARGET + 4,
+    paddingHorizontal: spacing.lg,
   },
+  historySeparator: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  historyText: { flex: 1, color: colors.text, fontSize: font.body },
   privacy: { alignItems: 'center', paddingVertical: spacing.sm },
   privacyText: { color: colors.textFaint, fontSize: font.tiny, textDecorationLine: 'underline' },
-  historyText: { flex: 1, color: colors.text, fontSize: font.body },
 });

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import { colors } from '@/src/theme';
+import { lilleNightMapStyle } from '@/src/theme/mapStyle';
 import { haversineMeters } from '@/shared/geo';
 import type { LatLng } from '@/shared/types';
 
@@ -102,6 +103,7 @@ export function PlacesMap({
       style={style}
       initialCameraPosition={camera(center, pins, route)}
       mapColorScheme={MapColorScheme.DARK}
+      mapStyle={lilleNightMapStyle}
       myLocationEnabled={showUserLocation}
       myLocationButtonEnabled={showUserLocation && interactive}
       mapToolbarEnabled={false}

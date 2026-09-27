@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
-import { colors, font, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { colors, font, gradients, radius, shadows, spacing, TOUCH_TARGET } from '@/src/theme';
 
 interface Props {
   initialValue?: string;
@@ -12,19 +13,23 @@ interface Props {
 
 export function SearchBar({ initialValue = '', autoFocus, onSubmit }: Props) {
   const [value, setValue] = useState(initialValue);
+  const [focused, setFocused] = useState(false);
   const submit = () => {
     const q = value.trim();
     if (q) onSubmit(q);
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, focused && styles.focused]}>
       <Ionicons name="search" size={22} color={colors.textMuted} />
       <TextInput
         style={styles.input}
         value={value}
         onChangeText={setValue}
         onSubmitEditing={submit}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        selectionColor={colors.gold}
         placeholder="Manger japonais, aller danser…"
         placeholderTextColor={colors.textFaint}
         returnKeyType="search"
@@ -44,11 +49,13 @@ export function SearchBar({ initialValue = '', autoFocus, onSubmit }: Props) {
       )}
       <Pressable
         onPress={submit}
-        style={({ pressed }) => [styles.go, pressed && { opacity: 0.8 }]}
+        style={({ pressed }) => [styles.goWrap, pressed && { opacity: 0.85 }]}
         accessibilityRole="button"
         accessibilityLabel="Lancer la recherche"
       >
-        <Ionicons name="arrow-forward" size={24} color={colors.accentText} />
+        <LinearGradient colors={gradients.brick} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.go}>
+          <Ionicons name="arrow-forward" size={24} color={colors.accentText} />
+        </LinearGradient>
       </Pressable>
     </View>
   );
@@ -59,25 +66,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: colors.surfaceRaised,
+    borderColor: 'rgba(245, 238, 226, 0.10)',
     borderWidth: 1,
     borderRadius: radius.lg,
+    borderCurve: 'continuous',
     paddingLeft: spacing.lg,
-    paddingRight: spacing.xs,
-    minHeight: 64,
+    paddingRight: spacing.xs + 2,
+    minHeight: 68,
+    boxShadow: shadows.raised,
   },
+  focused: { borderColor: colors.gold },
   input: {
     flex: 1,
     color: colors.text,
     fontSize: font.body + 2,
     paddingVertical: spacing.md,
   },
+  goWrap: { borderRadius: radius.md, boxShadow: shadows.glow },
   go: {
-    width: TOUCH_TARGET + 4,
-    height: TOUCH_TARGET + 4,
+    width: TOUCH_TARGET + 6,
+    height: TOUCH_TARGET + 6,
     borderRadius: radius.md,
-    backgroundColor: colors.accent,
+    borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
   },

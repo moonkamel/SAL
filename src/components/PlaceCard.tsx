@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { photoUrl } from '@/src/lib/api';
-import { colors, font, radius, spacing } from '@/src/theme';
+import { colors, font, fonts, gradients, radius, shadows, spacing } from '@/src/theme';
 import {
   formatDistance,
   formatOpening,
@@ -14,6 +15,8 @@ import {
 } from '@/shared/format';
 import type { PlaceSummary } from '@/shared/types';
 
+import { PressableScale } from './PressableScale';
+
 interface Props {
   place: PlaceSummary;
   onPress?: () => void;
@@ -23,84 +26,100 @@ interface Props {
 
 export function PlaceCard({ place, onPress, compact }: Props) {
   const photoAuthor = place.photo?.attributions[0]?.displayName;
+  const photoHeight = compact ? 110 : 190;
 
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       disabled={!onPress}
-      style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
+      style={styles.card}
       accessibilityRole={onPress ? 'button' : undefined}
       accessibilityLabel={place.name}
     >
-      <View style={styles.photoWrap}>
+      <View style={{ height: photoHeight }}>
         {place.photo ? (
           <Image
             source={{ uri: photoUrl(place.photo.name, 800) }}
-            style={[styles.photo, compact && styles.photoCompact]}
+            style={StyleSheet.absoluteFill}
             contentFit="cover"
-            transition={150}
+            transition={200}
             cachePolicy="memory"
             accessibilityIgnoresInvertColors
           />
         ) : (
-          <View style={[styles.photo, compact && styles.photoCompact, styles.photoPlaceholder]}>
+          <View style={[StyleSheet.absoluteFill, styles.photoPlaceholder]}>
             <Ionicons name="image-outline" size={32} color={colors.textFaint} />
           </View>
         )}
-        {place.sponsored && (
-          <View style={styles.sponsoredBadge}>
-            <Text style={styles.sponsoredText}>Sponsorisé</Text>
-          </View>
-        )}
-        {photoAuthor && (
-          <Text style={styles.photoCredit} numberOfLines={1}>
-            Photo : {photoAuthor}
-          </Text>
-        )}
-      </View>
+        <LinearGradient colors={gradients.photo} style={StyleSheet.absoluteFill} />
 
-      <View style={styles.body}>
-        <Text style={styles.name} numberOfLines={1}>
-          {place.name}
-        </Text>
-        <Text style={styles.address} numberOfLines={1}>
-          {place.address}
-        </Text>
-
-        <View style={styles.row}>
-          <Ionicons name="walk" size={16} color={colors.textMuted} />
-          <Text style={styles.meta}>
-            {formatDistance(place.distanceMeters)} · {formatWalk(place.walkMinutes)}
-          </Text>
+        <View style={styles.topRow}>
+          {place.sponsored ? (
+            <View style={styles.sponsoredBadge}>
+              <Ionicons name="sparkles" size={12} color={colors.background} />
+              <Text style={styles.sponsoredText}>Sponsorisé</Text>
+            </View>
+          ) : (
+            <View />
+          )}
+          {place.rating !== undefined && (
+            <View style={styles.ratingPill}>
+              <Ionicons name="star" size={13} color={colors.star} />
+              <Text style={styles.ratingText}>{formatRating(place.rating)}</Text>
+              {place.userRatingCount !== undefined && (
+                <Text style={styles.ratingCount}>{formatRatingCount(place.userRatingCount)}</Text>
+              )}
+            </View>
+          )}
         </View>
 
-        <View style={styles.row}>
-          {place.rating !== undefined && (
-            <>
-              <Ionicons name="star" size={16} color={colors.star} />
-              <Text style={styles.rating}>{formatRating(place.rating)}</Text>
-              {place.userRatingCount !== undefined && (
-                <Text style={styles.meta}>({formatRatingCount(place.userRatingCount)})</Text>
-              )}
-            </>
-          )}
-          {place.priceLevel !== undefined && (
-            <Text style={styles.meta}>
-              {place.rating !== undefined ? ' · ' : ''}
-              {formatPrice(place.priceLevel)}
+        <View style={styles.titleBlock}>
+          <Text style={styles.name} numberOfLines={1}>
+            {place.name}
+          </Text>
+          {photoAuthor && (
+            <Text style={styles.photoCredit} numberOfLines={1}>
+              Photo : {photoAuthor}
             </Text>
           )}
         </View>
+      </View>
 
+      <View style={styles.body}>
+        <Text style={styles.address} numberOfLines={1}>
+          {place.address}
+        </Text>
+        <View style={styles.metaRow}>
+          <View style={styles.meta}>
+            <Ionicons name="walk" size={15} color={colors.gold} />
+            <Text style={styles.metaText}>
+              {formatDistance(place.distanceMeters)} · {formatWalk(place.walkMinutes)}
+            </Text>
+          </View>
+          {place.priceLevel !== undefined && (
+            <Text style={styles.price}>{formatPrice(place.priceLevel)}</Text>
+          )}
+        </View>
         {place.opening && (
-          <Text
-            style={[styles.opening, { color: place.opening.openNow ? colors.open : colors.closed }]}
-          >
-            {formatOpening(place.opening)}
-          </Text>
+          <View style={styles.meta}>
+            <View
+              style={[
+                styles.dot,
+                { backgroundColor: place.opening.openNow ? colors.open : colors.closed },
+              ]}
+            />
+            <Text
+              style={[
+                styles.opening,
+                { color: place.opening.openNow ? colors.open : colors.closed },
+              ]}
+            >
+              {formatOpening(place.opening)}
+            </Text>
+          </View>
         )}
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -108,39 +127,53 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
+    borderCurve: 'continuous',
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
+    boxShadow: shadows.card,
   },
-  photoWrap: { position: 'relative' },
-  photo: { width: '100%', height: 160, backgroundColor: colors.surfaceRaised },
-  photoCompact: { height: 100 },
-  photoPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  photoCredit: {
+  photoPlaceholder: {
+    backgroundColor: colors.surfaceRaised,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topRow: {
     position: 'absolute',
-    right: spacing.sm,
-    bottom: spacing.xs,
-    maxWidth: '70%',
-    color: '#FFFFFF',
-    fontSize: font.tiny - 1,
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowRadius: 3,
+    top: spacing.md,
+    left: spacing.md,
+    right: spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   sponsoredBadge: {
-    position: 'absolute',
-    left: spacing.sm,
-    top: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: colors.sponsored,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
   },
-  sponsoredText: { color: '#000000', fontSize: font.tiny, fontWeight: '700' },
-  body: { padding: spacing.lg, gap: spacing.xs },
-  name: { color: colors.text, fontSize: font.body + 2, fontWeight: '700' },
+  sponsoredText: { color: colors.background, fontSize: font.tiny, fontWeight: '800' },
+  ratingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.glass,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+  },
+  ratingText: { color: colors.text, fontSize: font.small - 1, fontWeight: '800' },
+  ratingCount: { color: colors.textMuted, fontSize: font.tiny },
+  titleBlock: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.md },
+  name: { color: colors.text, fontFamily: fonts.display, fontSize: font.title, lineHeight: 28 },
+  photoCredit: { color: colors.textMuted, fontSize: font.tiny - 1, marginTop: 2 },
+  body: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: 6 },
   address: { color: colors.textMuted, fontSize: font.small },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
-  meta: { color: colors.textMuted, fontSize: font.small },
-  rating: { color: colors.text, fontSize: font.small, fontWeight: '700' },
-  opening: { fontSize: font.small, fontWeight: '600', marginTop: 2 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaText: { color: colors.text, fontSize: font.small, fontWeight: '600' },
+  price: { color: colors.gold, fontSize: font.small, fontWeight: '800', letterSpacing: 1 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  opening: { fontSize: font.small, fontWeight: '700' },
 });

@@ -20,6 +20,15 @@ AdMob (react-native-google-mobile-ads) · Claude (reformulation optionnelle).
 | 4 | Navigation guidée intégrée (Google Navigation SDK) | ✅ à tester sur téléphone (nouveau build nécessaire) |
 | 5 | Publicité AdMob + consentement + lieux sponsorisés | ✅ à tester sur téléphone (nouveau build nécessaire) |
 
+### Design « Lille la nuit »
+
+- Palette : bleu nuit, **brique flamande** (actions), **or de la Vieille Bourse**
+  (accents), pierre crème (textes) — tokens dans `src/theme/index.ts`.
+- Titres en **Fraunces** (serif), silhouette de Lille dessinée en SVG sur l'accueil
+  (Porte de Paris, pignons à redents, Beffroi, Vieille Bourse, Déesse, Opéra, Treille).
+- Animations Reanimated : cartes qui apparaissent en cascade, boutons qui s'enfoncent,
+  squelettes de chargement ; carte Google au style nocturne assorti (`src/theme/mapStyle.ts`).
+
 ### Choix techniques validés
 
 - **Navigation SDK** : `@googlemaps/react-native-navigation-sdk` **0.16.3**. La 0.17+ exige

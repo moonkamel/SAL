@@ -5,10 +5,11 @@ import { type ComponentProps, useCallback, useEffect, useMemo, useState } from '
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GradientButton } from '@/src/components/GradientButton';
 import { PlacesMap } from '@/src/components/PlacesMap';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { ApiRequestError, getRoutes } from '@/src/lib/api';
-import { colors, font, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { colors, font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { formatArrival, formatDistance, formatDuration } from '@/shared/format';
 import { decodePolyline } from '@/shared/polyline';
 import type { LatLng, RouteOption, TravelMode } from '@/shared/types';
@@ -192,20 +193,13 @@ export default function RoutePreviewScreen() {
               sur la carte.
             </Text>
           ) : (
-            <Pressable
-              style={({ pressed }) => [
-                styles.start,
-                pressed && { opacity: 0.85 },
-                !selected?.available && { opacity: 0.4 },
-              ]}
+            <GradientButton
+              title="Démarrer"
+              icon="navigate"
               onPress={onStart}
               disabled={!selected?.available}
-              accessibilityRole="button"
               accessibilityLabel="Démarrer le guidage"
-            >
-              <Ionicons name="navigate" size={26} color={colors.accentText} />
-              <Text style={styles.startText}>Démarrer</Text>
-            </Pressable>
+            />
           )}
         </View>
       )}
@@ -251,7 +245,7 @@ const styles = StyleSheet.create({
   modeTime: { color: colors.text, fontSize: font.small + 1, fontWeight: '700' },
   modeLabel: { color: colors.textMuted, fontSize: font.tiny },
   summary: { gap: 2 },
-  duration: { color: colors.text, fontSize: font.hero - 4, fontWeight: '800' },
+  duration: { color: colors.text, fontFamily: fonts.display, fontSize: font.hero - 2 },
   lines: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   line: {
     backgroundColor: colors.surfaceRaised,
@@ -261,14 +255,4 @@ const styles = StyleSheet.create({
   },
   lineText: { color: colors.text, fontSize: font.small, fontWeight: '700' },
   note: { color: colors.textMuted, fontSize: font.small, textAlign: 'center' },
-  start: {
-    minHeight: 64,
-    borderRadius: radius.lg,
-    backgroundColor: colors.accent,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  startText: { color: colors.accentText, fontSize: font.title, fontWeight: '800' },
 });

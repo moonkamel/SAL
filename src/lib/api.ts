@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 import type {
   ApiError,
@@ -17,6 +18,8 @@ import type {
 function apiOrigin(): string {
   const configured = process.env.EXPO_PUBLIC_API_URL;
   if (configured) return configured.replace(/\/$/, '');
+  // Sur le web, l'app et les routes API sont servies par la même origine.
+  if (Platform.OS === 'web') return '';
   const hostUri = Constants.expoConfig?.hostUri;
   if (hostUri) return `http://${hostUri}`;
   throw new Error('Backend introuvable : définissez EXPO_PUBLIC_API_URL');

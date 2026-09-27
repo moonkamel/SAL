@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
@@ -16,13 +16,14 @@ import { countActiveFilters, FilterSheet } from '@/src/components/FilterSheet';
 import { GoogleAttribution } from '@/src/components/GoogleAttribution';
 import { LocationBanner } from '@/src/components/LocationBanner';
 import { PlaceCard } from '@/src/components/PlaceCard';
+import { SkeletonCard } from '@/src/components/SkeletonCard';
 import { ResultsMap } from '@/src/components/ResultsMap';
 import { useAds } from '@/src/features/ads/AdsProvider';
 import { NativeAdCard } from '@/src/features/ads/NativeAdCard';
 import { withAdSlots } from '@/src/features/ads/policy';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { ApiRequestError, searchPlaces } from '@/src/lib/api';
-import { colors, font, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { colors, font, fonts, motion, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import type { PlaceSummary, SearchFilters } from '@/shared/types';
 
 type State =
@@ -103,16 +104,17 @@ export default function ResultsScreen() {
           <Ionicons
             name={view === 'list' ? 'map-outline' : 'list-outline'}
             size={20}
-            color={colors.text}
+            color={colors.gold}
           />
           <Text style={styles.toggleText}>{view === 'list' ? 'Carte' : 'Liste'}</Text>
         </Pressable>
       </View>
 
       {state.kind === 'loading' && (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.muted}>Recherche des meilleurs lieux…</Text>
+        <View style={styles.list} accessibilityLabel="Recherche des meilleurs lieux">
+          <SkeletonCard />
+          <View style={{ height: spacing.lg }} />
+          <SkeletonCard />
         </View>
       )}
 
@@ -143,19 +145,31 @@ export default function ResultsScreen() {
           keyExtractor={(item) => (item.type === 'ad' ? item.key : item.place.id)}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
-          renderItem={({ item }) =>
-            item.type === 'ad' ? (
-              <NativeAdCard />
-            ) : (
-              <PlaceCard place={item.place} onPress={() => openPlace(item.place.id)} />
-            )
-          }
+          renderItem={({ item, index }) => (
+            // Apparition en cascade des premières cartes, puis instantanée au défilement.
+            <Animated.View
+              entering={FadeInDown.delay(Math.min(index, 6) * motion.stagger).duration(motion.slow)}
+              layout={LinearTransition.duration(motion.base)}
+            >
+              {item.type === 'ad' ? (
+                <NativeAdCard />
+              ) : (
+                <PlaceCard place={item.place} onPress={() => openPlace(item.place.id)} />
+              )}
+            </Animated.View>
+          )}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
           }
           ListHeaderComponent={
-            <View style={{ marginBottom: spacing.lg }}>
+            <View style={{ marginBottom: spacing.lg, gap: spacing.md }}>
               <LocationBanner />
+              {state.places.length > 0 && (
+                <Text style={styles.count}>
+                  {state.places.length} {state.places.length > 1 ? 'adresses' : 'adresse'} autour
+                  de vous
+                </Text>
+              )}
             </View>
           }
           ListEmptyComponent={
@@ -192,6 +206,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   list: { padding: spacing.lg, paddingTop: 0 },
+  count: { color: colors.text, fontFamily: fonts.displayMedium, fontSize: font.title - 2 },
   toggle: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -200,6 +215,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: colors.gold,
   },
   toggleText: { color: colors.text, fontSize: font.small + 1, fontWeight: '600' },
   center: {
@@ -209,7 +226,6 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     padding: spacing.xl,
   },
-  muted: { color: colors.textMuted, fontSize: font.body },
   message: { color: colors.text, fontSize: font.body, textAlign: 'center' },
   retry: {
     minHeight: TOUCH_TARGET + 4,
