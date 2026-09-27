@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { AmbianceTags } from '@/src/features/lille/AmbianceTags';
 import { photoUrl } from '@/src/lib/api';
 import { colors, font, fonts, gradients, radius, shadows, spacing } from '@/src/theme';
 import {
@@ -100,6 +101,7 @@ export function PlaceCard({ place, onPress, compact }: Props) {
             <Text style={styles.price}>{formatPrice(place.priceLevel)}</Text>
           )}
         </View>
+        <AmbianceTags ambiance={place.ambiance} />
         {place.opening && (
           <View style={styles.meta}>
             <View

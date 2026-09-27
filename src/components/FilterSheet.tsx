@@ -4,20 +4,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, font, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { formatDistance } from '@/shared/format';
-import type { PriceLevel, SearchFilters } from '@/shared/types';
+import { AMBIANCE_LABELS, type Ambiance, type PriceLevel, type SearchFilters } from '@/shared/types';
 
 import { Chip } from './Chip';
 
 export const DISTANCE_OPTIONS = [500, 1000, 2000, 5000];
 export const RATING_OPTIONS = [3.5, 4, 4.5];
 const PRICE_OPTIONS: PriceLevel[] = [1, 2, 3, 4];
+const AMBIANCE_OPTIONS = Object.keys(AMBIANCE_LABELS) as Ambiance[];
 
 export function countActiveFilters(f: SearchFilters): number {
   return (
     (f.openNow ? 1 : 0) +
     (f.maxDistanceMeters ? 1 : 0) +
     (f.priceLevels?.length ? 1 : 0) +
-    (f.minRating ? 1 : 0)
+    (f.minRating ? 1 : 0) +
+    (f.ambiance?.length ?? 0)
   );
 }
 
@@ -35,6 +37,12 @@ export function FilterSheet({ visible, filters, onApply, onClose }: Props) {
   useEffect(() => {
     if (visible) setDraft(filters);
   }, [visible, filters]);
+
+  const toggleAmbiance = (a: Ambiance) => {
+    const current = draft.ambiance ?? [];
+    const next = current.includes(a) ? current.filter((x) => x !== a) : [...current, a];
+    setDraft({ ...draft, ambiance: next.length ? next : undefined });
+  };
 
   const togglePrice = (p: PriceLevel) => {
     const current = draft.priceLevels ?? [];
@@ -56,6 +64,20 @@ export function FilterSheet({ visible, filters, onApply, onClose }: Props) {
               trackColor={{ true: colors.accent, false: colors.border }}
               accessibilityLabel="Ouvert maintenant"
             />
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.label}>Ambiance</Text>
+            <View style={styles.chips}>
+              {AMBIANCE_OPTIONS.map((a) => (
+                <Chip
+                  key={a}
+                  label={AMBIANCE_LABELS[a]}
+                  selected={draft.ambiance?.includes(a) ?? false}
+                  onPress={() => toggleAmbiance(a)}
+                />
+              ))}
+            </View>
           </View>
 
           <View style={styles.section}>

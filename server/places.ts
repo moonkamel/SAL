@@ -2,6 +2,7 @@
 // la clé GOOGLE_PLACES_API_KEY n'est jamais envoyée à l'application.
 
 import type {
+  Ambiance,
   LatLng,
   OpeningStatus,
   PhotoRef,
@@ -43,6 +44,12 @@ const DETAILS_FIELD_MASK = [
   'nationalPhoneNumber',
   'websiteUri',
   'googleMapsUri',
+  'outdoorSeating',
+  'liveMusic',
+  'goodForGroups',
+  'goodForChildren',
+  'servesCocktails',
+  'servesVegetarianFood',
 ].join(',');
 
 // Résumé pour la liste des favoris : pas d'avis, donc moins cher.
@@ -57,6 +64,23 @@ const SUMMARY_FIELD_MASK = [
   'currentOpeningHours',
   'photos',
 ].join(',');
+
+/** Correspondance ambiance → champ booléen Google Places (tranche « Atmosphere »). */
+export const AMBIANCE_FIELDS: Record<Ambiance, keyof GooglePlace> = {
+  terrace: 'outdoorSeating',
+  liveMusic: 'liveMusic',
+  groups: 'goodForGroups',
+  kids: 'goodForChildren',
+  cocktails: 'servesCocktails',
+  vegetarian: 'servesVegetarianFood',
+};
+
+/** Masque Text Search : les champs d'ambiance ne sont demandés que s'ils sont filtrés. */
+export function textSearchFieldMask(ambiance: Ambiance[] = []): string {
+  if (ambiance.length === 0) return TEXT_SEARCH_FIELD_MASK;
+  const extra = [...new Set(ambiance.map((a) => `places.${AMBIANCE_FIELDS[a]}`))];
+  return [TEXT_SEARCH_FIELD_MASK, ...extra].join(',');
+}
 
 const MAX_DETAIL_PHOTOS = 6;
 const MAX_REVIEWS = 3;
@@ -111,6 +135,19 @@ interface GooglePlace {
   nationalPhoneNumber?: string;
   websiteUri?: string;
   googleMapsUri?: string;
+  outdoorSeating?: boolean;
+  liveMusic?: boolean;
+  goodForGroups?: boolean;
+  goodForChildren?: boolean;
+  servesCocktails?: boolean;
+  servesVegetarianFood?: boolean;
+}
+
+/** Ambiances que Google confirme (valeur `true`) pour ce lieu. */
+export function ambianceOf(place: GooglePlace): Ambiance[] {
+  return (Object.keys(AMBIANCE_FIELDS) as Ambiance[]).filter(
+    (a) => place[AMBIANCE_FIELDS[a]] === true,
+  );
 }
 
 export interface RawPlace {
@@ -123,6 +160,7 @@ export interface RawPlace {
   priceLevel?: PriceLevel;
   opening?: OpeningStatus;
   photo?: PhotoRef;
+  ambiance?: Ambiance[];
 }
 
 export interface TextSearchParams {
@@ -133,6 +171,7 @@ export interface TextSearchParams {
   openNow?: boolean;
   minRating?: number;
   priceLevels?: PriceLevel[];
+  ambiance?: Ambiance[];
 }
 
 // --- Prix ---
@@ -234,6 +273,7 @@ export function mapPlace(place: GooglePlace, now: Date = new Date()): RawPlace |
     priceLevel: place.priceLevel ? PRICE_FROM_GOOGLE[place.priceLevel] : undefined,
     opening: toOpeningStatus(place.currentOpeningHours, now),
     photo: photo ? mapPhoto(photo) : undefined,
+    ambiance: ambianceOf(place),
   };
 }
 
@@ -281,7 +321,7 @@ export async function textSearch(params: TextSearchParams): Promise<RawPlace[]> 
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': apiKey(),
-      'X-Goog-FieldMask': TEXT_SEARCH_FIELD_MASK,
+      'X-Goog-FieldMask': textSearchFieldMask(params.ambiance),
     },
     body: JSON.stringify(body),
   });

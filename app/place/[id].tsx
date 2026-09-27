@@ -16,6 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GoogleAttribution } from '@/src/components/GoogleAttribution';
 import { GradientButton } from '@/src/components/GradientButton';
+import { AmbianceTags } from '@/src/features/lille/AmbianceTags';
+import { TransitCard } from '@/src/features/lille/TransitCard';
 import { PhotoCarousel } from '@/src/components/PhotoCarousel';
 import { PlacesMap } from '@/src/components/PlacesMap';
 import { ReviewItem } from '@/src/components/ReviewItem';
@@ -182,6 +184,8 @@ export default function PlaceScreen() {
             </View>
           )}
 
+          <AmbianceTags ambiance={p.ambiance} />
+
           <View style={styles.infoCard}>
             <InfoRow icon="walk" text={`${formatDistance(distance)} · ${formatWalk(estimateWalkMinutes(distance))}`} />
             <InfoRow icon="location-outline" text={p.address} />
@@ -208,6 +212,9 @@ export default function PlaceScreen() {
             showUserLocation={status === 'granted'}
             style={styles.map}
           />
+
+          {/* Pour rentrer : métro, tram et bus au plus près du lieu, en temps réel. */}
+          <TransitCard near={p.location} title="Pour rentrer en transports" />
 
           {p.reviews.length > 0 && (
             <View>

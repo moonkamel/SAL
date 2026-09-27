@@ -16,6 +16,8 @@ export interface SearchFilters {
   priceLevels?: PriceLevel[];
   /** Note Google minimale (0–5). */
   minRating?: number;
+  /** Ambiances demandées (toutes doivent être présentes). */
+  ambiance?: Ambiance[];
 }
 
 export interface SearchRequest {
@@ -54,6 +56,8 @@ export interface PlaceSummary {
   walkMinutes: number;
   sponsored: boolean;
   score: number;
+  /** Ambiances confirmées par Google (seulement si des filtres d'ambiance sont actifs). */
+  ambiance?: Ambiance[];
 }
 
 export interface Review {
@@ -86,6 +90,8 @@ export interface PlaceDetails {
   googleMapsUri?: string;
   /** Les 3 avis les plus récents (vide en mode résumé). */
   reviews: Review[];
+  /** Ambiances confirmées par Google (fiche complète). */
+  ambiance?: Ambiance[];
 }
 
 export interface SearchResponse {
@@ -116,4 +122,58 @@ export interface RouteOption {
 
 export interface RouteResponse {
   options: RouteOption[];
+}
+
+// --- Filtres d'ambiance (Google Places : champs « Atmosphere ») ---
+
+export type Ambiance = 'terrace' | 'liveMusic' | 'groups' | 'kids' | 'cocktails' | 'vegetarian';
+
+export const AMBIANCE_LABELS: Record<Ambiance, string> = {
+  terrace: 'Terrasse',
+  liveMusic: 'Musique live',
+  groups: 'En groupe',
+  kids: 'Avec enfants',
+  cocktails: 'Cocktails',
+  vegetarian: 'Végétarien',
+};
+
+// --- V'Lille (vélos en libre-service, temps réel GBFS) ---
+
+export interface VlilleStation {
+  id: string;
+  name: string;
+  location: LatLng;
+  bikes: number;
+  docks: number;
+  /** Faux si la station est hors service (pas de location ou de dépôt possible). */
+  operational: boolean;
+  distanceMeters: number;
+  walkMinutes: number;
+}
+
+export interface VlilleResponse {
+  stations: VlilleStation[];
+  /** Horodatage des données (ISO), pour afficher « il y a 1 min ». */
+  updatedAt?: string;
+}
+
+// --- Ilévia (prochains passages métro, tram, bus) ---
+
+export interface TransitDeparture {
+  line: string;
+  direction: string;
+  /** Minutes avant les prochains départs (triées). */
+  minutes: number[];
+}
+
+export interface TransitStop {
+  name: string;
+  location: LatLng;
+  distanceMeters: number;
+  walkMinutes: number;
+  departures: TransitDeparture[];
+}
+
+export interface TransitResponse {
+  stops: TransitStop[];
 }

@@ -29,6 +29,22 @@ AdMob (react-native-google-mobile-ads) · Claude (reformulation optionnelle).
 - Animations Reanimated : cartes qui apparaissent en cascade, boutons qui s'enfoncent,
   squelettes de chargement ; carte Google au style nocturne assorti (`src/theme/mapStyle.ts`).
 
+### Fonctionnalités lilloises
+
+- **V'Lille en direct** (mode vélo de l'aperçu d'itinéraire) : station la plus proche avec
+  des vélos au départ, station avec des places libres près du lieu. Données GBFS ouvertes
+  d'Ilévia (`VLILLE_GBFS_URL`, par défaut `https://media.ilevia.fr/opendata/gbfs.json`),
+  rafraîchies chaque minute.
+- **Prochains passages Ilévia** (métro, tram, bus) : « Départs près de vous » en mode
+  transports, et « Pour rentrer en transports » sur la fiche d'un lieu. Données temps réel
+  de l'open data de la MEL (`ILEVIA_PASSAGES_URL`), rafraîchies toutes les 30 s. Si l'API
+  exige une clé, créez un compte sur <https://data.lillemetropole.fr> et renseignez
+  `MEL_API_KEY` côté serveur.
+- **Filtres d'ambiance** : terrasse, musique live, en groupe, avec enfants, cocktails,
+  végétarien (panneau « Filtres », ou déduits de la phrase par Claude). Seuls les lieux
+  pour lesquels Google confirme l'ambiance sont gardés. Ces champs Google ne sont demandés
+  **que** lorsqu'un filtre d'ambiance est actif (tranche Places plus chère).
+
 ### Choix techniques validés
 
 - **Navigation SDK** : `@googlemaps/react-native-navigation-sdk` **0.16.3**. La 0.17+ exige
@@ -56,6 +72,8 @@ app/                 écrans (Expo Router) + routes API (*+api.ts)
   api/place/[id]+api.ts GET /api/place/:id → Place Details (avis) ou résumé (?fields=summary)
   api/photo+api.ts   GET  /api/photo  → photo Google sans exposer la clé
   api/route+api.ts   GET  /api/route?from=lat,lng&to=lat,lng → marche, vélo, voiture, transports
+  api/vlille+api.ts  GET  /api/vlille?near=lat,lng → stations V'Lille proches (temps réel)
+  api/transit+api.ts GET  /api/transit?near=lat,lng → prochains passages Ilévia
   route/[id].tsx     aperçu d'itinéraire : tracé, choix du mode, durée, « Démarrer »
   navigate/[id].tsx  guidage plein écran (Navigation SDK), « Arrêter », aucune publicité
   arrived/[id].tsx   « Vous êtes arrivé » : noter le lieu, nouvelle recherche

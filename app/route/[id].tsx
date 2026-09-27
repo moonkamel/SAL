@@ -6,6 +6,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GradientButton } from '@/src/components/GradientButton';
+import { TransitCard } from '@/src/features/lille/TransitCard';
+import { VlilleCard } from '@/src/features/lille/VlilleCard';
 import { PlacesMap } from '@/src/components/PlacesMap';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { ApiRequestError, getRoutes } from '@/src/lib/api';
@@ -186,6 +188,10 @@ export default function RoutePreviewScreen() {
               ))}
             </View>
           )}
+
+          {/* Temps réel lillois : V'Lille à vélo, prochains passages en transports. */}
+          {mode === 'bicycle' && <VlilleCard from={state.from} to={destination} />}
+          {mode === 'transit' && <TransitCard near={state.from} title="Départs près de vous" />}
 
           {mode === 'transit' ? (
             <Text style={styles.note}>

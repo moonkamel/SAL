@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { estimateWalkMinutes, haversineMeters, SEARCH_RADIUS_METERS } from '@/shared/geo';
 import { detailsToSummary } from '@/shared/summary';
 import type {
+  Ambiance,
   PlaceDetails,
   PlaceSummary,
   PriceLevel,
@@ -33,6 +34,10 @@ export const SearchRequestSchema = z.object({
         .array(z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]))
         .optional(),
       minRating: z.number().min(0).max(5).optional(),
+      ambiance: z
+        .array(z.enum(['terrace', 'liveMusic', 'groups', 'kids', 'cocktails', 'vegetarian']))
+        .max(6)
+        .optional(),
     })
     .optional(),
 });
@@ -41,6 +46,24 @@ interface CachedSearch {
   places: RawPlace[];
   effectiveQuery: string;
   rewritten: boolean;
+  /** Ambiances appliquées (choisies par l'utilisateur ou déduites par Claude). */
+  ambiance: Ambiance[];
+}
+
+// Mots ajoutés à la requête Google pour orienter la pertinence vers l'ambiance voulue.
+const AMBIANCE_HINTS: Partial<Record<Ambiance, string>> = {
+  terrace: 'terrasse',
+  liveMusic: 'concert',
+  cocktails: 'cocktails',
+  vegetarian: 'végétarien',
+};
+
+export function withAmbianceHints(query: string, ambiance: Ambiance[]): string {
+  const lower = query.toLowerCase();
+  const hints = ambiance
+    .map((a) => AMBIANCE_HINTS[a])
+    .filter((h): h is string => !!h && !lower.includes(h));
+  return [query, ...hints].join(' ');
 }
 
 const ttlSeconds = Number(process.env.SEARCH_CACHE_TTL_SECONDS ?? 300);
@@ -60,6 +83,7 @@ export function cacheKey(req: SearchRequest): string {
     f.openNow ?? false,
     [...(f.priceLevels ?? [])].sort(),
     f.minRating ?? 0,
+    [...(f.ambiance ?? [])].sort(),
   ]);
 }
 
@@ -75,9 +99,11 @@ async function fetchPlaces(req: SearchRequest): Promise<CachedSearch> {
     ? f.priceLevels
     : rewrite?.priceLevels;
 
-  const effectiveQuery = rewrite?.textQuery ?? req.query.trim();
+  const ambiance: Ambiance[] = f.ambiance?.length ? f.ambiance : (rewrite?.ambiance ?? []);
+  const effectiveQuery = withAmbianceHints(rewrite?.textQuery ?? req.query.trim(), ambiance);
   const places = await textSearch({
     textQuery: effectiveQuery,
+    ambiance,
     center: req.location,
     radiusMeters: SEARCH_RADIUS_METERS,
     includedType: rewrite?.includedType,
@@ -86,17 +112,24 @@ async function fetchPlaces(req: SearchRequest): Promise<CachedSearch> {
     priceLevels,
   });
 
-  const result: CachedSearch = { places, effectiveQuery, rewritten: rewrite !== null };
+  const result: CachedSearch = { places, effectiveQuery, rewritten: rewrite !== null, ambiance };
   cache.set(key, result);
   return result;
+}
+
+/** Vrai si Google confirme toutes les ambiances demandées pour ce lieu. */
+export function hasAmbiance(place: { ambiance?: Ambiance[] }, wanted: Ambiance[]): boolean {
+  return wanted.every((a) => place.ambiance?.includes(a));
 }
 
 export function rankPlaces(
   places: RawPlace[],
   req: SearchRequest,
+  ambiance: Ambiance[] = [],
 ): PlaceSummary[] {
   const maxDistance = req.filters?.maxDistanceMeters;
   return places
+    .filter((place) => hasAmbiance(place, ambiance))
     .map((place, index) => {
       const distanceMeters = Math.round(haversineMeters(req.location, place.location));
       const score = scorePlace({
@@ -112,6 +145,7 @@ export function rankPlaces(
         walkMinutes: estimateWalkMinutes(distanceMeters),
         sponsored: false,
         score,
+        ambiance: ambiance.length ? place.ambiance : undefined,
       };
     })
     .filter((p) => maxDistance === undefined || p.distanceMeters <= maxDistance)
@@ -125,6 +159,7 @@ export function passesFilters(p: PlaceSummary, f: SearchFilters = {}): boolean {
   if (f.priceLevels?.length && (p.priceLevel === undefined || !f.priceLevels.includes(p.priceLevel)))
     return false;
   if (f.minRating && (p.rating ?? 0) < f.minRating) return false;
+  if (f.ambiance?.length && !hasAmbiance(p, f.ambiance)) return false;
   return true;
 }
 
@@ -147,12 +182,14 @@ async function resolveSponsored(
       if (inResults) return { ...inResults, sponsored: true };
       try {
         // Absent des résultats Google : on charge sa fiche (sans avis, donc moins cher).
-        let details = sponsoredDetailsCache.get(c.placeId);
+        // Avec un filtre d'ambiance, il faut la fiche complète pour le vérifier.
+        const mode = req.filters?.ambiance?.length ? 'full' : 'summary';
+        let details = sponsoredDetailsCache.get(`${mode}|${c.placeId}`);
         if (!details) {
-          details = await placeDetails(c.placeId, 'summary');
-          sponsoredDetailsCache.set(c.placeId, details);
+          details = await placeDetails(c.placeId, mode);
+          sponsoredDetailsCache.set(`${mode}|${c.placeId}`, details);
         }
-        return detailsToSummary(details, req.location, true);
+        return { ...detailsToSummary(details, req.location, true), ambiance: details.ambiance };
       } catch (error) {
         console.warn(`[sponsored] campagne ${c.id} ignorée`, error);
         return null;
@@ -163,8 +200,8 @@ async function resolveSponsored(
 }
 
 export async function search(req: SearchRequest): Promise<SearchResponse> {
-  const { places, effectiveQuery, rewritten } = await fetchPlaces(req);
-  const organic = rankPlaces(places, req);
+  const { places, effectiveQuery, rewritten, ambiance } = await fetchPlaces(req);
+  const organic = rankPlaces(places, req, ambiance);
   const campaigns = activeCampaigns({
     queries: [req.query, effectiveQuery],
     location: req.location,

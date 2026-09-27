@@ -1,18 +1,10 @@
 import { TtlCache } from '@/server/cache';
+import { parseLatLng } from '@/server/params';
 import { PlacesError } from '@/server/places';
 import { computeAllRoutes } from '@/server/routes';
-import type { LatLng, RouteOption, RouteResponse } from '@/shared/types';
+import type { RouteOption, RouteResponse } from '@/shared/types';
 
 const cache = new TtlCache<RouteOption[]>(5 * 60 * 1000, 500);
-
-function parseLatLng(value: string | null): LatLng | null {
-  const parts = value?.split(',').map(Number);
-  if (!parts || parts.length !== 2) return null;
-  const [lat, lng] = parts as [number, number];
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
-  return { lat, lng };
-}
 
 /** GET /api/route?from=lat,lng&to=lat,lng → itinéraires marche, vélo, voiture, transports. */
 export async function GET(request: Request): Promise<Response> {
