@@ -6,7 +6,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 
-import type { PriceLevel } from '@/shared/types';
+import type { Ambiance, PriceLevel } from '@/shared/types';
 
 // Types Google Places (Table A) utiles pour les sorties à Lille.
 export const INCLUDED_TYPES = [
@@ -56,6 +56,9 @@ const RewriteSchema = z.object({
   openNow: z.boolean().nullable(),
   priceLevels: z.array(z.number().int()).nullable(),
   minRating: z.number().nullable(),
+  ambiance: z
+    .array(z.enum(['terrace', 'liveMusic', 'groups', 'kids', 'cocktails', 'vegetarian']))
+    .nullable(),
 });
 
 export interface RewriteResult {
@@ -64,6 +67,7 @@ export interface RewriteResult {
   openNow?: boolean;
   priceLevels?: PriceLevel[];
   minRating?: number;
+  ambiance?: Ambiance[];
 }
 
 const SYSTEM_PROMPT = `Tu transformes une recherche libre d'un utilisateur de l'application « Sortir à Lille » en paramètres pour Google Places Text Search.
@@ -74,7 +78,8 @@ Règles :
 - includedType : seulement si un type de la liste correspond clairement à la demande, sinon null. Pour « aller danser », utilise night_club.
 - openNow : true uniquement si l'utilisateur précise « maintenant », « ce soir », « encore ouvert »… sinon null.
 - priceLevels : niveaux acceptés (1 = bon marché, 2 = modéré, 3 = cher, 4 = très cher) seulement si l'utilisateur parle de budget, sinon null.
-- minRating : note minimale (ex. 4) seulement si l'utilisateur demande explicitement un lieu « bien noté », sinon null.`;
+- minRating : note minimale (ex. 4) seulement si l'utilisateur demande explicitement un lieu « bien noté », sinon null.
+- ambiance : seulement les critères explicitement demandés, sinon null. terrace = terrasse / dehors ; liveMusic = musique live / concert ; groups = en groupe / entre potes / « pour 8 » ; kids = avec enfants / en famille ; cocktails = cocktails ; vegetarian = végétarien / vegan.`;
 
 let client: Anthropic | null = null;
 
@@ -121,6 +126,7 @@ export async function rewriteQuery(query: string): Promise<RewriteResult | null>
       openNow: out.openNow ?? undefined,
       priceLevels: priceLevels?.length ? priceLevels : undefined,
       minRating,
+      ambiance: out.ambiance?.length ? out.ambiance : undefined,
     };
   } catch (error) {
     if (error instanceof Anthropic.RateLimitError) {

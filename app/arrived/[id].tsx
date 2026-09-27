@@ -6,8 +6,10 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GradientButton } from '@/src/components/GradientButton';
+import { LilleSkyline } from '@/src/components/LilleSkyline';
 import { getRatings, saveRating } from '@/src/features/ratings/ratings';
-import { colors, font, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { colors, font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 
 export default function ArrivedScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name: string }>();
@@ -29,7 +31,8 @@ export default function ArrivedScreen() {
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
 
       <View style={styles.content}>
-        <Ionicons name="flag" size={72} color={colors.open} />
+        <LilleSkyline style={styles.skyline} />
+        <Ionicons name="flag" size={72} color={colors.gold} />
         <Text style={styles.title}>Vous êtes arrivé !</Text>
         {name && <Text style={styles.place}>{name}</Text>}
 
@@ -70,14 +73,11 @@ export default function ArrivedScreen() {
       </View>
 
       <View style={styles.actions}>
-        <Pressable
-          style={({ pressed }) => [styles.primary, pressed && { opacity: 0.85 }]}
+        <GradientButton
+          title="Nouvelle recherche"
+          icon="search"
           onPress={() => router.dismissTo('/')}
-          accessibilityRole="button"
-        >
-          <Ionicons name="search" size={22} color={colors.accentText} />
-          <Text style={styles.primaryText}>Nouvelle recherche</Text>
-        </Pressable>
+        />
         <Pressable
           style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.85 }]}
           onPress={() => router.back()}
@@ -93,7 +93,8 @@ export default function ArrivedScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xl },
-  title: { color: colors.text, fontSize: font.hero, fontWeight: '800', textAlign: 'center' },
+  title: { color: colors.text, fontFamily: fonts.display, fontSize: font.hero, textAlign: 'center' },
+  skyline: { position: 'absolute', left: 0, right: 0, top: 0, height: 180, opacity: 0.9 },
   place: { color: colors.textMuted, fontSize: font.title - 2, textAlign: 'center' },
   rateCard: {
     marginTop: spacing.xl,
@@ -108,16 +109,6 @@ const styles = StyleSheet.create({
   stars: { flexDirection: 'row', gap: spacing.sm },
   link: { color: colors.accent, fontSize: font.body, fontWeight: '600' },
   actions: { padding: spacing.xl, gap: spacing.md },
-  primary: {
-    minHeight: 64,
-    borderRadius: radius.lg,
-    backgroundColor: colors.accent,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  primaryText: { color: colors.accentText, fontSize: font.title - 2, fontWeight: '800' },
   secondary: {
     minHeight: TOUCH_TARGET + 4,
     borderRadius: radius.lg,

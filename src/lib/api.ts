@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 import type {
   ApiError,
@@ -7,6 +8,8 @@ import type {
   RouteResponse,
   SearchRequest,
   SearchResponse,
+  TransitResponse,
+  VlilleResponse,
 } from '@/shared/types';
 
 /**
@@ -17,6 +20,8 @@ import type {
 function apiOrigin(): string {
   const configured = process.env.EXPO_PUBLIC_API_URL;
   if (configured) return configured.replace(/\/$/, '');
+  // Sur le web, l'app et les routes API sont servies par la même origine.
+  if (Platform.OS === 'web') return '';
   const hostUri = Constants.expoConfig?.hostUri;
   if (hostUri) return `http://${hostUri}`;
   throw new Error('Backend introuvable : définissez EXPO_PUBLIC_API_URL');
@@ -59,6 +64,16 @@ export function getPlace(
 export function getRoutes(from: LatLng, to: LatLng, signal?: AbortSignal): Promise<RouteResponse> {
   const q = `from=${from.lat},${from.lng}&to=${to.lat},${to.lng}`;
   return request<RouteResponse>(`/api/route?${q}`, { signal });
+}
+
+export function getVlille(near: LatLng, limit = 3, signal?: AbortSignal): Promise<VlilleResponse> {
+  return request<VlilleResponse>(`/api/vlille?near=${near.lat},${near.lng}&limit=${limit}`, {
+    signal,
+  });
+}
+
+export function getTransit(near: LatLng, signal?: AbortSignal): Promise<TransitResponse> {
+  return request<TransitResponse>(`/api/transit?near=${near.lat},${near.lng}`, { signal });
 }
 
 export function photoUrl(photoName: string, width = 400): string {

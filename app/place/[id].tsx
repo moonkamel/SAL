@@ -15,13 +15,16 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GoogleAttribution } from '@/src/components/GoogleAttribution';
+import { GradientButton } from '@/src/components/GradientButton';
+import { AmbianceTags } from '@/src/features/lille/AmbianceTags';
+import { TransitCard } from '@/src/features/lille/TransitCard';
 import { PhotoCarousel } from '@/src/components/PhotoCarousel';
 import { PlacesMap } from '@/src/components/PlacesMap';
 import { ReviewItem } from '@/src/components/ReviewItem';
 import { useFavorites } from '@/src/features/favorites/FavoritesProvider';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { ApiRequestError, getPlace } from '@/src/lib/api';
-import { colors, font, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { colors, font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import {
   formatDistance,
   formatOpening,
@@ -181,6 +184,8 @@ export default function PlaceScreen() {
             </View>
           )}
 
+          <AmbianceTags ambiance={p.ambiance} />
+
           <View style={styles.infoCard}>
             <InfoRow icon="walk" text={`${formatDistance(distance)} · ${formatWalk(estimateWalkMinutes(distance))}`} />
             <InfoRow icon="location-outline" text={p.address} />
@@ -208,6 +213,9 @@ export default function PlaceScreen() {
             style={styles.map}
           />
 
+          {/* Pour rentrer : métro, tram et bus au plus près du lieu, en temps réel. */}
+          <TransitCard near={p.location} title="Pour rentrer en transports" />
+
           {p.reviews.length > 0 && (
             <View>
               <Text style={styles.sectionTitle}>Avis récents</Text>
@@ -222,8 +230,9 @@ export default function PlaceScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-        <Pressable
-          style={({ pressed }) => [styles.goButton, pressed && { opacity: 0.85 }]}
+        <GradientButton
+          title="Y aller"
+          icon="navigate"
           onPress={() =>
             router.push({
               pathname: '/route/[id]',
@@ -235,12 +244,8 @@ export default function PlaceScreen() {
               },
             })
           }
-          accessibilityRole="button"
           accessibilityLabel={`Y aller : ${p.name}`}
-        >
-          <Ionicons name="navigate" size={24} color={colors.accentText} />
-          <Text style={styles.goText}>Y aller</Text>
-        </Pressable>
+        />
       </View>
     </View>
   );
@@ -284,7 +289,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   body: { padding: spacing.xl, gap: spacing.md },
-  name: { color: colors.text, fontSize: font.title + 4, fontWeight: '800' },
+  name: { color: colors.text, fontFamily: fonts.display, fontSize: font.title + 8, lineHeight: 36 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   rating: { color: colors.text, fontSize: font.body, fontWeight: '700' },
   muted: { color: colors.textMuted, fontSize: font.body },
@@ -308,7 +313,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: colors.text,
     fontSize: font.title,
-    fontWeight: '700',
+    fontFamily: fonts.displayMedium,
     marginTop: spacing.lg,
   },
   footer: {
@@ -322,16 +327,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  goButton: {
-    minHeight: 64,
-    borderRadius: radius.lg,
-    backgroundColor: colors.accent,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  goText: { color: colors.accentText, fontSize: font.title, fontWeight: '800' },
   secondaryButton: {
     minHeight: TOUCH_TARGET,
     paddingHorizontal: spacing.xl,
