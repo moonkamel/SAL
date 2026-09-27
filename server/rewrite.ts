@@ -57,7 +57,7 @@ const RewriteSchema = z.object({
   priceLevels: z.array(z.number().int()).nullable(),
   minRating: z.number().nullable(),
   ambiance: z
-    .array(z.enum(['terrace', 'liveMusic', 'groups', 'kids', 'cocktails', 'vegetarian']))
+    .array(z.enum(['terrace', 'liveMusic', 'groups', 'kids', 'cocktails', 'vegetarian', 'accessible']))
     .nullable(),
 });
 
@@ -79,7 +79,7 @@ Règles :
 - openNow : true uniquement si l'utilisateur précise « maintenant », « ce soir », « encore ouvert »… sinon null.
 - priceLevels : niveaux acceptés (1 = bon marché, 2 = modéré, 3 = cher, 4 = très cher) seulement si l'utilisateur parle de budget, sinon null.
 - minRating : note minimale (ex. 4) seulement si l'utilisateur demande explicitement un lieu « bien noté », sinon null.
-- ambiance : seulement les critères explicitement demandés, sinon null. terrace = terrasse / dehors ; liveMusic = musique live / concert ; groups = en groupe / entre potes / « pour 8 » ; kids = avec enfants / en famille ; cocktails = cocktails ; vegetarian = végétarien / vegan.`;
+- ambiance : seulement les critères explicitement demandés, sinon null. terrace = terrasse / dehors ; liveMusic = musique live / concert ; groups = en groupe / entre potes / « pour 8 » ; kids = avec enfants / en famille ; cocktails = cocktails ; vegetarian = végétarien / vegan ; accessible = accessible en fauteuil roulant / PMR / handicap.`;
 
 let client: Anthropic | null = null;
 

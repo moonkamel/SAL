@@ -21,6 +21,12 @@ import { SearchBar } from '@/src/components/SearchBar';
 import { AdBanner } from '@/src/features/ads/AdBanner';
 import { useAds } from '@/src/features/ads/AdsProvider';
 import { useSearchHistory } from '@/src/features/history/useSearchHistory';
+import { useLiveData } from '@/src/features/lille/useLiveData';
+import { useUserLocation } from '@/src/features/location/LocationProvider';
+import { SurpriseCard } from '@/src/features/moment/SurpriseCard';
+import { WeatherCard } from '@/src/features/moment/WeatherCard';
+import { weatherIcon } from '@/src/features/moment/weatherIcons';
+import { getWeather } from '@/src/lib/api';
 import { momentLabel } from '@/src/lib/moment';
 import {
   colors,
@@ -34,6 +40,7 @@ import {
   spacing,
   TOUCH_TARGET,
 } from '@/src/theme';
+import type { Suggestion, WeatherResponse } from '@/shared/types';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -54,9 +61,22 @@ export default function HomeScreen() {
   const { history, add, clear } = useSearchHistory();
   const { onSearch, privacyOptionsRequired, showPrivacyOptions } = useAds();
 
-  const search = (query: string) => {
+  const { coords } = useUserLocation();
+  // Arrondi à ~1 km : pas de nouvel appel à chaque petit déplacement.
+  const lat = Math.round(coords.lat * 100) / 100;
+  const lng = Math.round(coords.lng * 100) / 100;
+  const { data: weather } = useLiveData<WeatherResponse>(
+    (signal) => getWeather({ lat, lng }, signal),
+    10 * 60_000,
+    [lat, lng],
+  );
+
+  const search = (query: string, ambiance?: Suggestion['ambiance']) => {
     add(query);
-    router.push({ pathname: '/results', params: { q: query } });
+    router.push({
+      pathname: '/results',
+      params: ambiance?.length ? { q: query, ambiance: ambiance.join(',') } : { q: query },
+    });
     // Peut afficher l'interstitiel (au plus une fois par session, jamais à la 1re recherche).
     onSearch();
   };
@@ -80,7 +100,21 @@ export default function HomeScreen() {
             <LilleSkyline style={styles.skyline} />
 
             <Animated.View entering={FadeInDown.duration(motion.slow)} style={styles.topBar}>
-              <Text style={styles.moment}>{momentLabel()}</Text>
+              <View style={styles.momentRow}>
+                <Text style={styles.moment}>{momentLabel()}</Text>
+                {weather && (
+                  <View
+                    style={styles.weatherChip}
+                    accessible
+                    accessibilityLabel={`${Math.round(weather.weather.temperature)} degrés`}
+                  >
+                    <Ionicons name={weatherIcon(weather.weather)} size={13} color={colors.gold} />
+                    <Text style={styles.weatherText}>
+                      {Math.round(weather.weather.temperature)}°
+                    </Text>
+                  </View>
+                )}
+              </View>
               <PressableScale
                 onPress={() => router.push('/favorites')}
                 style={styles.favButton}
@@ -104,7 +138,17 @@ export default function HomeScreen() {
             entering={FadeInDown.delay(motion.stagger * 2).duration(motion.slow)}
             style={styles.searchWrap}
           >
-            <SearchBar onSubmit={search} />
+            <SearchBar onSubmit={(q) => search(q)} />
+          </Animated.View>
+
+          <Animated.View
+            entering={FadeInDown.delay(motion.stagger * 3).duration(motion.slow)}
+            style={[styles.padded, styles.moments]}
+          >
+            <SurpriseCard />
+            {weather && (
+              <WeatherCard data={weather} onPress={(s) => search(s.query, s.ambiance)} />
+            )}
           </Animated.View>
 
           <View style={styles.section}>
@@ -210,6 +254,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.xl,
   },
+  momentRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  weatherChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.glass,
+  },
+  weatherText: { color: colors.text, fontSize: font.tiny, fontWeight: '800' },
+  moments: { marginTop: spacing.lg, gap: spacing.md },
   moment: { color: colors.gold, fontSize: font.tiny, fontWeight: '800', letterSpacing: 1.6 },
   favButton: {
     flexDirection: 'row',

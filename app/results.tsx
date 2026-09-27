@@ -24,7 +24,11 @@ import { withAdSlots } from '@/src/features/ads/policy';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { ApiRequestError, searchPlaces } from '@/src/lib/api';
 import { colors, font, fonts, motion, radius, spacing, TOUCH_TARGET } from '@/src/theme';
-import type { PlaceSummary, SearchFilters } from '@/shared/types';
+import { AMBIANCE_LABELS, type Ambiance, type PlaceSummary, type SearchFilters } from '@/shared/types';
+
+function parseAmbianceParam(value?: string): Ambiance[] {
+  return (value ?? '').split(',').filter((a): a is Ambiance => a in AMBIANCE_LABELS);
+}
 
 type State =
   | { kind: 'loading' }
@@ -32,12 +36,16 @@ type State =
   | { kind: 'done'; places: PlaceSummary[] };
 
 export default function ResultsScreen() {
-  const { q } = useLocalSearchParams<{ q: string }>();
+  const { q, ambiance } = useLocalSearchParams<{ q: string; ambiance?: string }>();
   const query = (q ?? '').trim();
   const { refresh } = useUserLocation();
   const { canRequestAds } = useAds();
 
-  const [filters, setFilters] = useState<SearchFilters>({});
+  // Filtres initiaux passés par l'accueil (ex. suggestion météo « en terrasse »).
+  const [filters, setFilters] = useState<SearchFilters>(() => {
+    const initial = parseAmbianceParam(ambiance);
+    return initial.length ? { ambiance: initial } : {};
+  });
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
