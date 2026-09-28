@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import { type GRoute, mapItinerary, pickItineraries } from '@/server/itineraries';
-import { currentSegment, distanceToLine, formatClock, liveInstruction, segmentPoints } from '@/shared/trip';
+import {
+  alongLine,
+  currentSegment,
+  distanceToLine,
+  formatClock,
+  liveInstruction,
+  NOT_BOARDED,
+  segmentPoints,
+  stopsLeft,
+  trackRide,
+} from '@/shared/trip';
 import { encodePolyline } from './helpers/polyline';
 
 const RIHOUR = { lat: 50.6357, lng: 3.06291 };
@@ -121,6 +131,67 @@ describe('accompagnement en direct', () => {
     expect(currentSegment(trip, GAMBETTA, 1)).toBe(2);
     // Jamais de retour en arrière.
     expect(currentSegment(trip, START, 2)).toBe(2);
+  });
+});
+
+describe('montée à bord et arrêts restants', () => {
+  const trip = mapItinerary(ROUTE, 'X', NOW)!;
+  const ride = trip.segments[1] as Extract<(typeof trip.segments)[number], { kind: 'ride' }>;
+  const t = (iso: string) => Date.parse(iso);
+  const mid = { lat: (RIHOUR.lat + GAMBETTA.lat) / 2, lng: (RIHOUR.lng + GAMBETTA.lng) / 2 };
+
+  it('situe un point le long de la ligne', () => {
+    const { along, total, offset } = alongLine(mid, [RIHOUR, GAMBETTA]);
+    expect(offset).toBeLessThan(1);
+    expect(along / total).toBeCloseTo(0.5, 2);
+  });
+
+  it('attend à l’arrêt sans se croire à bord', () => {
+    const at = t('2026-09-28T10:39:00Z');
+    const fix = { position: RIHOUR, speed: 0, at };
+    expect(trackRide(ride, NOT_BOARDED, fix, at, true)).toEqual(NOT_BOARDED);
+  });
+
+  it('détecte la montée quand on file sur la ligne, puis compte les arrêts', () => {
+    const at = t('2026-09-28T10:40:30Z');
+    // Encore près de l'arrêt, mais à 30 km/h sur la ligne : on est dedans.
+    const near = { lat: RIHOUR.lat - 0.0003, lng: RIHOUR.lng - 0.00035 };
+    const boarded = trackRide(ride, NOT_BOARDED, { position: near, speed: 8, at }, at, true);
+    expect(boarded.boardedAt).toBe(at);
+    expect(stopsLeft(ride.stopCount, boarded.fraction)).toBe(2);
+    // À mi-chemin : il reste 1 arrêt, on prévient de descendre.
+    const later = at + 60_000;
+    const half = trackRide(ride, boarded, { position: mid, speed: 8, at: later }, later, true);
+    expect(stopsLeft(ride.stopCount, half.fraction)).toBe(1);
+    // Un GPS qui recule un peu ne fait pas remonter le compte.
+    const back = trackRide(ride, half, { position: near, speed: 8, at: later + 5000 }, later + 5000, true);
+    expect(back.fraction).toBe(half.fraction);
+  });
+
+  it('dans le métro sous terre, suit l’horaire quand le GPS se tait', () => {
+    const lastFix = { position: RIHOUR, speed: 0, at: t('2026-09-28T10:39:50Z') };
+    // Pas encore l'heure : on attend toujours.
+    expect(trackRide(ride, NOT_BOARDED, lastFix, t('2026-09-28T10:40:30Z'), true).boardedAt).toBeNull();
+    // Départ passé et plus de GPS depuis une minute : à bord, à mi-parcours selon l'horaire.
+    const now = t('2026-09-28T10:41:24Z');
+    const r = trackRide(ride, NOT_BOARDED, lastFix, now, true);
+    expect(r.boardedAt).toBe(t('2026-09-28T10:40:09Z'));
+    expect(r.fraction).toBeCloseTo(0.5, 1);
+    // Sans être passé par la station, on ne devine rien.
+    expect(trackRide(ride, NOT_BOARDED, lastFix, now, false).boardedAt).toBeNull();
+  });
+
+  it('un bus à l’arrêt ne passe pas « à bord » faute de GPS', () => {
+    const bus = { ...ride, line: { ...ride.line, vehicle: 'Bus' } };
+    const lastFix = { position: RIHOUR, speed: 0, at: t('2026-09-28T10:39:00Z') };
+    expect(trackRide(bus, NOT_BOARDED, lastFix, t('2026-09-28T10:45:00Z'), true).boardedAt).toBeNull();
+  });
+
+  it('compte les arrêts restants', () => {
+    expect(stopsLeft(6, 0)).toBe(6);
+    expect(stopsLeft(6, 0.5)).toBe(3);
+    expect(stopsLeft(6, 0.9)).toBe(1);
+    expect(stopsLeft(6, 1)).toBe(1);
   });
 });
 

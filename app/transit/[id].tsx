@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Location from 'expo-location';
+import * as Speech from 'expo-speech';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { type ComponentProps, type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -10,16 +11,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GradientButton } from '@/src/components/GradientButton';
 import { type MapDot, type MapLine, PlacesMap } from '@/src/components/PlacesMap';
 import { mapboxGuideAvailable } from '@/src/features/guide/available';
-import { setPendingJourney } from '@/src/features/journey/journeyStore';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { ItineraryCard } from '@/src/features/transit/ItineraryCard';
 import { TripTimeline } from '@/src/features/transit/TripTimeline';
-import { useStopRealtime } from '@/src/features/transit/useStopRealtime';
 import { ApiRequestError, getItineraries } from '@/src/lib/api';
 import { colors, font, fonts, radius, spacing } from '@/src/theme';
 import { haversineMeters } from '@/shared/geo';
-import { journeyFromItinerary } from '@/shared/journey';
-import { currentSegment, liveInstruction, segmentPoints } from '@/shared/trip';
+import {
+  currentSegment,
+  type Fix,
+  lineLabel,
+  NOT_BOARDED,
+  type RideTracking,
+  segmentPoints,
+  stopsLeft,
+  trackRide,
+} from '@/shared/trip';
 import type { LatLng, TransitItinerary } from '@/shared/types';
 
 type State =
@@ -35,7 +42,7 @@ const FollowMap: ComponentType<ComponentProps<typeof import('@/src/features/guid
   ? (require('@/src/features/guide/FollowMap') as typeof import('@/src/features/guide/FollowMap')).FollowMap
   : () => null;
 
-/** Trajets en transports (métro, tram, bus) avec horaires, puis accompagnement en direct. */
+/** Trajets en transports (métro, tram, bus) avec horaires, puis suivi des étapes. */
 export default function TransitTripScreen() {
   const params = useLocalSearchParams<{ id: string; name: string; lat: string; lng: string }>();
   const name = params.name ?? 'Destination';
@@ -125,7 +132,8 @@ export default function TransitTripScreen() {
     [params.id, destination, name],
   );
 
-  const position = usePosition(!!shown && status === 'granted');
+  const fix = useFix(!!shown && status === 'granted');
+  const position = fix?.position ?? null;
 
   // Où marcher : pendant le trajet, la fin du tronçon à pied en cours ; avant, l'arrêt de départ.
   const walkTarget = useMemo<LatLng | null>(() => {
@@ -178,9 +186,9 @@ export default function TransitTripScreen() {
       </View>
 
       {trip ? (
-        <LiveTrip
+        <TripProgress
           trip={trip}
-          position={position}
+          fix={fix}
           destinationName={name}
           placeId={params.id}
           onStop={() => {
@@ -220,15 +228,9 @@ export default function TransitTripScreen() {
                   icon="navigate"
                   onPress={() => {
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    if (mapboxGuideAvailable) {
-                      // Toutes les étapes s'enchaînent dans un seul écran guidé.
-                      setPendingJourney(journeyFromItinerary(shown, params.id, name));
-                      router.push('/journey');
-                    } else {
-                      setTrip(shown);
-                    }
+                    setTrip(shown);
                   }}
-                  accessibilityLabel="Démarrer l’accompagnement en direct"
+                  accessibilityLabel="Lancer le trajet"
                 />
               </>
             )}
@@ -239,16 +241,22 @@ export default function TransitTripScreen() {
   );
 }
 
-/** Position GPS précise, suivie tant que l'écran l'utilise. */
-function usePosition(enabled: boolean): LatLng | null {
-  const [position, setPosition] = useState<LatLng | null>(null);
+/** Mesure GPS précise (position, vitesse, heure), suivie tant que l'écran l'utilise. */
+function useFix(enabled: boolean): Fix | null {
+  const [fix, setFix] = useState<Fix | null>(null);
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
     let sub: Location.LocationSubscription | null = null;
+    // distanceInterval 0 : des mesures arrivent même à l'arrêt, sinon on croirait le GPS perdu.
     void Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
-      (loc) => setPosition({ lat: loc.coords.latitude, lng: loc.coords.longitude }),
+      { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 0 },
+      (loc) =>
+        setFix({
+          position: { lat: loc.coords.latitude, lng: loc.coords.longitude },
+          speed: loc.coords.speed != null && loc.coords.speed >= 0 ? loc.coords.speed : null,
+          at: loc.timestamp || Date.now(),
+        }),
     )
       .then((s) => (cancelled ? s.remove() : (sub = s)))
       .catch(() => {});
@@ -257,21 +265,29 @@ function usePosition(enabled: boolean): LatLng | null {
       sub?.remove();
     };
   }, [enabled]);
-  return position;
+  return fix;
 }
 
-/** Accompagnement en direct : position suivie, étape en cours, alerte avant de descendre. */
-function LiveTrip({
+function say(text: string) {
+  Speech.stop();
+  Speech.speak(text, { language: 'fr-FR' });
+}
+
+/**
+ * Trajet lancé : la liste des étapes, l'étape en cours surlignée automatiquement.
+ * Dans le véhicule, on affiche (et on dit) combien d'arrêts il reste.
+ */
+function TripProgress({
   trip,
+  fix,
   destinationName,
   placeId,
   onStop,
   onProgress,
   bottomInset,
-  position,
 }: {
   trip: TransitItinerary;
-  position: LatLng | null;
+  fix: Fix | null;
   destinationName: string;
   placeId: string;
   onStop: () => void;
@@ -280,85 +296,99 @@ function LiveTrip({
 }) {
   useKeepAwake();
   const [index, setIndex] = useState(0);
-  const [now, setNow] = useState(() => new Date());
-  const alerted = useRef(new Set<string>());
+  // Suivi du véhicule, remis à zéro à chaque étape.
+  const [tracked, setTracked] = useState<{ index: number; ride: RideTracking }>({ index: 0, ride: NOT_BOARDED });
+  const [now, setNow] = useState(() => Date.now());
+  const sawAtStop = useRef(new Set<number>());
+  const announced = useRef(new Set<string>());
 
+  // Sous terre, plus de GPS : l'horloge fait avancer l'estimation.
   useEffect(() => {
-    const tick = setInterval(() => setNow(new Date()), 10_000);
+    const tick = setInterval(() => setNow(Date.now()), 5_000);
     return () => clearInterval(tick);
   }, []);
+  useEffect(() => () => void Speech.stop(), []);
 
   useEffect(() => {
-    if (position) setIndex((prev) => currentSegment(trip, position, prev));
-  }, [position, trip]);
+    if (!fix) return;
+    setIndex((prev) => currentSegment(trip, fix.position, prev));
+  }, [fix, trip]);
 
-  // Prochain véhicule à prendre (celui de l'étape en cours, ou de la suivante si on marche).
-  const cur = trip.segments[index];
-  const nextRide = cur?.kind === 'ride' ? cur : trip.segments[index + 1];
-  const ride = nextRide?.kind === 'ride' ? nextRide : undefined;
-  const realtime = useStopRealtime(ride?.departureStop.name, ride?.line.short, ride?.headsign);
+  const seg = trip.segments[index];
+  const ride = seg?.kind === 'ride' ? seg : undefined;
 
-  const instruction = position
-    ? liveInstruction(trip, index, position, destinationName, now, realtime?.[0])
-    : { title: 'Recherche de votre position…', subtitle: 'Sortez à l’extérieur si possible.' };
-
-  // Vibration une seule fois par étape : départ imminent, ou descendre au prochain arrêt.
   useEffect(() => {
-    if (!instruction.alert) return;
-    const key = `${instruction.alert}-${index}`;
-    if (alerted.current.has(key)) return;
-    alerted.current.add(key);
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-  }, [instruction.alert, index]);
+    if (ride && fix && haversineMeters(fix.position, ride.departureStop.location) < 100) {
+      sawAtStop.current.add(index);
+    }
+    if (!ride) return;
+    setTracked((prev) => ({
+      index,
+      ride: trackRide(ride, prev.index === index ? prev.ride : NOT_BOARDED, fix, now, sawAtStop.current.has(index)),
+    }));
+  }, [ride, fix, now, index]);
+
+  const tracking = tracked.index === index ? tracked.ride : NOT_BOARDED;
+  const left = ride && tracking.boardedAt !== null ? stopsLeft(ride.stopCount, tracking.fraction) : null;
+
+  // Une seule annonce par étape : montée détectée, puis « descendez au prochain arrêt ».
+  useEffect(() => {
+    if (!ride || left === null) return;
+    const key = left <= 1 ? `off-${index}` : `on-${index}`;
+    if (announced.current.has(key)) return;
+    announced.current.add(key);
+    if (left <= 1) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      say(`Prochain arrêt : ${ride.arrivalStop.name}. Préparez-vous à descendre.`);
+    } else {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      say(`Vous êtes dans le ${lineLabel(ride.line)}. Encore ${left} arrêts avant ${ride.arrivalStop.name}.`);
+    }
+  }, [ride, left, index]);
 
   const last = trip.segments[trip.segments.length - 1];
   const arrived =
-    position !== null &&
+    fix !== null &&
     index === trip.segments.length - 1 &&
     last?.kind === 'walk' &&
-    haversineMeters(position, last.to) < 60;
+    haversineMeters(fix.position, last.to) < 60;
 
   useEffect(() => onProgress(index), [index, onProgress]);
 
   return (
-    <View style={[styles.panel, styles.livePanel]}>
-      <View
-        style={[
-          styles.banner,
-          instruction.alert === 'prepare' && { backgroundColor: colors.accent },
-          instruction.alert === 'hurry' && { backgroundColor: '#8A5A12' },
-        ]}
-        accessibilityLiveRegion="polite"
-      >
-        <Text style={styles.bannerTitle}>{instruction.title}</Text>
-        <Text style={styles.bannerSubtitle}>{instruction.subtitle}</Text>
+    <ScrollView
+      style={styles.panel}
+      contentContainerStyle={[styles.panelContent, { paddingBottom: bottomInset + spacing.lg }]}
+    >
+      <Text style={styles.section}>Étapes</Text>
+      <TripTimeline
+        itinerary={trip}
+        destinationName={destinationName}
+        current={index}
+        onboard={left !== null ? { stopsLeft: left } : undefined}
+        onGuideWalk={
+          mapboxGuideAvailable
+            ? undefined
+            : (w) =>
+                router.push({
+                  pathname: '/guide/[id]',
+                  params: {
+                    id: placeId,
+                    name: w.toName,
+                    lat: String(w.to.lat),
+                    lng: String(w.to.lng),
+                    mode: 'walk',
+                    back: '1',
+                  },
+                })
+        }
+      />
+      <View style={styles.actions}>
+        <Pressable style={styles.stop} onPress={onStop} accessibilityRole="button">
+          <Text style={styles.stopText}>{arrived ? 'Terminer' : 'Arrêter'}</Text>
+        </Pressable>
       </View>
-      <ScrollView contentContainerStyle={[styles.panelContent, { paddingBottom: bottomInset + spacing.lg }]}>
-        <TripTimeline
-          itinerary={trip}
-          destinationName={destinationName}
-          current={index}
-          onGuideWalk={(seg) =>
-            router.push({
-              pathname: '/guide/[id]',
-              params: {
-                id: placeId,
-                name: seg.toName,
-                lat: String(seg.to.lat),
-                lng: String(seg.to.lng),
-                mode: 'walk',
-                back: '1',
-              },
-            })
-          }
-        />
-        <View style={styles.actions}>
-          <Pressable style={styles.stop} onPress={onStop} accessibilityRole="button">
-            <Text style={styles.stopText}>{arrived ? 'Terminer' : 'Arrêter'}</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -377,13 +407,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.lg,
     marginTop: -radius.lg,
   },
-  livePanel: { overflow: 'hidden' },
   panelContent: { padding: spacing.lg, gap: spacing.md },
   section: { color: colors.text, fontFamily: fonts.displayMedium, fontSize: font.title - 2, marginTop: spacing.sm },
   fare: { color: colors.textMuted, fontSize: font.small },
-  banner: { backgroundColor: colors.surfaceRaised, padding: spacing.lg, gap: 4 },
-  bannerTitle: { color: colors.text, fontFamily: fonts.display, fontSize: font.title },
-  bannerSubtitle: { color: colors.text, fontSize: font.body },
   actions: { flexDirection: 'row', justifyContent: 'center', marginTop: spacing.md },
   stop: {
     paddingHorizontal: spacing.xl,

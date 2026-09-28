@@ -79,6 +79,105 @@ export function currentSegment(itinerary: TransitItinerary, position: LatLng, pr
   return index;
 }
 
+/** Projection d'un point sur un tracé : mètres parcourus depuis le début, longueur, écart. */
+export function alongLine(p: LatLng, points: LatLng[]): { along: number; total: number; offset: number } {
+  const k = Math.cos((p.lat * Math.PI) / 180) * 111_320;
+  const xy = (q: LatLng) => ({ x: (q.lng - p.lng) * k, y: (q.lat - p.lat) * 111_320 });
+  let total = 0;
+  let best = { along: 0, offset: Infinity };
+  for (let i = 1; i < points.length; i++) {
+    const a = xy(points[i - 1]!);
+    const b = xy(points[i]!);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    const t = len === 0 ? 0 : Math.max(0, Math.min(1, -(a.x * dx + a.y * dy) / (len * len)));
+    const offset = Math.hypot(a.x + t * dx, a.y + t * dy);
+    if (offset < best.offset) best = { along: total + t * len, offset };
+    total += len;
+  }
+  return { along: best.along, total, offset: best.offset };
+}
+
+/** Suivi d'un tronçon en véhicule : montée détectée et part du trajet déjà faite (0 → 1). */
+export interface RideTracking {
+  boardedAt: number | null;
+  fraction: number;
+}
+
+export interface Fix {
+  position: LatLng;
+  /** m/s, si le GPS la donne. */
+  speed: number | null;
+  /** Horodatage (ms) de la mesure. */
+  at: number;
+}
+
+export const NOT_BOARDED: RideTracking = { boardedAt: null, fraction: 0 };
+
+/** Au-delà, on est sur la ligne, pas à côté. */
+const ON_LINE_METERS = 80;
+/** Parcourus depuis l'arrêt de montée le long de la ligne : on est dans le véhicule. */
+const BOARD_ALONG_METERS = 150;
+/** ≈ 15 km/h : plus vite qu'à pied. */
+const BOARD_SPEED = 4;
+/** Mesure plus vieille que ça : on ne s'y fie plus. */
+const FRESH_FIX_MS = 20_000;
+/** Plus de GPS depuis ça, dans le métro : on est sous terre. */
+const GPS_LOST_MS = 45_000;
+
+/**
+ * Détecte la montée dans le bus / tram / métro et estime l'avancement.
+ * - GPS : on avance sur la ligne (plus de 150 m depuis l'arrêt) ou on va plus vite qu'à pied.
+ * - Métro (souterrain, sans GPS) : on était à la station, l'heure de départ est passée
+ *   et le GPS s'est tu ; l'avancement suit alors les horaires.
+ * L'avancement ne recule jamais.
+ */
+export function trackRide(
+  ride: Ride,
+  prev: RideTracking,
+  fix: Fix | null,
+  now: number,
+  /** L'utilisateur a été vu à l'arrêt de montée. */
+  sawAtStop: boolean,
+): RideTracking {
+  const dep = Date.parse(ride.departureTime);
+  const duration = Math.max(60_000, Date.parse(ride.arrivalTime) - dep);
+  const fresh = fix !== null && now - fix.at < FRESH_FIX_MS;
+  const line = fresh ? alongLine(fix.position, segmentPoints(ride)) : null;
+  const onLine = line !== null && line.offset < ON_LINE_METERS;
+
+  let boardedAt = prev.boardedAt;
+  if (boardedAt === null) {
+    if (onLine && (line.along > BOARD_ALONG_METERS || (fix!.speed ?? 0) > BOARD_SPEED)) {
+      boardedAt = now;
+    } else if (
+      ride.line.vehicle === 'Métro' &&
+      sawAtStop &&
+      now > dep + 60_000 &&
+      (fix === null || now - fix.at > GPS_LOST_MS)
+    ) {
+      boardedAt = Math.max(dep, fix?.at ?? dep);
+    }
+  }
+  if (boardedAt === null) return NOT_BOARDED;
+
+  let fraction: number;
+  if (onLine && line.total > 0) {
+    fraction = line.along / line.total;
+  } else {
+    // Monté nettement après l'horaire prévu : c'est un véhicule plus tardif.
+    const start = boardedAt > dep + 120_000 ? boardedAt : dep;
+    fraction = (now - start) / duration;
+  }
+  return { boardedAt, fraction: Math.max(prev.fraction, Math.min(1, Math.max(0, fraction))) };
+}
+
+/** Arrêts restant avant de descendre (au moins 1 tant qu'on est à bord). */
+export function stopsLeft(stopCount: number, fraction: number): number {
+  return Math.max(1, Math.min(stopCount, Math.ceil((1 - fraction) * stopCount - 1e-6)));
+}
+
 export function formatClock(iso: string | Date): string {
   const d = typeof iso === 'string' ? new Date(iso) : iso;
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;

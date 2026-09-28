@@ -14,6 +14,8 @@ interface Props {
   destinationName: string;
   /** Tronçon en cours (pendant le trajet). */
   current?: number;
+  /** À bord du véhicule de l'étape en cours : arrêts restant avant de descendre. */
+  onboard?: { stopsLeft: number };
   /** « Y aller » : guidage à pied jusqu'au bout d'un tronçon. */
   onGuideWalk?: (segment: Extract<TripSegment, { kind: 'walk' }>) => void;
 }
@@ -21,7 +23,7 @@ interface Props {
 const minutes = (s: number) => `${Math.max(1, Math.round(s / 60))} min`;
 
 /** Étapes du trajet, façon feuille de route. */
-export function TripTimeline({ itinerary, destinationName, current, onGuideWalk }: Props) {
+export function TripTimeline({ itinerary, destinationName, current, onboard, onGuideWalk }: Props) {
   return (
     <View style={styles.list}>
       {itinerary.segments.map((seg, i) => {
@@ -71,7 +73,11 @@ export function TripTimeline({ itinerary, destinationName, current, onGuideWalk 
                       Direction {seg.headsign}
                     </Text>
                   </View>
-                  {state !== 'done' && <Realtime ride={seg} />}
+                  {state === 'now' && onboard ? (
+                    <OnBoard stopsLeft={onboard.stopsLeft} color={seg.line.color} />
+                  ) : (
+                    state !== 'done' && <Realtime ride={seg} />
+                  )}
                   <Text style={styles.muted}>
                     {seg.stopCount} arrêt{seg.stopCount > 1 ? 's' : ''} · {minutes(seg.durationSeconds)}
                   </Text>
@@ -98,6 +104,17 @@ export function TripTimeline({ itinerary, destinationName, current, onGuideWalk 
   );
 }
 
+/** Dans le véhicule : combien d'arrêts avant de descendre. */
+function OnBoard({ stopsLeft, color }: { stopsLeft: number; color: string }) {
+  const label = stopsLeft <= 1 ? 'Descendez au prochain arrêt' : `À bord · encore ${stopsLeft} arrêts`;
+  return (
+    <View style={[styles.onboard, { borderColor: color }]} accessibilityLiveRegion="polite">
+      <Ionicons name={stopsLeft <= 1 ? 'exit-outline' : 'train-outline'} size={16} color={colors.text} />
+      <Text style={styles.onboardText}>{label}</Text>
+    </View>
+  );
+}
+
 /** Temps réel Ilévia à l'arrêt de montée (masqué s'il n'est pas disponible). */
 function Realtime({ ride }: { ride: Extract<TripSegment, { kind: 'ride' }> }) {
   const mins = useStopRealtime(ride.departureStop.name, ride.line.short, ride.headsign);
@@ -116,6 +133,18 @@ const styles = StyleSheet.create({
   live: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.open },
   liveText: { color: colors.open, fontSize: font.small, fontWeight: '800' },
+  onboard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    backgroundColor: colors.surfaceRaised,
+  },
+  onboardText: { color: colors.text, fontSize: font.small, fontWeight: '800' },
   list: { gap: 2 },
   row: { flexDirection: 'row', gap: spacing.md },
   rail: { width: 22, alignItems: 'center' },
