@@ -1,8 +1,8 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Redirect, Stack, useLocalSearchParams } from 'expo-router';
 
-import { GuideScreen } from '@/src/features/guide/GuideScreen';
+import { mapboxGuideAvailable } from '@/src/features/guide/available';
 
-/** Guidage pas à pas à pied ou à vélo (Mapbox). */
+/** Guidage pas à pas à pied ou à vélo (Mapbox), ou guidage Google si Mapbox est absent. */
 export default function GuideRoute() {
   const params = useLocalSearchParams<{
     id: string;
@@ -12,6 +12,12 @@ export default function GuideRoute() {
     mode?: string;
     back?: string;
   }>();
+
+  if (!mapboxGuideAvailable) {
+    return <Redirect href={{ pathname: '/navigate/[id]', params }} />;
+  }
+  // Chargé seulement si Mapbox est présent : l'importer sans le module natif fait planter.
+  const { GuideScreen } = require('@/src/features/guide/GuideScreen') as typeof import('@/src/features/guide/GuideScreen');
   return (
     <>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
