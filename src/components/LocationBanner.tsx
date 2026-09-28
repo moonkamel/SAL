@@ -3,10 +3,12 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { colors, font, radius, spacing } from '@/src/theme';
+import { useTone } from '@/src/theme/tone';
 
 /** Affiché quand on n'a pas la position : les résultats sont centrés sur la Grand-Place. */
 export function LocationBanner() {
   const { status, isFallback, requestPermission } = useUserLocation();
+  const { c } = useTone();
   if (status === 'pending' || !isFallback) return null;
 
   const message =
@@ -17,11 +19,11 @@ export function LocationBanner() {
   return (
     <Pressable
       onPress={status === 'denied' ? requestPermission : undefined}
-      style={styles.banner}
+      style={[styles.banner, { backgroundColor: c.surfaceRaised }]}
       accessibilityRole={status === 'denied' ? 'button' : 'text'}
     >
       <Ionicons name="location-outline" size={20} color={colors.star} />
-      <Text style={styles.text}>{message}</Text>
+      <Text style={[styles.text, { color: c.textMuted }]}>{message}</Text>
     </Pressable>
   );
 }

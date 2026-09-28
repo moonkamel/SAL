@@ -16,3 +16,9 @@ export function momentLabel(date: Date = new Date()): string {
   const day = hour < 5 ? (date.getDay() + 6) % 7 : date.getDay();
   return `${DAYS[day]} ${momentOfDay(hour)} · LILLE`;
 }
+
+/** Journée (6 h – 19 h) : « On fait quoi aujourd'hui ? » et accueil en tonalité jour. */
+export function isDaytime(date: Date = new Date()): boolean {
+  const hour = date.getHours();
+  return hour >= 6 && hour < 19;
+}

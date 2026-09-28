@@ -8,6 +8,7 @@ import { useLiveData } from '@/src/features/lille/useLiveData';
 import { OfferCard } from '@/src/features/offers/OfferCard';
 import { getAgenda, getOffers } from '@/src/lib/api';
 import { colors, font, fonts, spacing } from '@/src/theme';
+import { useTone } from '@/src/theme/tone';
 import type { AgendaResponse, LatLng, OffersResponse } from '@/shared/types';
 
 /** On ne recharge qu'après un déplacement de ~200 m ; les distances restent exactes. */
@@ -16,10 +17,11 @@ export function refreshKey(p: LatLng): number[] {
 }
 
 function Rail({ title, onSeeAll, children }: { title: string; onSeeAll: () => void; children: ReactNode }) {
+  const { c } = useTone();
   return (
     <View style={styles.section}>
       <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
+        <Text style={[styles.title, { color: c.text }]}>{title}</Text>
         <Pressable onPress={onSeeAll} hitSlop={12} accessibilityRole="button" accessibilityLabel={`${title} : tout voir`}>
           <Text style={styles.seeAll}>Tout voir</Text>
         </Pressable>

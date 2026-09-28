@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import type { ComponentProps } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { setStatusBarStyle } from 'expo-status-bar';
+import { type ComponentProps, useCallback } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -25,6 +26,7 @@ import { useLiveData } from '@/src/features/lille/useLiveData';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { OffersRail, TonightRail } from '@/src/features/moment/HomeRails';
 import { SurpriseCard } from '@/src/features/moment/SurpriseCard';
+import { useDaytime } from '@/src/features/moment/useDaytime';
 import { WeatherCard } from '@/src/features/moment/WeatherCard';
 import { weatherIcon } from '@/src/features/moment/weatherIcons';
 import { getWeather } from '@/src/lib/api';
@@ -33,7 +35,6 @@ import {
   colors,
   font,
   fonts,
-  gradients,
   motion,
   palette,
   radius,
@@ -41,6 +42,7 @@ import {
   spacing,
   TOUCH_TARGET,
 } from '@/src/theme';
+import { TONES, ToneProvider } from '@/src/theme/tone';
 import type { Suggestion, WeatherResponse } from '@/shared/types';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -61,6 +63,17 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { history, add, clear } = useSearchHistory();
   const { onSearch, privacyOptionsRequired, showPrivacyOptions } = useAds();
+  // Le jour (6 h – 19 h) : « aujourd'hui » et tonalité jour ; le soir : la nuit lilloise.
+  const day = useDaytime();
+  const t = TONES[day ? 'day' : 'night'];
+
+  // Barre d'état sombre sur le ciel clair ; les autres écrans restent en tonalité nuit.
+  useFocusEffect(
+    useCallback(() => {
+      setStatusBarStyle(day ? 'dark' : 'light');
+      return () => setStatusBarStyle('light');
+    }, [day]),
+  );
 
   const { coords } = useUserLocation();
   // Arrondi à ~1 km : pas de nouvel appel à chaque petit déplacement.
@@ -83,163 +96,171 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={{ paddingBottom: spacing.xxl }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+    <ToneProvider value={day ? 'day' : 'night'}>
+      <View style={[styles.screen, { backgroundColor: t.background }]}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          {/* Ciel nocturne et silhouette de Lille. */}
-          <LinearGradient
-            colors={gradients.sky}
-            style={[styles.sky, { paddingTop: insets.top + spacing.md }]}
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: spacing.xxl }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <LilleSkyline style={styles.skyline} />
-
-            <Animated.View entering={FadeInDown.duration(motion.slow)} style={styles.topBar}>
-              <View style={styles.momentRow}>
-                <Text style={styles.moment}>{momentLabel()}</Text>
-                {weather && (
-                  <View
-                    style={styles.weatherChip}
-                    accessible
-                    accessibilityLabel={`${Math.round(weather.weather.temperature)} degrés`}
-                  >
-                    <Ionicons name={weatherIcon(weather.weather)} size={13} color={colors.gold} />
-                    <Text style={styles.weatherText}>
-                      {Math.round(weather.weather.temperature)}°
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <PressableScale
-                onPress={() => router.push('/favorites')}
-                style={styles.favButton}
-                accessibilityRole="button"
-                accessibilityLabel="Mes favoris"
-              >
-                <Ionicons name="heart" size={18} color={colors.accent} />
-                <Text style={styles.favText}>Favoris</Text>
-              </PressableScale>
-            </Animated.View>
-
-            <Animated.Text
-              entering={FadeInDown.delay(motion.stagger).duration(motion.slow)}
-              style={styles.hero}
+            {/* Ciel (bleu le jour, nocturne le soir) et silhouette de Lille. */}
+            <LinearGradient
+              colors={t.sky}
+              style={[styles.sky, { paddingTop: insets.top + spacing.md }]}
             >
-              Qu’est-ce qu’on fait ce soir <Text style={styles.heroAccent}>à Lille</Text> ?
-            </Animated.Text>
-          </LinearGradient>
+              <LilleSkyline style={styles.skyline} tone={day ? 'day' : 'night'} />
 
-          <Animated.View
-            entering={FadeInDown.delay(motion.stagger * 2).duration(motion.slow)}
-            style={styles.searchWrap}
-          >
-            <SearchBar onSubmit={(q) => search(q)} />
-          </Animated.View>
-
-          <Animated.View
-            entering={FadeInDown.delay(motion.stagger * 3).duration(motion.slow)}
-            style={[styles.padded, styles.moments]}
-          >
-            <SurpriseCard />
-            {weather && (
-              <WeatherCard data={weather} onPress={(s) => search(s.query, s.ambiance)} />
-            )}
-          </Animated.View>
-
-          <TonightRail near={coords} />
-          <OffersRail near={coords} />
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Envie de…</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categories}
-            >
-              {CATEGORIES.map((c, i) => (
-                <Animated.View
-                  key={c.label}
-                  entering={FadeInRight.delay(motion.stagger * (3 + i)).duration(motion.slow)}
-                >
-                  <PressableScale
-                    onPress={() => search(c.query)}
-                    style={styles.category}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Rechercher : ${c.label}`}
-                  >
-                    <View style={[styles.categoryIcon, { backgroundColor: `${c.tint}26` }]}>
-                      <Ionicons name={c.icon} size={24} color={c.tint} />
+              <Animated.View entering={FadeInDown.duration(motion.slow)} style={styles.topBar}>
+                <View style={styles.momentRow}>
+                  <Text style={[styles.moment, day && { color: t.text }]}>{momentLabel()}</Text>
+                  {weather && (
+                    <View
+                      style={[styles.weatherChip, { backgroundColor: t.glass }]}
+                      accessible
+                      accessibilityLabel={`${Math.round(weather.weather.temperature)} degrés`}
+                    >
+                      <Ionicons name={weatherIcon(weather.weather)} size={13} color={t.gold} />
+                      <Text style={[styles.weatherText, { color: t.text }]}>
+                        {Math.round(weather.weather.temperature)}°
+                      </Text>
                     </View>
-                    <Text style={styles.categoryLabel} numberOfLines={2}>
-                      {c.label}
-                    </Text>
-                  </PressableScale>
-                </Animated.View>
-              ))}
-            </ScrollView>
-          </View>
+                  )}
+                </View>
+                <PressableScale
+                  onPress={() => router.push('/favorites')}
+                  style={[styles.favButton, { backgroundColor: t.glass, borderColor: t.glassBorder }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Mes favoris"
+                >
+                  <Ionicons name="heart" size={18} color={colors.accent} />
+                  <Text style={[styles.favText, { color: t.text }]}>Favoris</Text>
+                </PressableScale>
+              </Animated.View>
 
-          <View style={styles.padded}>
-            <LocationBanner />
-          </View>
+              <Animated.Text
+                entering={FadeInDown.delay(motion.stagger).duration(motion.slow)}
+                style={[styles.hero, { color: t.text }, day && styles.heroDay]}
+              >
+                On fait quoi {day ? 'aujourd’hui' : 'ce soir'}{' '}
+                <Text style={[styles.heroAccent, { color: t.highlight }]}>à Lille</Text>
+                {/* Espace insécable : le « ? » ne se retrouve jamais seul sur une ligne. */}
+                {'\u00A0?'}
+              </Animated.Text>
+            </LinearGradient>
 
-          {history.length > 0 && (
             <Animated.View
-              entering={FadeInDown.delay(motion.stagger * 4).duration(motion.slow)}
-              style={[styles.section, styles.padded]}
+              entering={FadeInDown.delay(motion.stagger * 2).duration(motion.slow)}
+              style={styles.searchWrap}
             >
-              <View style={styles.historyHeader}>
-                <Text style={styles.sectionTitleInline}>Recherches récentes</Text>
-                <Pressable onPress={clear} hitSlop={12} accessibilityRole="button">
-                  <Text style={styles.clear}>Effacer</Text>
-                </Pressable>
-              </View>
-              <View style={styles.historyCard}>
-                {history.map((q, i) => (
-                  <Pressable
-                    key={q}
-                    onPress={() => search(q)}
-                    style={({ pressed }) => [
-                      styles.historyItem,
-                      i > 0 && styles.historySeparator,
-                      pressed && { backgroundColor: colors.surfaceRaised },
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Relancer la recherche ${q}`}
-                  >
-                    <Ionicons name="time-outline" size={20} color={colors.textFaint} />
-                    <Text style={styles.historyText} numberOfLines={1}>
-                      {q}
-                    </Text>
-                    <Ionicons name="arrow-forward" size={18} color={colors.textFaint} />
-                  </Pressable>
-                ))}
-              </View>
+              <SearchBar onSubmit={(q) => search(q)} />
             </Animated.View>
-          )}
-        </ScrollView>
 
-        {privacyOptionsRequired && (
-          <Pressable
-            onPress={() => void showPrivacyOptions()}
-            style={styles.privacy}
-            hitSlop={8}
-            accessibilityRole="button"
-          >
-            <Text style={styles.privacyText}>Confidentialité et publicité</Text>
-          </Pressable>
-        )}
-        <View style={{ paddingBottom: insets.bottom }}>
-          <AdBanner />
-        </View>
-      </KeyboardAvoidingView>
-    </View>
+            <Animated.View
+              entering={FadeInDown.delay(motion.stagger * 3).duration(motion.slow)}
+              style={[styles.padded, styles.moments]}
+            >
+              <SurpriseCard />
+              {weather && (
+                <WeatherCard data={weather} onPress={(s) => search(s.query, s.ambiance)} />
+              )}
+            </Animated.View>
+
+            <TonightRail near={coords} />
+            <OffersRail near={coords} />
+
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: t.text }]}>Envie de…</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categories}
+              >
+                {CATEGORIES.map((c, i) => (
+                  <Animated.View
+                    key={c.label}
+                    entering={FadeInRight.delay(motion.stagger * (3 + i)).duration(motion.slow)}
+                  >
+                    <PressableScale
+                      onPress={() => search(c.query)}
+                      style={[
+                        styles.category,
+                        { backgroundColor: t.surface, borderColor: t.border, boxShadow: t.cardShadow },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Rechercher : ${c.label}`}
+                    >
+                      <View style={[styles.categoryIcon, { backgroundColor: `${c.tint}26` }]}>
+                        <Ionicons name={c.icon} size={24} color={c.tint} />
+                      </View>
+                      <Text style={[styles.categoryLabel, { color: t.text }]} numberOfLines={2}>
+                        {c.label}
+                      </Text>
+                    </PressableScale>
+                  </Animated.View>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.padded}>
+              <LocationBanner />
+            </View>
+
+            {history.length > 0 && (
+              <Animated.View
+                entering={FadeInDown.delay(motion.stagger * 4).duration(motion.slow)}
+                style={[styles.section, styles.padded]}
+              >
+                <View style={styles.historyHeader}>
+                  <Text style={[styles.sectionTitleInline, { color: t.text }]}>Recherches récentes</Text>
+                  <Pressable onPress={clear} hitSlop={12} accessibilityRole="button">
+                    <Text style={styles.clear}>Effacer</Text>
+                  </Pressable>
+                </View>
+                <View style={[styles.historyCard, { backgroundColor: t.surface }]}>
+                  {history.map((q, i) => (
+                    <Pressable
+                      key={q}
+                      onPress={() => search(q)}
+                      style={({ pressed }) => [
+                        styles.historyItem,
+                        i > 0 && [styles.historySeparator, { borderTopColor: t.border }],
+                        pressed && { backgroundColor: t.surfaceRaised },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Relancer la recherche ${q}`}
+                    >
+                      <Ionicons name="time-outline" size={20} color={t.textFaint} />
+                      <Text style={[styles.historyText, { color: t.text }]} numberOfLines={1}>
+                        {q}
+                      </Text>
+                      <Ionicons name="arrow-forward" size={18} color={t.textFaint} />
+                    </Pressable>
+                  ))}
+                </View>
+              </Animated.View>
+            )}
+          </ScrollView>
+
+          {privacyOptionsRequired && (
+            <Pressable
+              onPress={() => void showPrivacyOptions()}
+              style={styles.privacy}
+              hitSlop={8}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.privacyText, { color: t.textFaint }]}>Confidentialité et publicité</Text>
+            </Pressable>
+          )}
+          <View style={{ paddingBottom: insets.bottom }}>
+            <AdBanner />
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </ToneProvider>
   );
 }
 
@@ -290,6 +311,8 @@ const styles = StyleSheet.create({
     lineHeight: font.hero * 1.15,
     maxWidth: 340,
   },
+  // « aujourd'hui » est plus long que « ce soir » : un cran plus petit pour tenir sur 2 lignes.
+  heroDay: { fontSize: font.hero - 4, lineHeight: (font.hero - 4) * 1.15 },
   heroAccent: { color: colors.gold, fontFamily: fonts.displayItalic },
   searchWrap: { marginTop: -spacing.xxl, paddingHorizontal: spacing.lg },
   section: { marginTop: spacing.xl, gap: spacing.md },

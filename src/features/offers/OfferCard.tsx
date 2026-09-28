@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/src/components/PressableScale';
 import { colors, font, fonts, radius, spacing } from '@/src/theme';
+import { useTone } from '@/src/theme/tone';
 import { formatDistance } from '@/shared/format';
 import type { Offer } from '@/shared/types';
 
@@ -16,22 +17,24 @@ interface Props {
 
 /** Bon plan d'un établissement partenaire (« 1 verre offert avant 20 h »). */
 export function OfferCard({ offer, showPlace, onPress, compact }: Props) {
+  const { tone, c } = useTone();
+  const dayStyle = tone === 'day' && { backgroundColor: c.surface, boxShadow: c.cardShadow, borderColor: c.gold };
   const body = (
     <>
       <View style={styles.top}>
-        <View style={styles.badge}>
+        <View style={[styles.badge, { backgroundColor: c.gold }]}>
           <Ionicons name="pricetag" size={12} color={colors.background} />
           <Text style={styles.badgeText}>Bon plan</Text>
         </View>
-        <Text style={[styles.schedule, { color: offer.live ? colors.open : colors.textMuted }]}>
+        <Text style={[styles.schedule, { color: offer.live ? colors.open : c.textMuted }]}>
           {offer.live ? 'En ce moment' : offer.schedule}
         </Text>
       </View>
-      <Text style={styles.title} numberOfLines={compact ? 2 : undefined}>
+      <Text style={[styles.title, { color: c.text }]} numberOfLines={compact ? 2 : undefined}>
         {offer.title}
       </Text>
       {showPlace && (
-        <Text style={styles.place} numberOfLines={1}>
+        <Text style={[styles.place, { color: c.text }]} numberOfLines={1}>
           {offer.placeName}
           {offer.distanceMeters !== undefined && (
             <Text style={styles.muted}> · {formatDistance(offer.distanceMeters)}</Text>
@@ -48,11 +51,11 @@ export function OfferCard({ offer, showPlace, onPress, compact }: Props) {
       )}
     </>
   );
-  if (!onPress) return <View style={[styles.card, compact && styles.compact]}>{body}</View>;
+  if (!onPress) return <View style={[styles.card, compact && styles.compact, dayStyle]}>{body}</View>;
   return (
     <PressableScale
       onPress={onPress}
-      style={[styles.card, compact && styles.compact]}
+      style={[styles.card, compact && styles.compact, dayStyle]}
       accessibilityRole="button"
       accessibilityLabel={`Bon plan chez ${offer.placeName} : ${offer.title}. ${offer.schedule}`}
     >

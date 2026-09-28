@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/src/components/PressableScale';
 import { colors, font, fonts, palette, radius, spacing } from '@/src/theme';
+import { useTone } from '@/src/theme/tone';
 import { formatDistance } from '@/shared/format';
 import { type AgendaEvent, type EventCategory, GENRE_LABELS } from '@/shared/types';
 
@@ -30,10 +31,16 @@ interface Props {
 
 export function EventCard({ event, onPress, compact }: Props) {
   const cat = CATEGORY_INFO[event.category];
+  const { tone, c } = useTone();
+  const day = tone === 'day';
   return (
     <PressableScale
       onPress={onPress}
-      style={[styles.card, compact ? styles.compact : styles.full]}
+      style={[
+        styles.card,
+        compact ? styles.compact : styles.full,
+        day && { backgroundColor: c.surface, boxShadow: c.cardShadow },
+      ]}
       accessibilityRole="button"
       accessibilityLabel={`${event.featured ? 'À la une. ' : ''}${cat.label} : ${event.title}, ${event.timeLabel}, ${event.venueName}`}
     >
@@ -45,27 +52,33 @@ export function EventCard({ event, onPress, compact }: Props) {
           transition={150}
         />
       ) : (
-        <View style={[compact ? styles.imageCompact : styles.image, styles.placeholder]}>
-          <Ionicons name={cat.icon} size={compact ? 26 : 30} color={colors.gold} />
+        <View
+          style={[
+            compact ? styles.imageCompact : styles.image,
+            styles.placeholder,
+            day && { backgroundColor: c.goldTint },
+          ]}
+        >
+          <Ionicons name={cat.icon} size={compact ? 26 : 30} color={c.gold} />
         </View>
       )}
       <View style={styles.body}>
         <View style={styles.metaRow}>
-          <Text style={styles.time}>{event.timeLabel}</Text>
+          <Text style={[styles.time, { color: c.gold }]}>{event.timeLabel}</Text>
           {event.featured && (
             <View style={styles.featured}>
               <Text style={styles.featuredText}>À la une</Text>
             </View>
           )}
         </View>
-        <Text style={styles.title} numberOfLines={2}>
+        <Text style={[styles.title, { color: c.text }]} numberOfLines={2}>
           {event.title}
         </Text>
-        <Text style={styles.venue} numberOfLines={1}>
+        <Text style={[styles.venue, { color: c.text }]} numberOfLines={1}>
           {event.venueName} · {formatDistance(event.distanceMeters)}
         </Text>
         {!compact && (
-          <Text style={styles.muted} numberOfLines={1}>
+          <Text style={[styles.muted, { color: c.textMuted }]} numberOfLines={1}>
             {[cat.label, ...(event.genres ?? []).map((g) => GENRE_LABELS[g])].join(' · ')}
             {event.free ? <Text style={styles.free}> · Gratuit</Text> : null}
           </Text>
