@@ -19,7 +19,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GoogleAttribution } from '@/src/components/GoogleAttribution';
 import { GradientButton } from '@/src/components/GradientButton';
 import { AmbianceTags } from '@/src/features/lille/AmbianceTags';
-import { TransitCard } from '@/src/features/lille/TransitCard';
 import { OfferCard } from '@/src/features/offers/OfferCard';
 import { PartnerLinks } from '@/src/features/partners/PartnerLinks';
 import { PhotoCarousel } from '@/src/components/PhotoCarousel';
@@ -262,9 +261,6 @@ export default function PlaceScreen() {
           />
 
           <PartnerLinks links={p.partnerLinks} />
-
-          {/* Pour rentrer : métro, tram et bus au plus près du lieu, en temps réel. */}
-          <TransitCard near={p.location} title="Pour rentrer en transports" />
 
           {p.reviews.length > 0 && (
             <View>

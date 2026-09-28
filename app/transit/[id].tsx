@@ -12,6 +12,7 @@ import { type MapDot, type MapLine, PlacesMap } from '@/src/components/PlacesMap
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { ItineraryCard } from '@/src/features/transit/ItineraryCard';
 import { TripTimeline } from '@/src/features/transit/TripTimeline';
+import { useStopRealtime } from '@/src/features/transit/useStopRealtime';
 import { ApiRequestError, getItineraries } from '@/src/lib/api';
 import { colors, font, fonts, radius, spacing } from '@/src/theme';
 import { haversineMeters } from '@/shared/geo';
@@ -254,8 +255,14 @@ function LiveTrip({
     if (position) setIndex((prev) => currentSegment(trip, position, prev));
   }, [position, trip]);
 
+  // Prochain véhicule à prendre (celui de l'étape en cours, ou de la suivante si on marche).
+  const cur = trip.segments[index];
+  const nextRide = cur?.kind === 'ride' ? cur : trip.segments[index + 1];
+  const ride = nextRide?.kind === 'ride' ? nextRide : undefined;
+  const realtime = useStopRealtime(ride?.departureStop.name, ride?.line.short, ride?.headsign);
+
   const instruction = position
-    ? liveInstruction(trip, index, position, destinationName, now)
+    ? liveInstruction(trip, index, position, destinationName, now, realtime?.[0])
     : { title: 'Recherche de votre position…', subtitle: 'Sortez à l’extérieur si possible.' };
 
   // Vibration une seule fois par étape : départ imminent, ou descendre au prochain arrêt.

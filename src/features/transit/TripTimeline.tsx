@@ -7,6 +7,7 @@ import { formatClock } from '@/shared/trip';
 import type { TransitItinerary, TripSegment } from '@/shared/types';
 
 import { LineBadge } from './LineBadge';
+import { useStopRealtime } from './useStopRealtime';
 
 interface Props {
   itinerary: TransitItinerary;
@@ -70,6 +71,7 @@ export function TripTimeline({ itinerary, destinationName, current, onGuideWalk 
                       Direction {seg.headsign}
                     </Text>
                   </View>
+                  {state !== 'done' && <Realtime ride={seg} />}
                   <Text style={styles.muted}>
                     {seg.stopCount} arrêt{seg.stopCount > 1 ? 's' : ''} · {minutes(seg.durationSeconds)}
                   </Text>
@@ -96,7 +98,24 @@ export function TripTimeline({ itinerary, destinationName, current, onGuideWalk 
   );
 }
 
+/** Temps réel Ilévia à l'arrêt de montée (masqué s'il n'est pas disponible). */
+function Realtime({ ride }: { ride: Extract<TripSegment, { kind: 'ride' }> }) {
+  const mins = useStopRealtime(ride.departureStop.name, ride.line.short, ride.headsign);
+  if (!mins?.length) return null;
+  return (
+    <View style={styles.live} accessible accessibilityLabel={`Temps réel : dans ${mins.join(', ')} minutes`}>
+      <View style={styles.liveDot} />
+      <Text style={styles.liveText}>
+        Temps réel : {mins.map((m) => (m <= 0 ? 'à quai' : `${m} min`)).join(' · ')}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  live: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.open },
+  liveText: { color: colors.open, fontSize: font.small, fontWeight: '800' },
   list: { gap: 2 },
   row: { flexDirection: 'row', gap: spacing.md },
   rail: { width: 22, alignItems: 'center' },

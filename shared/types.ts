@@ -194,16 +194,10 @@ export interface TransitDeparture {
   minutes: number[];
 }
 
-export interface TransitStop {
-  name: string;
-  location: LatLng;
-  distanceMeters: number;
-  walkMinutes: number;
+/** Prochains passages en temps réel à un arrêt (par son nom). */
+export interface StopDeparturesResponse {
+  stop: string;
   departures: TransitDeparture[];
-}
-
-export interface TransitResponse {
-  stops: TransitStop[];
 }
 
 // --- Météo (Open-Meteo) et suggestions ---

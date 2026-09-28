@@ -13,7 +13,7 @@ import type {
   SearchRequest,
   SearchResponse,
   SurpriseResponse,
-  TransitResponse,
+  StopDeparturesResponse,
   VlilleResponse,
   WeatherResponse,
 } from '@/shared/types';
@@ -101,8 +101,9 @@ export function getVlille(near: LatLng, limit = 3, signal?: AbortSignal): Promis
   });
 }
 
-export function getTransit(near: LatLng, signal?: AbortSignal): Promise<TransitResponse> {
-  return request<TransitResponse>(`/api/transit?near=${near.lat},${near.lng}`, { signal });
+/** Prochains passages Ilévia en temps réel à un arrêt, par son nom. */
+export function getStopDepartures(stop: string, signal?: AbortSignal): Promise<StopDeparturesResponse> {
+  return request<StopDeparturesResponse>(`/api/transit?stop=${encodeURIComponent(stop)}`, { signal });
 }
 
 export function getWeather(near: LatLng, signal?: AbortSignal): Promise<WeatherResponse> {

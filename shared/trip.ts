@@ -108,6 +108,8 @@ export function liveInstruction(
   position: LatLng,
   destinationName: string,
   now: Date = new Date(),
+  /** Minutes avant le prochain passage en temps réel (Ilévia), pour le prochain véhicule. */
+  realtimeWait?: number,
 ): LiveInstruction {
   const segs = itinerary.segments;
   const seg = segs[index];
@@ -123,18 +125,20 @@ export function liveInstruction(
         subtitle: `${walkMin} min à pied · arrivée vers ${formatClock(itinerary.arrivalTime)}`,
       };
     }
-    const wait = minutesUntil(next.departureTime, now);
+    const wait = realtimeWait ?? minutesUntil(next.departureTime, now);
+    const when =
+      realtimeWait !== undefined
+        ? `dans ${wait} min (temps réel)`
+        : `à ${formatClock(next.departureTime)}${wait >= 0 ? ` (dans ${wait} min)` : ''}`;
     return {
       title: `Marchez jusqu’à ${seg.toName}`,
-      subtitle: `${walkMin} min à pied · ${lineLabel(next.line)} à ${formatClock(next.departureTime)}${
-        wait >= 0 ? ` (dans ${wait} min)` : ''
-      }`,
+      subtitle: `${walkMin} min à pied · ${lineLabel(next.line)} ${when}`,
       alert: wait >= 0 && wait <= walkMin ? 'hurry' : undefined,
     };
   }
 
   const atStart = haversineMeters(position, seg.departureStop.location) < RIDE_DONE_METERS;
-  const wait = minutesUntil(seg.departureTime, now);
+  const wait = realtimeWait ?? minutesUntil(seg.departureTime, now);
   if (atStart && wait >= 0) {
     return {
       title: `Attendez le ${lineLabel(seg.line)}`,
