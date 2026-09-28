@@ -121,18 +121,18 @@ describe('K : agenda', () => {
 
   it('garde les événements qui chevauchent la fenêtre', () => {
     const w = windowFor('today', SAT_20H);
-    const e = fromPartnerEvent(event(), GRAND_PLACE, w);
+    const e = fromPartnerEvent(event(), GRAND_PLACE, w, SAT_20H);
     expect(e?.timeLabel).toBe('21:00 – 23:30');
     expect(e?.distanceMeters).toBeGreaterThan(500);
-    expect(fromPartnerEvent(event({ start: '2026-09-29T21:00:00+02:00', end: undefined }), GRAND_PLACE, w)).toBeNull();
-    const ongoing = fromPartnerEvent(event({ start: '2026-09-27T19:00:00+02:00' }), GRAND_PLACE, w);
+    expect(fromPartnerEvent(event({ start: '2026-09-29T21:00:00+02:00', end: undefined }), GRAND_PLACE, w, SAT_20H)).toBeNull();
+    const ongoing = fromPartnerEvent(event({ start: '2026-09-27T19:00:00+02:00' }), GRAND_PLACE, w, SAT_20H);
     expect(ongoing?.timeLabel).toBe('En cours · jusqu’à 23:30');
   });
 
   it('met « À la une » en premier', () => {
     const w = windowFor('today', SAT_20H);
-    const a = fromPartnerEvent(event({ id: 'a' }), GRAND_PLACE, w)!;
-    const b = fromPartnerEvent(event({ id: 'b', featured: true, start: '2026-09-27T22:00:00+02:00' }), GRAND_PLACE, w)!;
+    const a = fromPartnerEvent(event({ id: 'a' }), GRAND_PLACE, w, SAT_20H)!;
+    const b = fromPartnerEvent(event({ id: 'b', featured: true, start: '2026-09-27T22:00:00+02:00' }), GRAND_PLACE, w, SAT_20H)!;
     expect(sortEvents([a, b]).map((e) => e.id)).toEqual(['b', 'a']);
   });
 
@@ -154,6 +154,8 @@ describe('K : agenda', () => {
       'agenda-lille',
       GRAND_PLACE,
       w,
+      SAT_20H,
+      'agenda-lille-slug',
     );
     expect(e).toMatchObject({
       title: 'Jazz au Vieux-Lille',
@@ -161,12 +163,47 @@ describe('K : agenda', () => {
       venueName: 'La Péniche',
       timeLabel: '20:30 – 22:30',
       imageUrl: 'https://cdn.example/jazz.jpg',
-      url: 'https://openagenda.com/agendas/agenda-lille/events/jazz-au-vieux-lille',
+      url: 'https://openagenda.com/fr/agenda-lille-slug/events/jazz-au-vieux-lille',
+      genres: ['jazz'],
+      ongoing: false,
+      dateLabel: 'dimanche 27 septembre · 20:30 – 22:30',
       source: 'openagenda',
     });
     expect(fromOpenAgenda({ title: 'Sans lieu' }, 'x', GRAND_PLACE, w)).toBeNull();
     expect(guessCategory('Braderie de Lille')).toBe('marche');
     expect(guessCategory('Pièce de théâtre')).toBe('spectacle');
+  });
+
+  it('classe les événements sans se laisser piéger par des bouts de mots', async () => {
+    const { categorize, detectGenres, isFree, plainText } = await import('@/server/eventText');
+    expect(categorize('Collection photographique Pecqueur')).toBe('expo'); // « rap » dans « photographique »
+    expect(categorize('Exposition - République de Bérangère Fromont', 'Théâtre du Nord')).toBe('expo');
+    expect(categorize('Concert de Lomepal')).toBe('concert');
+    expect(categorize('Soirée disco au Magazine Club')).toBe('soiree');
+    expect(categorize('Braderie de Lille')).toBe('marche');
+    expect(categorize('Rencontre', 'Projection du film suivie d’un débat')).toBe('spectacle');
+    expect(detectGenres('Concert jazz manouche')).toEqual(['jazz']);
+    expect(detectGenres('Soirée techno et house')).toEqual(['electro']);
+    expect(detectGenres('Récital de piano')).toEqual(['classique']);
+    expect(detectGenres('Collection photographique')).toEqual([]);
+    expect(isFree('Entrée libre')).toBe(true);
+    expect(isFree('12 € / 8 € réduit')).toBe(false);
+    expect(plainText('**Trio** de [jazz](https://x.fr)<br>Entrée libre')).toBe('Trio de jazz\nEntrée libre');
+  });
+
+  it('n’affiche « En cours » que si c’est commencé maintenant', () => {
+    // Lundi 28/09 : « ce week-end » = vendredi 2/10 18 h → lundi 5/10 6 h.
+    const monday = new Date('2026-09-28T11:00:00Z');
+    const w = windowFor('weekend', monday);
+    const expo = fromPartnerEvent(
+      event({ category: 'expo', start: '2026-10-02T14:00:00+02:00', end: '2026-10-02T22:30:00+02:00' }),
+      GRAND_PLACE,
+      w,
+      monday,
+    )!;
+    expect(expo.ongoing).toBe(false);
+    expect(expo.timeLabel).toBe('ven. 14:00 – 22:30');
+    expect(expo.dateLabel).toBe('vendredi 2 octobre · 14:00 – 22:30');
   });
 
   it('ne garde que les sorties culturelles pour touristes et jeunes', () => {

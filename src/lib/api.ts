@@ -2,6 +2,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import type {
+  AgendaEvent,
   AgendaResponse,
   AgendaWhen,
   ApiError,
@@ -134,14 +135,24 @@ export function getOffers(near: LatLng, signal?: AbortSignal): Promise<OffersRes
   return request<OffersResponse>(`/api/offers?near=${near.lat},${near.lng}`, { signal });
 }
 
-export function getAgenda(
+// Derniers événements reçus : la fiche d'un événement s'ouvre sans nouvel appel.
+const knownEvents = new Map<string, AgendaEvent>();
+
+export async function getAgenda(
   near: LatLng,
   when: AgendaWhen,
   signal?: AbortSignal,
 ): Promise<AgendaResponse> {
-  return request<AgendaResponse>(`/api/agenda?near=${near.lat},${near.lng}&when=${when}`, {
+  const res = await request<AgendaResponse>(`/api/agenda?near=${near.lat},${near.lng}&when=${when}`, {
     signal,
   });
+  if (knownEvents.size > 500) knownEvents.clear();
+  for (const e of res.events) knownEvents.set(e.id, e);
+  return res;
+}
+
+export function getKnownEvent(id: string): AgendaEvent | undefined {
+  return knownEvents.get(id);
 }
 
 // --- Espace partenaires ---

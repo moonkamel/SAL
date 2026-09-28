@@ -6,7 +6,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { PressableScale } from '@/src/components/PressableScale';
 import { colors, font, fonts, palette, radius, spacing } from '@/src/theme';
 import { formatDistance } from '@/shared/format';
-import type { AgendaEvent, EventCategory } from '@/shared/types';
+import { type AgendaEvent, type EventCategory, GENRE_LABELS } from '@/shared/types';
 
 export const CATEGORY_INFO: Record<
   EventCategory,
@@ -66,8 +66,8 @@ export function EventCard({ event, onPress, compact }: Props) {
         </Text>
         {!compact && (
           <Text style={styles.muted} numberOfLines={1}>
-            {cat.label}
-            {event.price ? ` · ${event.price}` : ''}
+            {[cat.label, ...(event.genres ?? []).map((g) => GENRE_LABELS[g])].join(' · ')}
+            {event.free ? <Text style={styles.free}> · Gratuit</Text> : null}
           </Text>
         )}
       </View>
@@ -95,4 +95,5 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontFamily: fonts.displayMedium, fontSize: font.body },
   venue: { color: colors.text, fontSize: font.small },
   muted: { color: colors.textMuted, fontSize: font.small },
+  free: { color: colors.open, fontWeight: '800' },
 });

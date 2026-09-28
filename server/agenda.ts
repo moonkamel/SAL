@@ -3,15 +3,17 @@
 // - événements publics d'OpenAgenda, si OPENAGENDA_KEY et OPENAGENDA_AGENDAS sont définies.
 
 import { haversineMeters } from '@/shared/geo';
-import type { AgendaEvent, AgendaWhen, EventCategory, LatLng } from '@/shared/types';
+import type { AgendaEvent, AgendaWhen, LatLng } from '@/shared/types';
 
 import { TtlCache } from './cache';
 import { getContent } from './content';
+import { categorize, detectGenres, isFree, plainText } from './eventText';
 import { addDays, formatParisDayTime, formatParisTime, parisParts, parisTime } from './paris';
 import type { EventItem } from './schemas';
 
 export const OPENAGENDA_URL = process.env.OPENAGENDA_URL ?? 'https://api.openagenda.com/v2';
 const RADIUS_METERS = 15_000;
+const MAX_EVENTS = 150;
 const DEFAULT_DURATION_MS = 3 * 3_600_000;
 
 export interface TimeWindow {
@@ -43,20 +45,47 @@ function overlaps(start: Date, end: Date | undefined, w: TimeWindow): boolean {
   return start < w.end && e > w.start;
 }
 
-export function timeLabel(start: Date, end: Date | undefined, w: TimeWindow): string {
+/**
+ * Horaire court. « En cours » seulement si c'est commencé MAINTENANT (et pas juste
+ * avant le début de la fenêtre, ex. vendredi après-midi pour « ce week-end »).
+ */
+export function timeLabel(start: Date, end: Date | undefined, w: TimeWindow, now: Date = new Date()): string {
+  if (start <= now) return end ? `En cours · jusqu’à ${formatParisTime(end)}` : 'En cours';
   const sameOutingDay = w.end.getTime() - w.start.getTime() <= 30 * 3_600_000;
   const startLabel = sameOutingDay ? formatParisTime(start) : formatParisDayTime(start);
-  if (start < w.start) return end ? `En cours · jusqu’à ${formatParisTime(end)}` : 'En cours';
   return end && end.getTime() - start.getTime() < 24 * 3_600_000
     ? `${startLabel} – ${formatParisTime(end)}`
     : startLabel;
 }
 
-export function fromPartnerEvent(item: EventItem, near: LatLng, w: TimeWindow): AgendaEvent | null {
+const longDateFmt = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: 'Europe/Paris',
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+});
+
+/** « samedi 3 octobre · 21:00 – 23:30 ». */
+export function dateLabel(start: Date, end?: Date): string {
+  const day = longDateFmt.format(start);
+  if (!end) return `${day} · ${formatParisTime(start)}`;
+  if (end.getTime() - start.getTime() < 24 * 3_600_000) {
+    return `${day} · ${formatParisTime(start)} – ${formatParisTime(end)}`;
+  }
+  return `du ${day} au ${longDateFmt.format(end)}`;
+}
+
+export function fromPartnerEvent(
+  item: EventItem,
+  near: LatLng,
+  w: TimeWindow,
+  now: Date = new Date(),
+): AgendaEvent | null {
   if (!item.active) return null;
   const start = new Date(item.start);
   const end = item.end ? new Date(item.end) : undefined;
   if (!overlaps(start, end, w)) return null;
+  const genres = detectGenres(item.title, item.description);
   return {
     id: item.id,
     title: item.title,
@@ -68,13 +97,18 @@ export function fromPartnerEvent(item: EventItem, near: LatLng, w: TimeWindow): 
     address: item.address,
     start: item.start,
     end: item.end,
-    timeLabel: timeLabel(start, end, w),
+    timeLabel: timeLabel(start, end, w, now),
+    dateLabel: dateLabel(start, end),
+    ongoing: start <= now,
     price: item.price,
+    free: isFree(item.price),
     url: item.url,
+    ticketUrl: item.url,
     imageUrl: item.imageUrl,
     featured: item.featured,
     source: 'partner',
     distanceMeters: Math.round(haversineMeters(near, item.location)),
+    ...(genres.length ? { genres } : {}),
   };
 }
 
@@ -111,6 +145,7 @@ interface OpenAgendaEvent {
   age?: { min?: number | null; max?: number | null } | null;
   /** 6 = annulé (OpenAgenda). */
   status?: number;
+  registration?: { type?: string; value?: string }[];
 }
 
 /** Agenda de la Ville de Lille (https://openagenda.com/fr/ville-de-lille). */
@@ -136,18 +171,9 @@ export function isCulturalHighlight(ev: OpenAgendaEvent): boolean {
   return CULTURE.test(text);
 }
 
-const CATEGORY_WORDS: [EventCategory, RegExp][] = [
-  ['concert', /concert|musique|live|dj|jazz|rock|rap|électro|electro/i],
-  ['soiree', /soir[ée]e|clubbing|f[êe]te|bal\b/i],
-  ['expo', /expo|mus[ée]e|galerie|vernissage/i],
-  ['spectacle', /spectacle|th[ée][âa]tre|danse|humour|cirque|cin[ée]ma|projection/i],
-  ['marche', /march[ée]|brocante|braderie|vide-grenier/i],
-  ['sport', /sport|match|course|foot|basket/i],
-];
-
-export function guessCategory(...texts: (string | undefined)[]): EventCategory {
-  const all = texts.filter(Boolean).join(' ');
-  return CATEGORY_WORDS.find(([, re]) => re.test(all))?.[0] ?? 'autre';
+/** Conservé pour compatibilité : catégorie d'après les textes (titre en premier). */
+export function guessCategory(title: string, ...rest: (string | undefined)[]) {
+  return categorize(title, ...rest);
 }
 
 function imageUrl(image: OpenAgendaEvent['image']): string | undefined {
@@ -157,11 +183,20 @@ function imageUrl(image: OpenAgendaEvent['image']): string | undefined {
   return undefined;
 }
 
+/** Adresse publique d'un événement sur openagenda.com. */
+export function openAgendaEventUrl(agendaSlug: string | undefined, eventSlug: string | undefined) {
+  return agendaSlug && eventSlug
+    ? `https://openagenda.com/fr/${agendaSlug}/events/${eventSlug}`
+    : undefined;
+}
+
 export function fromOpenAgenda(
   ev: OpenAgendaEvent,
   agendaUid: string,
   near: LatLng,
   w: TimeWindow,
+  now: Date = new Date(),
+  agendaSlug?: string,
 ): AgendaEvent | null {
   const title = text(ev.title);
   const loc = ev.location;
@@ -179,23 +214,37 @@ export function fromOpenAgenda(
   const location = { lat: loc.latitude, lng: loc.longitude };
   const keywords = Array.isArray(ev.keywords) ? ev.keywords : (ev.keywords?.fr ?? []);
   const description = text(ev.description);
+  const longDescription = plainText(text(ev.longDescription));
+  const conditions = text(ev.conditions);
+  const category = categorize(title, description, keywords.join(' '));
+  const genres =
+    category === 'concert' || category === 'soiree'
+      ? detectGenres(title, description, keywords.join(' '), longDescription)
+      : [];
+  const ticket = ev.registration?.find((r) => r.type === 'link' && r.value?.startsWith('http'));
   return {
     id: `oa-${agendaUid}-${ev.uid ?? ev.slug ?? title}`,
     title,
     description,
-    category: guessCategory(title, description, keywords.join(' ')),
+    category,
     venueName: loc.name ?? 'Lieu à préciser',
     location,
     address: loc.address,
     start: timing.start.toISOString(),
     end: timing.end?.toISOString(),
-    timeLabel: timeLabel(timing.start, timing.end, w),
-    price: text(ev.conditions)?.slice(0, 40),
-    url: ev.slug ? `https://openagenda.com/agendas/${agendaUid}/events/${ev.slug}` : undefined,
+    timeLabel: timeLabel(timing.start, timing.end, w, now),
+    dateLabel: dateLabel(timing.start, timing.end),
+    ongoing: timing.start <= now,
+    price: conditions?.slice(0, 60),
+    free: isFree(conditions, description),
+    url: openAgendaEventUrl(agendaSlug, ev.slug),
+    ticketUrl: ticket?.value,
     imageUrl: imageUrl(ev.image),
     featured: false,
     source: 'openagenda',
     distanceMeters: Math.round(haversineMeters(near, location)),
+    ...(longDescription && longDescription !== description ? { longDescription } : {}),
+    ...(genres.length ? { genres } : {}),
   };
 }
 
@@ -208,20 +257,49 @@ async function fetchOpenAgenda(uid: string, key: string, w: TimeWindow): Promise
   const hit = openAgendaCache.get(cacheKey);
   if (hit) return hit;
 
-  const q = new URLSearchParams({
-    key,
-    size: '100',
-    detailed: '1',
-    'timings[gte]': w.start.toISOString(),
-    'timings[lte]': w.end.toISOString(),
-  });
-  const res = await fetch(`${OPENAGENDA_URL}/agendas/${encodeURIComponent(uid)}/events?${q}`, {
-    signal: AbortSignal.timeout(6000),
-  });
-  if (!res.ok) throw new Error(`OpenAgenda ${res.status}`);
-  const events = ((await res.json()) as { events?: OpenAgendaEvent[] }).events ?? [];
+  // Jusqu'à 3 pages de 100 (un week-end chargé dépasse 100 événements).
+  const events: OpenAgendaEvent[] = [];
+  let after: unknown[] | undefined;
+  for (let page = 0; page < 3; page++) {
+    const q = new URLSearchParams({
+      key,
+      size: '100',
+      detailed: '1',
+      'timings[gte]': w.start.toISOString(),
+      'timings[lte]': w.end.toISOString(),
+    });
+    for (const a of after ?? []) q.append('after[]', String(a));
+    const res = await fetch(`${OPENAGENDA_URL}/agendas/${encodeURIComponent(uid)}/events?${q}`, {
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) throw new Error(`OpenAgenda ${res.status}`);
+    const body = (await res.json()) as { events?: OpenAgendaEvent[]; after?: unknown[] | null };
+    events.push(...(body.events ?? []));
+    if (!body.after?.length || (body.events?.length ?? 0) < 100) break;
+    after = body.after;
+  }
   openAgendaCache.set(cacheKey, events);
   return events;
+}
+
+// Adresse publique des agendas (« ville-de-lille »), pour les liens vers openagenda.com.
+const KNOWN_SLUGS: Record<string, string> = { [VILLE_DE_LILLE_AGENDA]: 'ville-de-lille' };
+const slugCache = new TtlCache<string>(24 * 3_600_000, 20);
+
+async function agendaSlug(uid: string, key: string): Promise<string | undefined> {
+  if (KNOWN_SLUGS[uid]) return KNOWN_SLUGS[uid];
+  const hit = slugCache.get(uid);
+  if (hit) return hit;
+  try {
+    const res = await fetch(`${OPENAGENDA_URL}/agendas/${encodeURIComponent(uid)}?key=${key}`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    const slug = res.ok ? ((await res.json()) as { slug?: string }).slug : undefined;
+    if (slug) slugCache.set(uid, slug);
+    return slug;
+  } catch {
+    return undefined;
+  }
 }
 
 export function openAgendaConfig(): { key: string; agendas: string[] } | null {
@@ -234,15 +312,27 @@ export function openAgendaConfig(): { key: string; agendas: string[] } | null {
   return key && agendas.length ? { key, agendas } : null;
 }
 
-/** À la une d'abord, puis par heure de début, puis par distance. */
+/**
+ * À la une d'abord ; puis ce qui commence bientôt, par heure ; les événements déjà
+ * en cours (souvent des expos toute la journée) passent après.
+ */
 export function sortEvents(events: AgendaEvent[]): AgendaEvent[] {
   return [...events].sort(
     (a, b) =>
       Number(b.featured) - Number(a.featured) ||
+      Number(a.ongoing) - Number(b.ongoing) ||
       a.start.localeCompare(b.start) ||
       a.distanceMeters - b.distanceMeters,
   );
 }
+
+const dedupKey = (e: AgendaEvent) =>
+  `${e.title}|${e.venueName}`
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 
 export async function agenda(
   near: LatLng,
@@ -251,35 +341,39 @@ export async function agenda(
 ): Promise<AgendaEvent[]> {
   const w = windowFor(when, now);
   const partner = (await getContent('events'))
-    .map((item) => fromPartnerEvent(item, near, w))
+    .map((item) => fromPartnerEvent(item, near, w, now))
     .filter((e): e is AgendaEvent => e !== null);
 
   const oa = openAgendaConfig();
   const external = oa
     ? (
         await Promise.all(
-          oa.agendas.map((uid) =>
-            fetchOpenAgenda(uid, oa.key, w)
-              .then((events) =>
-                events.filter(isCulturalHighlight).map((ev) => fromOpenAgenda(ev, uid, near, w)),
-              )
-              .catch((error: unknown) => {
-                console.error('[agenda] OpenAgenda indisponible', uid, error);
-                return [];
-              }),
-          ),
+          oa.agendas.map(async (uid) => {
+            try {
+              const [events, slug] = await Promise.all([
+                fetchOpenAgenda(uid, oa.key, w),
+                agendaSlug(uid, oa.key),
+              ]);
+              return events
+                .filter(isCulturalHighlight)
+                .map((ev) => fromOpenAgenda(ev, uid, near, w, now, slug));
+            } catch (error) {
+              console.error('[agenda] OpenAgenda indisponible', uid, error);
+              return [];
+            }
+          }),
         )
       ).flat()
     : [];
 
-  // Même titre au même endroit (partenaire + OpenAgenda) : on garde la version partenaire.
-  const seen = new Set(partner.map((e) => `${e.title.toLowerCase()}|${e.venueName.toLowerCase()}`));
-  const merged = [
-    ...partner,
-    ...external.filter(
-      (e): e is AgendaEvent =>
-        e !== null && !seen.has(`${e.title.toLowerCase()}|${e.venueName.toLowerCase()}`),
-    ),
-  ];
-  return sortEvents(merged.filter((e) => e.distanceMeters <= RADIUS_METERS)).slice(0, 60);
+  // Doublons (même titre au même endroit) : le partenaire d'abord, puis la 1re occurrence.
+  const seen = new Set<string>();
+  const merged = [...partner, ...external].filter((e): e is AgendaEvent => {
+    if (!e) return false;
+    const key = dedupKey(e);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return sortEvents(merged.filter((e) => e.distanceMeters <= RADIUS_METERS)).slice(0, MAX_EVENTS);
 }

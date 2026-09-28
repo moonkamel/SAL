@@ -276,7 +276,40 @@ export interface AgendaEvent {
   featured: boolean;
   source: 'partner' | 'openagenda';
   distanceMeters: number;
+  /** Déjà commencé à l'heure de la demande. */
+  ongoing: boolean;
+  /** Date complète, ex. « samedi 3 octobre · 21:00 – 23:30 ». */
+  dateLabel: string;
+  /** Styles de musique détectés (concerts, soirées). */
+  genres?: MusicGenre[];
+  /** Entrée gratuite ou libre. */
+  free?: boolean;
+  /** Description complète, en texte simple. */
+  longDescription?: string;
+  /** Billetterie ou inscription. */
+  ticketUrl?: string;
 }
+
+export type MusicGenre =
+  | 'jazz'
+  | 'rock'
+  | 'electro'
+  | 'rap'
+  | 'classique'
+  | 'chanson'
+  | 'monde'
+  | 'folk';
+
+export const GENRE_LABELS: Record<MusicGenre, string> = {
+  jazz: 'Jazz & blues',
+  rock: 'Rock & métal',
+  electro: 'Électro',
+  rap: 'Rap & hip-hop',
+  classique: 'Classique',
+  chanson: 'Chanson & pop',
+  monde: 'Musiques du monde',
+  folk: 'Folk & acoustique',
+};
 
 export type AgendaWhen = 'today' | 'tomorrow' | 'weekend';
 

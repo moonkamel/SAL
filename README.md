@@ -65,7 +65,9 @@ AdMob (react-native-google-mobile-ads) · Claude (reformulation optionnelle).
   l'adresse, la note et le lien Google Maps (ou le lien web de l'app si
   `EXPO_PUBLIC_API_URL` est défini).
 - **Ce soir à Lille** (accueil + écran « Agenda ») : concerts, soirées, expos… ce soir,
-  demain ou ce week-end. Sources : les événements saisis dans l'espace partenaires
+  demain ou ce week-end, avec **filtres** (catégorie, style de musique : jazz, rock,
+  électro, rap, classique…, gratuit, à moins de 2 km) et une **fiche événement** dans
+  l'app (date, lieu, description, prix, billets, « Y aller », partage). Sources : les événements saisis dans l'espace partenaires
   (option **« À la une »**, payante, affichée en premier avec un badge) et l'agenda
   culturel de la **Ville de Lille** sur OpenAgenda (`OPENAGENDA_KEY`).
 - **Bons plans** (accueil, écran « Bons plans » et fiche du lieu) : offres des
