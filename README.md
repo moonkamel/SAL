@@ -66,8 +66,8 @@ AdMob (react-native-google-mobile-ads) · Claude (reformulation optionnelle).
   `EXPO_PUBLIC_API_URL` est défini).
 - **Ce soir à Lille** (accueil + écran « Agenda ») : concerts, soirées, expos… ce soir,
   demain ou ce week-end. Sources : les événements saisis dans l'espace partenaires
-  (option **« À la une »**, payante, affichée en premier avec un badge) et, en option,
-  les agendas publics d'**OpenAgenda** (`OPENAGENDA_KEY`, `OPENAGENDA_AGENDAS`).
+  (option **« À la une »**, payante, affichée en premier avec un badge) et l'agenda
+  culturel de la **Ville de Lille** sur OpenAgenda (`OPENAGENDA_KEY`).
 - **Bons plans** (accueil, écran « Bons plans » et fiche du lieu) : offres des
   établissements partenaires (« 2 bières pour le prix d'1 de 18 h à 20 h »), avec dates,
   jours et créneau horaire.
@@ -345,24 +345,28 @@ Les dates sont au format `AAAA-MM-JJ`, les heures `HH:MM` (heure de Lille).
 des 30 derniers jours, par partenaire et par lieu. C'est utile pour montrer à un
 établissement ce que lui apporte l'app.
 
-### Agenda OpenAgenda (optionnel)
+### Agenda OpenAgenda (Ville de Lille)
 
-[OpenAgenda](https://openagenda.com) publie les agendas de nombreuses structures
-culturelles. Pour les ajouter à « Ce soir à Lille » :
+« Ce soir à Lille » reprend l'agenda officiel de la **Ville de Lille**
+(<https://openagenda.com/fr/ville-de-lille>, identifiant `57621068`), filtré pour ne garder
+que les **sorties culturelles** qui intéressent touristes et jeunes Lillois (concerts,
+expos, spectacles, festivals, cinéma, soirées, visites…). Les réunions, conseils de
+quartier, activités pour tout-petits ou seniors, collectes, inscriptions et événements
+annulés sont écartés. Il suffit d'une **clé API OpenAgenda** (gratuite) :
 
-1. Créez un compte OpenAgenda et récupérez votre **clé API** (paramètres du compte).
-2. Cherchez les agendas lillois qui vous intéressent et notez leur **identifiant**
-   (numéro visible dans l'adresse ou les réglages de l'agenda).
-3. Côté serveur :
+1. Créez un compte sur <https://openagenda.com>, puis allez dans *Paramètres du compte →
+   Clé API* et copiez la **clé publique**.
+2. Ajoutez-la côté serveur (dans `.env.local`, et dans les variables d'environnement EAS
+   pour le serveur en ligne) :
 
 ```
 OPENAGENDA_KEY=votre-cle
-OPENAGENDA_AGENDAS=12345678,87654321
 ```
 
-Les réponses sont gardées 15 min en cache. Un événement présent à la fois chez un
-partenaire et dans OpenAgenda (même titre, même lieu) n'apparaît qu'une fois. Vérifiez les
-conditions de réutilisation de chaque agenda.
+Pour ajouter d'autres agendas, listez leurs identifiants séparés par des virgules :
+`OPENAGENDA_AGENDAS=57621068,12345678`. Les réponses sont gardées 15 min en cache. Un
+événement présent à la fois chez un partenaire et dans OpenAgenda (même titre, même lieu)
+n'apparaît qu'une fois.
 
 ## 2. Configuration locale
 

@@ -82,6 +82,10 @@ export function fromPartnerEvent(item: EventItem, near: LatLng, w: TimeWindow): 
 
 type Multilingual = string | Record<string, string | undefined> | undefined;
 
+function text_(value: Multilingual): string {
+  return text(value) ?? '';
+}
+
 function text(value: Multilingual): string | undefined {
   if (!value) return undefined;
   if (typeof value === 'string') return value;
@@ -103,6 +107,33 @@ interface OpenAgendaEvent {
   };
   image?: { base?: string; filename?: string } | string | null;
   conditions?: Multilingual;
+  longDescription?: Multilingual;
+  age?: { min?: number | null; max?: number | null } | null;
+  /** 6 = annulé (OpenAgenda). */
+  status?: number;
+}
+
+/** Agenda de la Ville de Lille (https://openagenda.com/fr/ville-de-lille). */
+export const VILLE_DE_LILLE_AGENDA = '57621068';
+
+// Sorties culturelles qui intéressent touristes et jeunes Lillois…
+const CULTURE =
+  /concert|festival|expo(sition)?s?\b|spectacle|th[ée][âa]tre|danse|cin[ée]ma|projection|mus[ée]e|visite|patrimoine|op[ée]ra|orchestre|jazz|rock|[ée]lectro|hip[- ]?hop|rap\b|dj\b|live\b|soir[ée]e|f[êe]te|braderie|march[ée] de no[ëe]l|vernissage|street[- ]?art|performance|humour|stand[- ]?up|cirque|lille3000|nuit (blanche|des mus[ée]es)|guinguette|bal\b|slam|photo/i;
+// … et pas la vie administrative ou les activités très ciblées.
+const EXCLUDED =
+  /conseil (municipal|de quartier|communal)|r[ée]union|permanence|b[ée]b[ée]s?\b|tout[- ]petits?|petite enfance|\b[0-6] ?(à|-) ?\d+ ?ans|seniors?\b|a[îi]n[ée]s|collecte|don du sang|vaccination|formation|inscriptions?\b|recrutement|emploi|cours (de|d')|stage\b|accueil de loisirs|centre social|[ée]lections?|enqu[êe]te publique|travaux|concertation|consultation|d[ée]m[ée]nagement|atelier (parents?|famille)|goûter|aide aux devoirs/i;
+
+/** Événement culturel susceptible d'intéresser touristes et 16-35 ans. */
+export function isCulturalHighlight(ev: OpenAgendaEvent): boolean {
+  if (ev.status === 6) return false; // annulé
+  const max = ev.age?.max;
+  const min = ev.age?.min;
+  if (typeof max === 'number' && max > 0 && max < 14) return false; // réservé aux enfants
+  if (typeof min === 'number' && min >= 60) return false;
+  const keywords = Array.isArray(ev.keywords) ? ev.keywords : (ev.keywords?.fr ?? []);
+  const text = [text_(ev.title), text_(ev.description), keywords.join(' ')].join(' ');
+  if (EXCLUDED.test(text)) return false;
+  return CULTURE.test(text);
 }
 
 const CATEGORY_WORDS: [EventCategory, RegExp][] = [
@@ -195,7 +226,8 @@ async function fetchOpenAgenda(uid: string, key: string, w: TimeWindow): Promise
 
 export function openAgendaConfig(): { key: string; agendas: string[] } | null {
   const key = process.env.OPENAGENDA_KEY;
-  const agendas = (process.env.OPENAGENDA_AGENDAS ?? '')
+  // Par défaut : l'agenda officiel de la Ville de Lille.
+  const agendas = (process.env.OPENAGENDA_AGENDAS ?? VILLE_DE_LILLE_AGENDA)
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
@@ -228,7 +260,9 @@ export async function agenda(
         await Promise.all(
           oa.agendas.map((uid) =>
             fetchOpenAgenda(uid, oa.key, w)
-              .then((events) => events.map((ev) => fromOpenAgenda(ev, uid, near, w)))
+              .then((events) =>
+                events.filter(isCulturalHighlight).map((ev) => fromOpenAgenda(ev, uid, near, w)),
+              )
               .catch((error: unknown) => {
                 console.error('[agenda] OpenAgenda indisponible', uid, error);
                 return [];

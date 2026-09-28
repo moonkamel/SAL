@@ -123,3 +123,12 @@ describe('accompagnement en direct', () => {
     expect(currentSegment(trip, START, 2)).toBe(2);
   });
 });
+
+describe('guidage de secours', () => {
+  it('ouvre Google Maps à pied vers la destination', async () => {
+    const { googleMapsDirections } = await import('@/src/features/navigation/googleMaps');
+    expect(googleMapsDirections({ lat: 50.63, lng: 3.06 }, 'walk')).toBe(
+      'https://www.google.com/maps/dir/?api=1&destination=50.63,3.06&travelmode=walking&dir_action=navigate',
+    );
+  });
+});

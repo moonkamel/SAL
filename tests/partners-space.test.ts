@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { fromOpenAgenda, fromPartnerEvent, guessCategory, sortEvents, windowFor } from '@/server/agenda';
+import {
+  fromOpenAgenda,
+  fromPartnerEvent,
+  guessCategory,
+  isCulturalHighlight,
+  openAgendaConfig,
+  sortEvents,
+  windowFor,
+} from '@/server/agenda';
 import { safeEqual } from '@/server/admin';
 import { offerToday, selectOffersNear } from '@/server/offers';
 import { addDays, parisParts, parisTime } from '@/server/paris';
@@ -159,6 +167,32 @@ describe('K : agenda', () => {
     expect(fromOpenAgenda({ title: 'Sans lieu' }, 'x', GRAND_PLACE, w)).toBeNull();
     expect(guessCategory('Braderie de Lille')).toBe('marche');
     expect(guessCategory('Pièce de théâtre')).toBe('spectacle');
+  });
+
+  it('ne garde que les sorties culturelles pour touristes et jeunes', () => {
+    const ev = (title: string, extra: object = {}) => ({ title: { fr: title }, ...extra });
+    expect(isCulturalHighlight(ev('Concert de jazz au Grand Sud'))).toBe(true);
+    expect(isCulturalHighlight(ev('Exposition « Lille la nuit » au Palais des Beaux-Arts'))).toBe(true);
+    expect(isCulturalHighlight(ev('Braderie de Lille'))).toBe(true);
+    expect(isCulturalHighlight(ev('Conseil municipal'))).toBe(false);
+    expect(isCulturalHighlight(ev('Conseil de quartier de Wazemmes'))).toBe(false);
+    expect(isCulturalHighlight(ev('Éveil musical pour les bébés'))).toBe(false);
+    expect(isCulturalHighlight(ev('Spectacle de marionnettes', { age: { min: 3, max: 6 } }))).toBe(false);
+    expect(isCulturalHighlight(ev('Thé dansant', { age: { min: 65, max: null } }))).toBe(false);
+    expect(isCulturalHighlight(ev('Concert annulé', { status: 6 }))).toBe(false);
+    expect(isCulturalHighlight(ev('Permanence des élus'))).toBe(false);
+    expect(isCulturalHighlight(ev('Collecte de sang'))).toBe(false);
+  });
+
+  it('utilise l’agenda de la Ville de Lille par défaut', () => {
+    vi.stubEnv('OPENAGENDA_KEY', 'cle');
+    vi.stubEnv('OPENAGENDA_AGENDAS', '');
+    expect(openAgendaConfig()).toBeNull(); // liste vide explicite : désactivé
+    vi.unstubAllEnvs();
+    vi.stubEnv('OPENAGENDA_KEY', 'cle');
+    delete process.env.OPENAGENDA_AGENDAS;
+    expect(openAgendaConfig()).toEqual({ key: 'cle', agendas: ['57621068'] });
+    vi.unstubAllEnvs();
   });
 
   describe('avec OpenAgenda et un événement partenaire', () => {

@@ -44,6 +44,11 @@ export interface PlacesMapProps {
   dots?: MapDot[];
   /** Change de valeur pour recentrer la caméra (ex. étape suivante). */
   focus?: LatLng[];
+  /**
+   * Vue « au niveau de la rue » : la caméra suit ce point, inclinée et orientée
+   * dans le sens de la marche (cap en degrés). Prioritaire sur le cadrage.
+   */
+  follow?: { position: LatLng; heading?: number } | null;
   /** N'activer que si la permission de localisation est accordée (sinon plantage Android). */
   showUserLocation?: boolean;
   interactive?: boolean;
@@ -87,6 +92,7 @@ export function PlacesMap({
   lines,
   dots,
   focus,
+  follow,
   showUserLocation = false,
   interactive = true,
   style,
@@ -132,9 +138,26 @@ export function PlacesMap({
         fillColor: '#FFFFFF',
       });
     }
+  }, [controller, ready, pins, route, lines, dots]);
+
+  // Caméra séparée des tracés : suivre la position ne redessine pas toute la carte.
+  const followLat = follow?.position.lat;
+  const followLng = follow?.position.lng;
+  const heading = follow?.heading;
+  useEffect(() => {
+    if (!controller || !ready) return;
+    if (followLat !== undefined && followLng !== undefined) {
+      controller.moveCamera({
+        target: { lat: followLat, lng: followLng },
+        zoom: 18,
+        tilt: 55,
+        bearing: heading ?? 0,
+      });
+      return;
+    }
     const all = focus?.length ? focus : [...(route ?? []), ...(lines ?? []).flatMap((l) => l.points)];
     controller.moveCamera(camera(center, pins, all.length > 1 ? all : undefined));
-  }, [controller, ready, pins, center, route, lines, dots, focus]);
+  }, [controller, ready, followLat, followLng, heading, focus, route, lines, center, pins]);
 
   const onMarkerClick = useCallback(
     (marker: { id: string }) => onPinPress?.(marker.id),

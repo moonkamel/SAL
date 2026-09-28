@@ -43,6 +43,8 @@ export default function TransitTripScreen() {
   const [now, setNow] = useState(() => new Date());
   // Pendant le trajet, la carte cadre l'étape en cours.
   const [liveIndex, setLiveIndex] = useState(0);
+  // Vue « rue » (caméra qui suit, inclinée, orientée) ou vue d'ensemble du trajet.
+  const [streetView, setStreetView] = useState(true);
 
   const load = useCallback(
     async (signal?: AbortSignal, quiet = false) => {
@@ -116,6 +118,9 @@ export default function TransitTripScreen() {
     [params.id, destination, name],
   );
 
+  const { position, heading } = usePositionAndHeading(!!shown && status === 'granted');
+  const follow = streetView && position ? { position, heading } : null;
+
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ title: trip ? 'En route' : 'En transports' }} />
@@ -127,6 +132,7 @@ export default function TransitTripScreen() {
             lines={lines}
             dots={dots}
             focus={focus}
+            follow={follow}
             showUserLocation={status === 'granted'}
             style={StyleSheet.absoluteFill}
           />
@@ -152,11 +158,23 @@ export default function TransitTripScreen() {
             )}
           </View>
         )}
+        {shown && position && (
+          <Pressable
+            onPress={() => setStreetView((v) => !v)}
+            style={[styles.viewToggle, { bottom: radius.lg + spacing.md }]}
+            accessibilityRole="button"
+            accessibilityLabel={streetView ? 'Voir tout le trajet' : 'Vue au niveau de la rue'}
+          >
+            <Ionicons name={streetView ? 'map-outline' : 'navigate'} size={18} color={colors.text} />
+            <Text style={styles.viewToggleText}>{streetView ? 'Trajet entier' : 'Vue rue'}</Text>
+          </Pressable>
+        )}
       </View>
 
       {trip ? (
         <LiveTrip
           trip={trip}
+          position={position}
           destinationName={name}
           placeId={params.id}
           onStop={() => {
@@ -209,6 +227,40 @@ export default function TransitTripScreen() {
   );
 }
 
+/**
+ * Position (GPS précis) et cap de la boussole, arrondi à 10° pour ne pas faire tourner
+ * la carte à chaque tremblement.
+ */
+function usePositionAndHeading(enabled: boolean): { position: LatLng | null; heading?: number } {
+  const [position, setPosition] = useState<LatLng | null>(null);
+  const [heading, setHeading] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    const subs: Location.LocationSubscription[] = [];
+    const keep = (s: Location.LocationSubscription) => (cancelled ? s.remove() : subs.push(s));
+    void Location.watchPositionAsync(
+      { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
+      (loc) => setPosition({ lat: loc.coords.latitude, lng: loc.coords.longitude }),
+    )
+      .then(keep)
+      .catch(() => {});
+    void Location.watchHeadingAsync((h) => {
+      const deg = h.trueHeading >= 0 ? h.trueHeading : h.magHeading;
+      setHeading(Math.round(deg / 10) * 10);
+    })
+      .then(keep)
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      subs.forEach((s) => s.remove());
+    };
+  }, [enabled]);
+
+  return { position, heading };
+}
+
 /** Accompagnement en direct : position suivie, étape en cours, alerte avant de descendre. */
 function LiveTrip({
   trip,
@@ -217,8 +269,10 @@ function LiveTrip({
   onStop,
   onProgress,
   bottomInset,
+  position,
 }: {
   trip: TransitItinerary;
+  position: LatLng | null;
   destinationName: string;
   placeId: string;
   onStop: () => void;
@@ -226,29 +280,13 @@ function LiveTrip({
   bottomInset: number;
 }) {
   useKeepAwake();
-  const [position, setPosition] = useState<LatLng | null>(null);
   const [index, setIndex] = useState(0);
   const [now, setNow] = useState(() => new Date());
   const alerted = useRef(new Set<string>());
 
   useEffect(() => {
-    let sub: Location.LocationSubscription | null = null;
-    let cancelled = false;
-    void Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.High, timeInterval: 4000, distanceInterval: 8 },
-      (loc) => setPosition({ lat: loc.coords.latitude, lng: loc.coords.longitude }),
-    )
-      .then((s) => {
-        if (cancelled) s.remove();
-        else sub = s;
-      })
-      .catch(() => {});
     const tick = setInterval(() => setNow(new Date()), 10_000);
-    return () => {
-      cancelled = true;
-      sub?.remove();
-      clearInterval(tick);
-    };
+    return () => clearInterval(tick);
   }, []);
 
   useEffect(() => {
@@ -355,4 +393,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceRaised,
   },
   stopText: { color: colors.text, fontWeight: '700', fontSize: font.body },
+  viewToggle: {
+    position: 'absolute',
+    left: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(10, 13, 28, 0.85)',
+  },
+  viewToggleText: { color: colors.text, fontSize: font.small, fontWeight: '700' },
 });

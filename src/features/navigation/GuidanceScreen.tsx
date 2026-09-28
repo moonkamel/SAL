@@ -32,6 +32,8 @@ import { colors, font, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { formatArrival, formatDistance, formatDuration } from '@/shared/format';
 import type { LatLng, TravelMode } from '@/shared/types';
 
+import { googleMapsDirections } from './googleMaps';
+
 import { setGuidanceActive } from './guidanceState';
 import { routeErrorMessage, sessionErrorMessage } from './messages';
 
@@ -96,6 +98,21 @@ export function GuidanceScreen({ placeId, name, destination, mode, returnOnArriv
       if (!cancelled) setPhase({ kind: 'error', message, openSettings });
     };
 
+    // Android peut ne pas avoir d'écran « courant » juste après une navigation
+    // (« No activity available ») : on réessaie quelques fois avant d'abandonner.
+    const acceptTerms = async (): Promise<boolean> => {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          if (await navigationController.areTermsAccepted()) return true;
+          return await navigationController.showTermsAndConditionsDialog();
+        } catch (error) {
+          if (attempt === 4 || cancelled) throw error;
+          await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+        }
+      }
+      return false;
+    };
+
     const waitForFirstLocation = () =>
       new Promise<void>((resolve) => {
         const timer = setTimeout(() => {
@@ -136,9 +153,7 @@ export function GuidanceScreen({ placeId, name, destination, mode, returnOnArriv
       }
 
       setPhase({ kind: 'starting', label: 'Conditions d’utilisation…' });
-      const accepted =
-        (await navigationController.areTermsAccepted()) ||
-        (await navigationController.showTermsAndConditionsDialog());
+      const accepted = await acceptTerms();
       if (!accepted) {
         fail(sessionErrorMessage(NavigationSessionStatus.TERMS_NOT_ACCEPTED));
         return;
@@ -298,6 +313,15 @@ export function GuidanceScreen({ placeId, name, destination, mode, returnOnArriv
           {phase.openSettings && (
             <Pressable style={styles.primary} onPress={() => void Linking.openSettings()}>
               <Text style={styles.primaryText}>Ouvrir les réglages</Text>
+            </Pressable>
+          )}
+          {!phase.openSettings && (
+            <Pressable
+              style={styles.primary}
+              onPress={() => void Linking.openURL(googleMapsDirections(destination, mode))}
+              accessibilityRole="button"
+            >
+              <Text style={styles.primaryText}>Ouvrir le guidage dans Google Maps</Text>
             </Pressable>
           )}
           <Pressable style={styles.secondary} onPress={() => router.back()}>
