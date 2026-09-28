@@ -222,6 +222,31 @@ Pour la production :
 Le lien « Confidentialité et publicité » de l'accueil permet de modifier ses choix
 (obligatoire dans l'UE).
 
+### Mapbox (guidage à pied et à vélo)
+
+Le guidage pas à pas **à pied et à vélo** utilise Mapbox : carte « Standard » en 3D
+(ambiance jour ou nuit selon l'heure), flèche qui suit la boussole, grande carte
+d'instruction façon Citymapper (« ↰ 140 m · Rue de la Monnaie »), voix en français,
+recalcul automatique en cas d'écart. Le guidage **en voiture** reste celui de Google
+(Navigation SDK). La recherche, les fiches et les trajets en transports restent sur Google.
+
+1. Créez un compte sur <https://console.mapbox.com>, page *Tokens* : copiez le
+   **Default public token** (il commence par `pk.`).
+2. Ajoutez-le dans `.env.local` (et dans les variables d'environnement EAS) :
+
+```
+EXPO_PUBLIC_MAPBOX_TOKEN=pk.…
+```
+
+Ce jeton public est prévu pour être embarqué dans l'app ; aucun jeton secret n'est
+nécessaire pour compiler. Mapbox propose une offre gratuite (cartes mobiles et
+itinéraires) puis facture à l'usage : vérifiez les quotas sur <https://www.mapbox.com/pricing>.
+Les itinéraires Mapbox ne sont affichés que sur la carte Mapbox (et inversement pour
+Google), conformément aux conditions de chaque fournisseur.
+
+**Nouveau module natif : il faut refaire l'app de développement**
+(`npm run build:dev:android`).
+
 ### Clés Maps de l'application (étape 2+)
 
 La carte utilise le Navigation SDK : il faut une clé **embarquée dans l'app**, distincte de

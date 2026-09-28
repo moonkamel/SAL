@@ -68,6 +68,10 @@ export default function RootLayout() {
                   <Stack.Screen name="favorites" options={{ title: 'Favoris' }} />
                   <Stack.Screen name="route/[id]" options={{ title: 'Itinéraire' }} />
                   <Stack.Screen name="transit/[id]" options={{ title: 'En transports' }} />
+                  <Stack.Screen
+                    name="guide/[id]"
+                    options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }}
+                  />
                   <Stack.Screen name="offers" options={{ title: 'Bons plans' }} />
                   <Stack.Screen name="agenda" options={{ title: 'Agenda' }} />
                   <Stack.Screen name="event/[id]" options={{ title: '' }} />

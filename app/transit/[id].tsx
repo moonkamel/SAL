@@ -341,7 +341,7 @@ function LiveTrip({
           current={index}
           onGuideWalk={(seg) =>
             router.push({
-              pathname: '/navigate/[id]',
+              pathname: '/guide/[id]',
               params: {
                 id: placeId,
                 name: seg.toName,

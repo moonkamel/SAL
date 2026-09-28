@@ -86,10 +86,10 @@ export default function RoutePreviewScreen() {
 
   const onStart = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({
-      pathname: '/navigate/[id]',
-      params: { id: params.id, name: params.name, lat: params.lat, lng: params.lng, mode },
-    });
+    const target = { id: params.id, name: params.name, lat: params.lat, lng: params.lng, mode };
+    // À pied et à vélo : notre guidage Mapbox façon Citymapper ; en voiture : Google.
+    if (mode === 'walk' || mode === 'bicycle') router.push({ pathname: '/guide/[id]', params: target });
+    else router.push({ pathname: '/navigate/[id]', params: target });
   };
 
   return (

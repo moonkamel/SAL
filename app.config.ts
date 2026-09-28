@@ -101,6 +101,8 @@ const config: ExpoConfig = {
       },
     ],
     ['expo-tracking-transparency', { userTrackingPermission: TRACKING_USAGE }],
+    // Carte et guidage à pied / à vélo (Mapbox). Aucun jeton secret requis pour la compilation.
+    '@rnmapbox/maps',
     [
       './plugins/withGoogleNavigation',
       { iosApiKey: GOOGLE_MAPS_IOS_API_KEY, androidApiKey: GOOGLE_MAPS_ANDROID_API_KEY },
