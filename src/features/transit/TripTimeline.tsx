@@ -14,7 +14,7 @@ interface Props {
   destinationName: string;
   /** Tronçon en cours (pendant le trajet). */
   current?: number;
-  /** Guidage vocal à pied jusqu'au bout d'un tronçon. */
+  /** « Y aller » : guidage à pied jusqu'au bout d'un tronçon. */
   onGuideWalk?: (segment: Extract<TripSegment, { kind: 'walk' }>) => void;
 }
 
@@ -56,7 +56,7 @@ export function TripTimeline({ itinerary, destinationName, current, onGuideWalk 
                       accessibilityRole="button"
                     >
                       <Ionicons name="navigate" size={15} color={colors.accent} />
-                      <Text style={styles.guideText}>Guidage vocal à pied</Text>
+                      <Text style={styles.guideText}>Y aller</Text>
                     </Pressable>
                   )}
                 </>

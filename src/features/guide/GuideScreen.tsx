@@ -33,6 +33,7 @@ import {
 } from '@/shared/guide';
 import type { LatLng } from '@/shared/types';
 
+import { FIRST_PERSON } from './camera';
 import { maneuverIcon } from './maneuverIcon';
 
 if (MAPBOX_TOKEN) void Mapbox.setAccessToken(MAPBOX_TOKEN);
@@ -232,8 +233,8 @@ export function GuideScreen({ placeId, name, destination, mode, returnOnArrival 
         <Camera
           followUserLocation={following}
           followUserMode={UserTrackingMode.FollowWithHeading}
-          followZoomLevel={17.5}
-          followPitch={55}
+          followZoomLevel={FIRST_PERSON.zoom}
+          followPitch={FIRST_PERSON.pitch}
           followPadding={{ paddingTop: 180 + insets.top, paddingBottom: 140 + insets.bottom }}
           defaultSettings={{ centerCoordinate: [destination.lng, destination.lat], zoomLevel: 15 }}
         />

@@ -3,12 +3,13 @@ import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Location from 'expo-location';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ComponentProps, type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GradientButton } from '@/src/components/GradientButton';
 import { type MapDot, type MapLine, PlacesMap } from '@/src/components/PlacesMap';
+import { mapboxGuideAvailable } from '@/src/features/guide/available';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { ItineraryCard } from '@/src/features/transit/ItineraryCard';
 import { TripTimeline } from '@/src/features/transit/TripTimeline';
@@ -25,6 +26,12 @@ type State =
   | { kind: 'done'; itineraries: TransitItinerary[] };
 
 const WALK_COLOR = '#B9B4C6';
+
+// Chargée seulement si l'app contient Mapbox : l'importer sans le module natif fait planter.
+const FollowMap: ComponentType<ComponentProps<typeof import('@/src/features/guide/FollowMap').FollowMap>> =
+  mapboxGuideAvailable
+  ? (require('@/src/features/guide/FollowMap') as typeof import('@/src/features/guide/FollowMap')).FollowMap
+  : () => null;
 
 /** Trajets en transports (métro, tram, bus) avec horaires, puis accompagnement en direct. */
 export default function TransitTripScreen() {
@@ -43,8 +50,6 @@ export default function TransitTripScreen() {
   const [now, setNow] = useState(() => new Date());
   // Pendant le trajet, la carte cadre l'étape en cours.
   const [liveIndex, setLiveIndex] = useState(0);
-  // Vue « rue » (caméra qui suit, inclinée, orientée) ou vue d'ensemble du trajet.
-  const [streetView, setStreetView] = useState(true);
 
   const load = useCallback(
     async (signal?: AbortSignal, quiet = false) => {
@@ -118,21 +123,31 @@ export default function TransitTripScreen() {
     [params.id, destination, name],
   );
 
-  const { position, heading } = usePositionAndHeading(!!shown && status === 'granted');
-  const follow = streetView && position ? { position, heading } : null;
+  const position = usePosition(!!shown && status === 'granted');
+
+  // Où marcher : pendant le trajet, la fin du tronçon à pied en cours ; avant, l'arrêt de départ.
+  const walkTarget = useMemo<LatLng | null>(() => {
+    if (!shown) return null;
+    const seg = trip ? shown.segments[liveIndex] : shown.segments[0];
+    if (!seg) return null;
+    if (seg.kind === 'walk') return seg.to;
+    return trip ? null : seg.departureStop.location;
+  }, [shown, trip, liveIndex]);
 
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ title: trip ? 'En route' : 'En transports' }} />
       <View style={styles.mapWrap}>
-        {shown ? (
+        {shown && mapboxGuideAvailable ? (
+          // Mapbox, vue « première personne » : on voit la rue comme on la parcourt.
+          <FollowMap position={position} target={walkTarget} style={StyleSheet.absoluteFill} bottomPadding={radius.lg} />
+        ) : shown ? (
           <PlacesMap
             center={destination}
             pins={pins}
             lines={lines}
             dots={dots}
             focus={focus}
-            follow={follow}
             showUserLocation={status === 'granted'}
             style={StyleSheet.absoluteFill}
           />
@@ -157,17 +172,6 @@ export default function TransitTripScreen() {
               </Text>
             )}
           </View>
-        )}
-        {shown && position && (
-          <Pressable
-            onPress={() => setStreetView((v) => !v)}
-            style={[styles.viewToggle, { bottom: radius.lg + spacing.md }]}
-            accessibilityRole="button"
-            accessibilityLabel={streetView ? 'Voir tout le trajet' : 'Vue au niveau de la rue'}
-          >
-            <Ionicons name={streetView ? 'map-outline' : 'navigate'} size={18} color={colors.text} />
-            <Text style={styles.viewToggleText}>{streetView ? 'Trajet entier' : 'Vue rue'}</Text>
-          </Pressable>
         )}
       </View>
 
@@ -210,7 +214,7 @@ export default function TransitTripScreen() {
                   </Text>
                 )}
                 <GradientButton
-                  title="C’est parti"
+                  title="Y aller"
                   icon="navigate"
                   onPress={() => {
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -227,38 +231,25 @@ export default function TransitTripScreen() {
   );
 }
 
-/**
- * Position (GPS précis) et cap de la boussole, arrondi à 10° pour ne pas faire tourner
- * la carte à chaque tremblement.
- */
-function usePositionAndHeading(enabled: boolean): { position: LatLng | null; heading?: number } {
+/** Position GPS précise, suivie tant que l'écran l'utilise. */
+function usePosition(enabled: boolean): LatLng | null {
   const [position, setPosition] = useState<LatLng | null>(null);
-  const [heading, setHeading] = useState<number | undefined>(undefined);
-
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    const subs: Location.LocationSubscription[] = [];
-    const keep = (s: Location.LocationSubscription) => (cancelled ? s.remove() : subs.push(s));
+    let sub: Location.LocationSubscription | null = null;
     void Location.watchPositionAsync(
       { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
       (loc) => setPosition({ lat: loc.coords.latitude, lng: loc.coords.longitude }),
     )
-      .then(keep)
-      .catch(() => {});
-    void Location.watchHeadingAsync((h) => {
-      const deg = h.trueHeading >= 0 ? h.trueHeading : h.magHeading;
-      setHeading(Math.round(deg / 10) * 10);
-    })
-      .then(keep)
+      .then((s) => (cancelled ? s.remove() : (sub = s)))
       .catch(() => {});
     return () => {
       cancelled = true;
-      subs.forEach((s) => s.remove());
+      sub?.remove();
     };
   }, [enabled]);
-
-  return { position, heading };
+  return position;
 }
 
 /** Accompagnement en direct : position suivie, étape en cours, alerte avant de descendre. */
@@ -393,16 +384,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceRaised,
   },
   stopText: { color: colors.text, fontWeight: '700', fontSize: font.body },
-  viewToggle: {
-    position: 'absolute',
-    left: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(10, 13, 28, 0.85)',
-  },
-  viewToggleText: { color: colors.text, fontSize: font.small, fontWeight: '700' },
 });
