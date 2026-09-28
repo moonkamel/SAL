@@ -5,6 +5,7 @@ import type {
   AgendaResponse,
   AgendaWhen,
   ApiError,
+  ItinerariesResponse,
   LatLng,
   OffersResponse,
   PlaceDetails,
@@ -116,6 +117,16 @@ export function getSurprise(near: LatLng, signal?: AbortSignal): Promise<Surpris
 export function placeWebUrl(id: string): string | undefined {
   const configured = process.env.EXPO_PUBLIC_API_URL;
   return configured ? `${configured.replace(/\/$/, '')}/place/${encodeURIComponent(id)}` : undefined;
+}
+
+export function getItineraries(
+  from: LatLng,
+  to: LatLng,
+  name: string,
+  signal?: AbortSignal,
+): Promise<ItinerariesResponse> {
+  const q = `from=${from.lat},${from.lng}&to=${to.lat},${to.lng}&name=${encodeURIComponent(name)}`;
+  return request<ItinerariesResponse>(`/api/itineraries?${q}`, { signal });
 }
 
 export function getOffers(near: LatLng, signal?: AbortSignal): Promise<OffersResponse> {

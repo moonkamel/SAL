@@ -11,6 +11,7 @@ export default function NavigateScreen() {
     lat: string;
     lng: string;
     mode: TravelMode;
+    back?: string;
   }>();
   const mode = params.mode && isGuidable(params.mode) ? params.mode : 'walk';
 
@@ -23,6 +24,7 @@ export default function NavigateScreen() {
         name={params.name ?? 'Destination'}
         destination={{ lat: Number(params.lat), lng: Number(params.lng) }}
         mode={mode as Exclude<TravelMode, 'transit'>}
+        returnOnArrival={params.back === '1'}
       />
     </>
   );

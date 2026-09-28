@@ -67,6 +67,7 @@ export default function RootLayout() {
                   <Stack.Screen name="place/[id]" options={{ title: '' }} />
                   <Stack.Screen name="favorites" options={{ title: 'Favoris' }} />
                   <Stack.Screen name="route/[id]" options={{ title: 'Itinéraire' }} />
+                  <Stack.Screen name="transit/[id]" options={{ title: 'En transports' }} />
                   <Stack.Screen name="offers" options={{ title: 'Bons plans' }} />
                   <Stack.Screen name="agenda" options={{ title: 'Agenda' }} />
                   <Stack.Screen name="admin" options={{ title: 'Espace partenaires' }} />

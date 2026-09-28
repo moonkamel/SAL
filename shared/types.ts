@@ -289,3 +289,66 @@ export type AgendaWhen = 'today' | 'tomorrow' | 'weekend';
 export interface AgendaResponse {
   events: AgendaEvent[];
 }
+
+// --- Trajets détaillés en transports en commun (style Citymapper) ---
+
+export interface TransitLineInfo {
+  /** « M1 », « R », « L1 »… */
+  short: string;
+  name: string;
+  /** Couleurs officielles de la ligne (#RRGGBB). */
+  color: string;
+  textColor: string;
+  /** « Métro », « Tram », « Bus »… */
+  vehicle: string;
+}
+
+export interface TransitStopInfo {
+  name: string;
+  location: LatLng;
+}
+
+export type TripSegment =
+  | {
+      kind: 'walk';
+      durationSeconds: number;
+      distanceMeters: number;
+      /** Tracé encodé. */
+      polyline: string;
+      from: LatLng;
+      to: LatLng;
+      /** Nom de l'arrêt ou du lieu d'arrivée de ce tronçon à pied. */
+      toName: string;
+    }
+  | {
+      kind: 'ride';
+      line: TransitLineInfo;
+      /** Direction affichée sur le véhicule. */
+      headsign: string;
+      departureStop: TransitStopInfo;
+      arrivalStop: TransitStopInfo;
+      /** ISO 8601. */
+      departureTime: string;
+      arrivalTime: string;
+      stopCount: number;
+      durationSeconds: number;
+      polyline: string;
+    };
+
+export interface TransitItinerary {
+  id: string;
+  /** ISO 8601 : départ (à pied) et arrivée à destination. */
+  departureTime: string;
+  arrivalTime: string;
+  durationSeconds: number;
+  walkMeters: number;
+  /** Tarif indiqué par Google, ex. « 1,80 € ». */
+  fare?: string;
+  segments: TripSegment[];
+  /** Même trajet, départs suivants du 1er véhicule (ISO), ex. métro toutes les 2 min. */
+  nextDepartures?: string[];
+}
+
+export interface ItinerariesResponse {
+  itineraries: TransitItinerary[];
+}

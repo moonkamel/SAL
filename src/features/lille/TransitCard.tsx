@@ -16,21 +16,14 @@ interface Props {
 
 /** Prochains passages métro / tram / bus aux arrêts Ilévia les plus proches (temps réel). */
 export function TransitCard({ near, title }: Props) {
-  const { data, error } = useLiveData<TransitResponse>(
+  const { data } = useLiveData<TransitResponse>(
     (signal) => getTransit(near, signal),
     30_000,
     [near.lat, near.lng],
   );
 
-  if (!data) {
-    if (!error) return null; // chargement discret
-    return (
-      <View style={styles.card}>
-        <Header title={title} />
-        <Text style={styles.muted}>Horaires Ilévia momentanément indisponibles.</Text>
-      </View>
-    );
-  }
+  // Chargement ou source indisponible : on n'affiche rien plutôt qu'un message d'erreur.
+  if (!data) return null;
   if (data.stops.length === 0) return null;
 
   return (
@@ -101,5 +94,4 @@ const styles = StyleSheet.create({
   direction: { flex: 1, color: colors.textMuted, fontSize: font.small },
   times: { color: colors.open, fontSize: font.small, fontWeight: '800' },
   source: { color: colors.textFaint, fontSize: font.tiny - 1 },
-  muted: { color: colors.textMuted, fontSize: font.small },
 });

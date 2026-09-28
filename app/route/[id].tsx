@@ -194,10 +194,18 @@ export default function RoutePreviewScreen() {
           {mode === 'transit' && <TransitCard near={state.from} title="Départs près de vous" />}
 
           {mode === 'transit' ? (
-            <Text style={styles.note}>
-              Le guidage pas à pas n’est pas disponible en transports en commun. Suivez le tracé
-              sur la carte.
-            </Text>
+            <GradientButton
+              title="Horaires et trajet détaillé"
+              icon="subway"
+              onPress={() =>
+                router.push({
+                  pathname: '/transit/[id]',
+                  params: { id: params.id, name: params.name, lat: params.lat, lng: params.lng },
+                })
+              }
+              disabled={!selected?.available}
+              accessibilityLabel="Voir les horaires et le trajet détaillé en transports"
+            />
           ) : (
             <GradientButton
               title="Démarrer"
@@ -260,5 +268,4 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   lineText: { color: colors.text, fontSize: font.small, fontWeight: '700' },
-  note: { color: colors.textMuted, fontSize: font.small, textAlign: 'center' },
 });

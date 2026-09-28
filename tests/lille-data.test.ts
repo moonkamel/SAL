@@ -5,6 +5,9 @@ import {
   groupPassages,
   parseDepartureTime,
   prettyName,
+  recordsOf,
+  sourceUrls,
+  toPassage,
 } from '@/server/ilevia';
 import { ambianceOf, textSearchFieldMask } from '@/server/places';
 import { hasAmbiance, withAmbianceHints } from '@/server/search';
@@ -74,6 +77,45 @@ describe('Ilévia (prochains passages)', () => {
   const f = (station: string, line: string, dir: string, time: string, lng: number, lat: number) => ({
     geometry: { type: 'Point', coordinates: [lng, lat] as [number, number] },
     properties: { nom_station: station, code_ligne: line, sens_ligne: dir, heure_estimee_depart: time },
+  });
+
+  it('lit les formats OGC (GeoJSON) et Opendatasoft (v1 et v2)', () => {
+    const expected = {
+      station: 'RIHOUR',
+      line: 'M1',
+      direction: 'CHU EURASANTE',
+      time: '2026-09-27T21:03:00',
+      location: { lat: 50.6362, lng: 3.0619 },
+    };
+    expect(toPassage(f('RIHOUR', 'M1', 'CHU EURASANTE', '2026-09-27T21:03:00', 3.0619, 50.6362))).toEqual(expected);
+    // Opendatasoft v1 : « fields » et geometry.
+    expect(
+      toPassage({
+        fields: { nomstation: 'RIHOUR', codeligne: 'M1', sensligne: 'CHU EURASANTE', heureestimeedepart: '2026-09-27T21:03:00' },
+        geometry: { type: 'Point', coordinates: [3.0619, 50.6362] },
+      }),
+    ).toEqual(expected);
+    // Opendatasoft v2 : objet à plat, coordonnées { lon, lat }.
+    expect(
+      toPassage({
+        nom_station: 'RIHOUR',
+        code_ligne: 'M1',
+        sens_ligne: 'CHU EURASANTE',
+        heure_estimee_depart: '2026-09-27T21:03:00',
+        coordonnees_geo: { lon: 3.0619, lat: 50.6362 },
+      }),
+    ).toEqual(expected);
+    expect(toPassage({ fields: { nomstation: 'X' } })).toBeNull();
+    expect(recordsOf({ records: [1, 2] })).toHaveLength(2);
+    expect(recordsOf({ features: [1] })).toHaveLength(1);
+    expect(recordsOf({ results: [] })).toHaveLength(0);
+  });
+
+  it('essaie plusieurs adresses de la MEL', () => {
+    const urls = sourceUrls(GRAND_PLACE);
+    expect(urls).toHaveLength(3);
+    expect(urls[0]).toContain('geofilter.distance=50.6366%2C3.0635%2C600');
+    expect(urls[2]).toContain('bbox=');
   });
 
   it('regroupe par arrêt et ligne, métro d’abord, arrêts les plus proches', () => {

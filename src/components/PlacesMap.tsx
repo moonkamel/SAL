@@ -18,12 +18,32 @@ export interface MapPin {
   snippet?: string;
 }
 
+/** Tracé coloré supplémentaire (ex. tronçons d'un trajet en transports). */
+export interface MapLine {
+  id: string;
+  points: LatLng[];
+  color: string;
+  width?: number;
+}
+
+/** Point rond (ex. arrêt de bus ou de métro). */
+export interface MapDot {
+  id: string;
+  center: LatLng;
+  color: string;
+}
+
 export interface PlacesMapProps {
   center: LatLng;
   pins: MapPin[];
   onPinPress?: (id: string) => void;
   /** Tracé d'itinéraire à dessiner ; la caméra le cadre entièrement. */
   route?: LatLng[];
+  /** Tracés colorés ; la caméra les cadre tous. */
+  lines?: MapLine[];
+  dots?: MapDot[];
+  /** Change de valeur pour recentrer la caméra (ex. étape suivante). */
+  focus?: LatLng[];
   /** N'activer que si la permission de localisation est accordée (sinon plantage Android). */
   showUserLocation?: boolean;
   interactive?: boolean;
@@ -64,6 +84,9 @@ export function PlacesMap({
   pins,
   onPinPress,
   route,
+  lines,
+  dots,
+  focus,
   showUserLocation = false,
   interactive = true,
   style,
@@ -90,8 +113,28 @@ export function PlacesMap({
         width: 12,
       });
     }
-    controller.moveCamera(camera(center, pins, route));
-  }, [controller, ready, pins, center, route]);
+    for (const line of lines ?? []) {
+      if (line.points.length < 2) continue;
+      void controller.addPolyline({
+        id: line.id,
+        points: line.points,
+        color: line.color,
+        width: line.width ?? 12,
+      });
+    }
+    for (const dot of dots ?? []) {
+      void controller.addCircle({
+        id: dot.id,
+        center: dot.center,
+        radius: 14,
+        strokeWidth: 4,
+        strokeColor: dot.color,
+        fillColor: '#FFFFFF',
+      });
+    }
+    const all = focus?.length ? focus : [...(route ?? []), ...(lines ?? []).flatMap((l) => l.points)];
+    controller.moveCamera(camera(center, pins, all.length > 1 ? all : undefined));
+  }, [controller, ready, pins, center, route, lines, dots, focus]);
 
   const onMarkerClick = useCallback(
     (marker: { id: string }) => onPinPress?.(marker.id),

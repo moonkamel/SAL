@@ -35,11 +35,21 @@ AdMob (react-native-google-mobile-ads) · Claude (reformulation optionnelle).
   des vélos au départ, station avec des places libres près du lieu. Données GBFS ouvertes
   d'Ilévia (`VLILLE_GBFS_URL`, par défaut `https://media.ilevia.fr/opendata/gbfs.json`),
   rafraîchies chaque minute.
+- **Trajets en transports, façon Citymapper** (aperçu d'itinéraire → mode transports →
+  « Horaires et trajet détaillé ») : propositions avec heure de départ et d'arrivée,
+  lignes aux couleurs officielles (M1 jaune, M2 rouge…), marche, prix du ticket et départs
+  suivants ; étapes détaillées (arrêt de montée, direction, nombre d'arrêts, arrêt de
+  descente). « C'est parti » lance l'**accompagnement en direct** : position suivie sur
+  la carte, étape en cours, compte à rebours avant le départ, vibration pour « pressez le
+  pas » et « descendez au prochain arrêt », guidage vocal à pied jusqu'à l'arrêt. Données
+  Google Routes API (horaires prévus d'Ilévia, tarif indiqué par Google).
 - **Prochains passages Ilévia** (métro, tram, bus) : « Départs près de vous » en mode
   transports, et « Pour rentrer en transports » sur la fiche d'un lieu. Données temps réel
-  de l'open data de la MEL (`ILEVIA_PASSAGES_URL`), rafraîchies toutes les 30 s. Si l'API
-  exige une clé, créez un compte sur <https://data.lillemetropole.fr> et renseignez
-  `MEL_API_KEY` côté serveur.
+  de l'open data de la MEL, rafraîchies toutes les 30 s. Le serveur essaie les adresses
+  connues de la MEL (API Opendatasoft puis OGC) et garde celle qui répond ;
+  `ILEVIA_PASSAGES_URL` permet d'en imposer une. Si l'API exige une clé, créez un compte
+  sur <https://data.lillemetropole.fr> et renseignez `MEL_API_KEY` côté serveur. Si aucune
+  source ne répond, l'encart est simplement masqué.
 - **Filtres d'ambiance** : terrasse, musique live, en groupe, avec enfants, cocktails,
   végétarien, **accès fauteuil** (entrée accessible en fauteuil roulant) (panneau « Filtres », ou déduits de la phrase par Claude). Seuls les lieux
   pour lesquels Google confirme l'ambiance sont gardés. Ces champs Google ne sont demandés

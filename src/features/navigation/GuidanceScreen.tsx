@@ -42,7 +42,8 @@ const SDK_MODE: Record<Exclude<TravelMode, 'transit'>, SdkTravelMode> = {
 };
 
 const INTRO_KEY = 'guidance-intro-seen:v1';
-const LOCATION_TIMEOUT_MS = 20_000;
+// Au-delà, on lance quand même le calcul : le SDK attend la position de son côté.
+const LOCATION_TIMEOUT_MS = 8_000;
 const BOTTOM_BAR_HEIGHT = 96;
 
 type Phase =
@@ -56,10 +57,12 @@ interface Props {
   name: string;
   destination: LatLng;
   mode: Exclude<TravelMode, 'transit'>;
+  /** Revenir à l'écran précédent à l'arrivée (ex. guidage jusqu'à un arrêt de bus). */
+  returnOnArrival?: boolean;
 }
 
 /** Guidage plein écran via le Google Navigation SDK. Aucune publicité ici. */
-export function GuidanceScreen({ placeId, name, destination, mode }: Props) {
+export function GuidanceScreen({ placeId, name, destination, mode, returnOnArrival }: Props) {
   useKeepAwake();
   const insets = useSafeAreaInsets();
   const {
@@ -155,7 +158,10 @@ export function GuidanceScreen({ placeId, name, destination, mode }: Props) {
       setViewVisible(true);
 
       setPhase({ kind: 'starting', label: 'Recherche de votre position…' });
-      await waitForFirstLocation();
+      // Sans cet appel, le SDK n'envoie aucune position : on attendait toujours le délai maximal.
+      const firstLocation = waitForFirstLocation();
+      await navigationController.startUpdatingLocation();
+      await firstLocation;
       if (cancelled) return;
 
       setPhase({ kind: 'starting', label: 'Calcul de l’itinéraire…' });
@@ -188,7 +194,14 @@ export function GuidanceScreen({ placeId, name, destination, mode }: Props) {
       cancelled = true;
       introResolver.current?.();
       removeAllListeners();
-      void stopGuidance().then(() => navigationController.cleanup().catch(() => {}));
+      void stopGuidance().then(() => {
+        try {
+          navigationController.stopUpdatingLocation();
+        } catch {
+          // Session déjà fermée.
+        }
+        return navigationController.cleanup().catch(() => {});
+      });
     };
     // Une seule session par écran : volontairement exécuté une seule fois au montage.
   }, []);
@@ -200,9 +213,10 @@ export function GuidanceScreen({ placeId, name, destination, mode }: Props) {
       if (event.isFinalDestination === false || finishedRef.current) return;
       finishedRef.current = true;
       void stopGuidance();
-      router.replace({ pathname: '/arrived/[id]', params: { id: placeId, name } });
+      if (returnOnArrival) router.back();
+      else router.replace({ pathname: '/arrived/[id]', params: { id: placeId, name } });
     });
-  }, [setOnRemainingTimeOrDistanceChanged, setOnArrival, stopGuidance, placeId, name]);
+  }, [setOnRemainingTimeOrDistanceChanged, setOnArrival, stopGuidance, placeId, name, returnOnArrival]);
 
   const confirmStop = useCallback(() => {
     if (phase.kind !== 'guiding') {

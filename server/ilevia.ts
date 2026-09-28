@@ -1,6 +1,8 @@
 // Prochains passages Ilévia (métro, tram, bus) en temps réel, depuis la plateforme
-// open data de la Métropole Européenne de Lille (API OGC Features).
-// Une clé API MEL est facultative (MEL_API_KEY) mais recommandée en production.
+// open data de la Métropole Européenne de Lille. La MEL a publié ce jeu de données sous
+// plusieurs formes (API Opendatasoft, API OGC Features) : on essaie chaque adresse
+// connue et on retient la première qui répond. ILEVIA_PASSAGES_URL permet d'imposer
+// une adresse. Une clé API MEL est facultative (MEL_API_KEY).
 
 import { estimateWalkMinutes, haversineMeters } from '@/shared/geo';
 import type { LatLng, TransitDeparture, TransitResponse, TransitStop } from '@/shared/types';
@@ -8,23 +10,75 @@ import type { LatLng, TransitDeparture, TransitResponse, TransitStop } from '@/s
 import { TtlCache } from './cache';
 import { PlacesError } from './places';
 
-export const ILEVIA_PASSAGES_URL =
-  process.env.ILEVIA_PASSAGES_URL ??
+const OGC_URL =
   'https://data.lillemetropole.fr/geoserver/ogc/features/v1/collections/dsp_ilevia%3Aprochains_passages/items';
+const ODS_DATASET = 'ilevia-prochainspassages';
 
 /** Rayon de recherche des arrêts autour d'un point (≈ 8 min à pied). */
 export const TRANSIT_RADIUS_METERS = 600;
 const MAX_STOPS = 2;
 const MAX_TIMES = 3;
 
-interface PassageFeature {
-  geometry?: { type: string; coordinates?: [number, number] } | null;
-  properties: {
-    nom_station?: string;
-    code_ligne?: string;
-    sens_ligne?: string;
-    heure_estimee_depart?: string;
-  };
+/** Un passage, quel que soit le format d'origine. */
+export interface Passage {
+  station: string;
+  line: string;
+  direction: string;
+  time: string;
+  location: LatLng;
+}
+
+type Json = Record<string, unknown>;
+
+/** Lit un champ sans tenir compte de la casse ni des « _ » (nom_station = nomstation). */
+function field(obj: Json | undefined, name: string): unknown {
+  if (!obj) return undefined;
+  const key = Object.keys(obj).find((k) => k.toLowerCase().replace(/[_\s]/g, '') === name);
+  return key ? obj[key] : undefined;
+}
+
+const str = (v: unknown) => (typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '');
+
+function locationOf(record: Json, props: Json): LatLng | null {
+  const geom = record.geometry as { coordinates?: unknown } | null | undefined;
+  const c = geom?.coordinates;
+  if (Array.isArray(c) && typeof c[0] === 'number' && typeof c[1] === 'number') {
+    return { lat: c[1], lng: c[0] };
+  }
+  for (const value of Object.values(props)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const v = value as Json;
+      if (typeof v.lat === 'number' && typeof v.lon === 'number') return { lat: v.lat, lng: v.lon };
+    }
+  }
+  // Opendatasoft : geo_point_2d = [lat, lon].
+  const gp = field(props, 'geopoint2d');
+  if (Array.isArray(gp) && typeof gp[0] === 'number' && typeof gp[1] === 'number') {
+    return { lat: gp[0], lng: gp[1] };
+  }
+  return null;
+}
+
+/** GeoJSON (properties), Opendatasoft v1 (fields) ou v2 (objet à plat). */
+export function toPassage(raw: unknown): Passage | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const record = raw as Json;
+  const props = (record.properties ?? record.fields ?? record) as Json;
+  const station = str(field(props, 'nomstation'));
+  const line = str(field(props, 'codeligne'));
+  const time = str(field(props, 'heureestimeedepart'));
+  const location = locationOf(record, props);
+  if (!station || !line || !time || !location) return null;
+  return { station, line, direction: str(field(props, 'sensligne')), time, location };
+}
+
+/** Enregistrements d'une réponse, quel que soit le format. */
+export function recordsOf(json: unknown): unknown[] {
+  const j = (json ?? {}) as Json;
+  for (const key of ['features', 'records', 'results']) {
+    if (Array.isArray(j[key])) return j[key] as unknown[];
+  }
+  return Array.isArray(json) ? json : [];
 }
 
 /** Rectangle englobant (lng/lat) d'un cercle, pour le paramètre bbox de l'API. */
@@ -80,33 +134,28 @@ export function parseDepartureTime(value: string): number {
 }
 
 /** Regroupe les passages par arrêt puis par ligne et direction, triés par proximité. */
-export function groupPassages(
-  features: PassageFeature[],
-  from: LatLng,
-  now: Date = new Date(),
-): TransitStop[] {
+export function groupPassages(records: unknown[], from: LatLng, now: Date = new Date()): TransitStop[] {
   const stops = new Map<string, { location: LatLng; lines: Map<string, TransitDeparture> }>();
 
-  for (const f of features) {
-    const p = f.properties;
-    const coords = f.geometry?.coordinates;
-    if (!p.nom_station || !p.code_ligne || !p.heure_estimee_depart || !coords) continue;
-    const minutes = Math.round((parseDepartureTime(p.heure_estimee_depart) - now.getTime()) / 60_000);
+  for (const raw of records) {
+    const p = toPassage(raw);
+    if (!p) continue;
+    const minutes = Math.round((parseDepartureTime(p.time) - now.getTime()) / 60_000);
     if (Number.isNaN(minutes) || minutes < 0 || minutes > 90) continue;
 
-    const stop = stops.get(p.nom_station) ?? {
-      location: { lat: coords[1], lng: coords[0] },
+    const stop = stops.get(p.station) ?? {
+      location: p.location,
       lines: new Map<string, TransitDeparture>(),
     };
-    const key = `${p.code_ligne}|${p.sens_ligne ?? ''}`;
+    const key = `${p.line}|${p.direction}`;
     const dep = stop.lines.get(key) ?? {
-      line: p.code_ligne,
-      direction: prettyName(p.sens_ligne ?? ''),
+      line: p.line,
+      direction: prettyName(p.direction),
       minutes: [],
     };
     dep.minutes.push(minutes);
     stop.lines.set(key, dep);
-    stops.set(p.nom_station, stop);
+    stops.set(p.station, stop);
   }
 
   return [...stops.entries()]
@@ -137,25 +186,64 @@ function lineRank(line: string): number {
 
 const cache = new TtlCache<TransitResponse>(30 * 1000, 300);
 
+/** Adresses à essayer, dans l'ordre, pour les passages autour d'un point. */
+export function sourceUrls(from: LatLng): string[] {
+  const key = process.env.MEL_API_KEY;
+  const ogc = (base: string) => {
+    const url = new URL(base);
+    url.searchParams.set('f', 'json');
+    url.searchParams.set('limit', '500');
+    url.searchParams.set('bbox', bboxAround(from, TRANSIT_RADIUS_METERS).join(','));
+    if (key) url.searchParams.set('apikey', key);
+    return url.toString();
+  };
+  const ods = (host: string) => {
+    const url = new URL(`https://${host}/api/records/1.0/search/`);
+    url.searchParams.set('dataset', ODS_DATASET);
+    url.searchParams.set('rows', '500');
+    url.searchParams.set('geofilter.distance', `${from.lat},${from.lng},${TRANSIT_RADIUS_METERS}`);
+    if (key) url.searchParams.set('apikey', key);
+    return url.toString();
+  };
+  const custom = process.env.ILEVIA_PASSAGES_URL;
+  if (custom) return [custom.includes('/records/1.0/') ? custom : ogc(custom)];
+  return [ods('data.lillemetropole.fr'), ods('opendata.lillemetropole.fr'), ogc(OGC_URL)];
+}
+
+// Index de la dernière adresse qui a fonctionné : on commence par elle.
+let preferred = 0;
+
+async function fetchRecords(from: LatLng): Promise<unknown[]> {
+  const urls = sourceUrls(from);
+  const order = [preferred, ...urls.keys()].filter((i, pos, all) => i < urls.length && all.indexOf(i) === pos);
+  for (const i of order) {
+    try {
+      const res = await fetch(urls[i]!, {
+        headers: { Accept: 'application/geo+json, application/json' },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!res.ok) {
+        console.warn('[ilevia] source', i, 'a répondu', res.status);
+        continue;
+      }
+      const records = recordsOf(await res.json());
+      // Une source qui répond mais sans aucun passage lisible n'est pas la bonne.
+      if (records.length > 0 && !records.some((r) => toPassage(r))) continue;
+      preferred = i;
+      return records;
+    } catch (error) {
+      console.warn('[ilevia] source', i, 'injoignable', error);
+    }
+  }
+  throw new PlacesError('Horaires Ilévia indisponibles', 502);
+}
+
 export async function transitNear(from: LatLng): Promise<TransitResponse> {
   // ~100 m de précision : les voisins partagent le même cache (30 s).
   const key = `${from.lat.toFixed(3)},${from.lng.toFixed(3)}`;
   const hit = cache.get(key);
   if (hit) return hit;
-
-  const url = new URL(ILEVIA_PASSAGES_URL);
-  url.searchParams.set('f', 'json');
-  url.searchParams.set('limit', '500');
-  url.searchParams.set('bbox', bboxAround(from, TRANSIT_RADIUS_METERS).join(','));
-  if (process.env.MEL_API_KEY) url.searchParams.set('apikey', process.env.MEL_API_KEY);
-
-  const res = await fetch(url, { headers: { Accept: 'application/geo+json, application/json' } });
-  if (!res.ok) {
-    console.error('[ilevia] prochains passages indisponibles', res.status);
-    throw new PlacesError('Horaires Ilévia indisponibles', 502);
-  }
-  const json = (await res.json()) as { features?: PassageFeature[] };
-  const result = { stops: groupPassages(json.features ?? [], from) };
+  const result = { stops: groupPassages(await fetchRecords(from), from) };
   cache.set(key, result);
   return result;
 }
