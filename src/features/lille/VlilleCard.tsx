@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { getVlille } from '@/src/lib/api';
@@ -12,10 +13,12 @@ import { useLiveData } from './useLiveData';
 interface Props {
   from: LatLng;
   to: LatLng;
+  /** Stations retenues (prise et dépôt), pour lancer le voyage V'Lille guidé. */
+  onStations?: (pickup: VlilleStation | undefined, dropoff: VlilleStation | undefined) => void;
 }
 
 /** Où prendre un V'Lille près de soi, et où le déposer près du lieu (temps réel). */
-export function VlilleCard({ from, to }: Props) {
+export function VlilleCard({ from, to, onStations }: Props) {
   const start = useLiveData<VlilleResponse>(
     (signal) => getVlille(from, 3, signal),
     60_000,
@@ -26,6 +29,14 @@ export function VlilleCard({ from, to }: Props) {
     60_000,
     [to.lat, to.lng],
   );
+
+  const pickupStation = start.data ? pickStation(start.data.stations, 'bikes') : undefined;
+  const dropoffStation = end.data ? pickStation(end.data.stations, 'docks') : undefined;
+  useEffect(() => {
+    onStations?.(pickupStation, dropoffStation);
+    // Seuls les identifiants et disponibilités comptent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickupStation?.id, pickupStation?.bikes, dropoffStation?.id, dropoffStation?.docks]);
 
   if (start.error && end.error && !start.data && !end.data) {
     return (

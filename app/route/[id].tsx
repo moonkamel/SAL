@@ -6,6 +6,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GradientButton } from '@/src/components/GradientButton';
+import { mapboxGuideAvailable } from '@/src/features/guide/available';
+import { setPendingJourney } from '@/src/features/journey/journeyStore';
 import { VlilleCard } from '@/src/features/lille/VlilleCard';
 import { PlacesMap } from '@/src/components/PlacesMap';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
@@ -13,7 +15,8 @@ import { ApiRequestError, getRoutes } from '@/src/lib/api';
 import { colors, font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { formatArrival, formatDistance, formatDuration } from '@/shared/format';
 import { decodePolyline } from '@/shared/polyline';
-import type { LatLng, RouteOption, TravelMode } from '@/shared/types';
+import { journeyWithVlille } from '@/shared/journey';
+import type { LatLng, RouteOption, TravelMode, VlilleStation } from '@/shared/types';
 
 const MODES: {
   mode: TravelMode;
@@ -84,7 +87,20 @@ export default function RoutePreviewScreen() {
     [params.id, params.name, destination],
   );
 
+  // Stations V'Lille retenues par la carte V'Lille (mode vélo).
+  const [stations, setStations] = useState<{ pickup?: VlilleStation; dropoff?: VlilleStation }>({});
+  const vlilleReady = mode === 'bicycle' && !!stations.pickup && !!stations.dropoff && mapboxGuideAvailable;
+
   const onStart = () => {
+    if (vlilleReady) {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      // À pied jusqu'à la station, à vélo jusqu'à la station d'arrivée, puis à pied.
+      setPendingJourney(
+        journeyWithVlille(stations.pickup, stations.dropoff, destination, params.id, params.name ?? 'Destination'),
+      );
+      router.push('/journey');
+      return;
+    }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const target = { id: params.id, name: params.name, lat: params.lat, lng: params.lng, mode };
     // À pied et à vélo : notre guidage Mapbox façon Citymapper ; en voiture : Google.
@@ -189,7 +205,13 @@ export default function RoutePreviewScreen() {
           )}
 
           {/* Temps réel lillois : V'Lille à vélo, prochains passages en transports. */}
-          {mode === 'bicycle' && <VlilleCard from={state.from} to={destination} />}
+          {mode === 'bicycle' && (
+            <VlilleCard
+              from={state.from}
+              to={destination}
+              onStations={(pickup, dropoff) => setStations({ pickup, dropoff })}
+            />
+          )}
 
           {mode === 'transit' ? (
             <GradientButton
@@ -206,7 +228,7 @@ export default function RoutePreviewScreen() {
             />
           ) : (
             <GradientButton
-              title="Démarrer"
+              title={vlilleReady ? 'Y aller en V’Lille' : 'Démarrer'}
               icon="navigate"
               onPress={onStart}
               disabled={!selected?.available}

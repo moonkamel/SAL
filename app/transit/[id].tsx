@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GradientButton } from '@/src/components/GradientButton';
 import { type MapDot, type MapLine, PlacesMap } from '@/src/components/PlacesMap';
 import { mapboxGuideAvailable } from '@/src/features/guide/available';
+import { setPendingJourney } from '@/src/features/journey/journeyStore';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { ItineraryCard } from '@/src/features/transit/ItineraryCard';
 import { TripTimeline } from '@/src/features/transit/TripTimeline';
@@ -17,6 +18,7 @@ import { useStopRealtime } from '@/src/features/transit/useStopRealtime';
 import { ApiRequestError, getItineraries } from '@/src/lib/api';
 import { colors, font, fonts, radius, spacing } from '@/src/theme';
 import { haversineMeters } from '@/shared/geo';
+import { journeyFromItinerary } from '@/shared/journey';
 import { currentSegment, liveInstruction, segmentPoints } from '@/shared/trip';
 import type { LatLng, TransitItinerary } from '@/shared/types';
 
@@ -218,7 +220,13 @@ export default function TransitTripScreen() {
                   icon="navigate"
                   onPress={() => {
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    setTrip(shown);
+                    if (mapboxGuideAvailable) {
+                      // Toutes les étapes s'enchaînent dans un seul écran guidé.
+                      setPendingJourney(journeyFromItinerary(shown, params.id, name));
+                      router.push('/journey');
+                    } else {
+                      setTrip(shown);
+                    }
                   }}
                   accessibilityLabel="Démarrer l’accompagnement en direct"
                 />

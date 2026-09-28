@@ -69,6 +69,10 @@ export default function RootLayout() {
                   <Stack.Screen name="route/[id]" options={{ title: 'Itinéraire' }} />
                   <Stack.Screen name="transit/[id]" options={{ title: 'En transports' }} />
                   <Stack.Screen
+                    name="journey"
+                    options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }}
+                  />
+                  <Stack.Screen
                     name="guide/[id]"
                     options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }}
                   />

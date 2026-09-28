@@ -244,6 +244,16 @@ itinéraires) puis facture à l'usage : vérifiez les quotas sur <https://www.ma
 Les itinéraires Mapbox ne sont affichés que sur la carte Mapbox (et inversement pour
 Google), conformément aux conditions de chaque fournisseur.
 
+**Voyages guidés de bout en bout** (écran `/journey`) : après « Y aller » sur un trajet en
+transports, ou « Y aller en V’Lille » en mode vélo, toutes les étapes s'enchaînent
+automatiquement dans un seul écran : marche guidée jusqu'à l'arrêt → « Prenez le bus L1
+direction… dans 3 min (temps réel) » → « Restez dans le bus » → « Descendez au prochain
+arrêt » → marche guidée jusqu'au lieu ; ou marche jusqu'à la station V'Lille (vélos
+disponibles) → vélo guidé jusqu'à la station d'arrivée (places libres) → marche. La voix
+annonce chaque changement d'étape ; un bouton « Étape suivante » sert de secours si le GPS
+ne capte plus (métro souterrain). Les tracés Google (bus, métro) ne sont jamais dessinés
+sur la carte Mapbox : seuls les chemins à pied et à vélo calculés par Mapbox le sont.
+
 **Nouveau module natif : il faut refaire l'app de développement**
 (`npm run build:dev:android`).
 
