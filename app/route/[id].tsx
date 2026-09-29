@@ -2,21 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { type ComponentProps, useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GradientButton } from '@/src/components/GradientButton';
-import { mapboxGuideAvailable } from '@/src/features/guide/available';
-import { setPendingJourney } from '@/src/features/journey/journeyStore';
 import { VlilleCard } from '@/src/features/lille/VlilleCard';
 import { PlacesMap } from '@/src/components/PlacesMap';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
+import { googleMapsDirections } from '@/src/features/navigation/googleMaps';
 import { ApiRequestError, getRoutes } from '@/src/lib/api';
 import { colors, font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { formatArrival, formatDistance, formatDuration } from '@/shared/format';
 import { decodePolyline } from '@/shared/polyline';
-import { journeyWithVlille } from '@/shared/journey';
-import type { LatLng, RouteOption, TravelMode, VlilleStation } from '@/shared/types';
+import type { LatLng, RouteOption, TravelMode } from '@/shared/types';
 
 const MODES: {
   mode: TravelMode;
@@ -87,25 +85,10 @@ export default function RoutePreviewScreen() {
     [params.id, params.name, destination],
   );
 
-  // Stations V'Lille retenues par la carte V'Lille (mode vélo).
-  const [stations, setStations] = useState<{ pickup?: VlilleStation; dropoff?: VlilleStation }>({});
-  const vlilleReady = mode === 'bicycle' && !!stations.pickup && !!stations.dropoff && mapboxGuideAvailable;
-
+  // Le guidage (voix, virages) se fait dans Google Maps.
   const onStart = () => {
-    if (vlilleReady) {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      // À pied jusqu'à la station, à vélo jusqu'à la station d'arrivée, puis à pied.
-      setPendingJourney(
-        journeyWithVlille(stations.pickup, stations.dropoff, destination, params.id, params.name ?? 'Destination'),
-      );
-      router.push('/journey');
-      return;
-    }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const target = { id: params.id, name: params.name, lat: params.lat, lng: params.lng, mode };
-    // À pied et à vélo : notre guidage Mapbox façon Citymapper ; en voiture : Google.
-    if (mode === 'walk' || mode === 'bicycle') router.push({ pathname: '/guide/[id]', params: target });
-    else router.push({ pathname: '/navigate/[id]', params: target });
+    void Linking.openURL(googleMapsDirections(destination, mode, { id: params.id, name: params.name }));
   };
 
   return (
@@ -206,11 +189,7 @@ export default function RoutePreviewScreen() {
 
           {/* Temps réel lillois : V'Lille à vélo, prochains passages en transports. */}
           {mode === 'bicycle' && (
-            <VlilleCard
-              from={state.from}
-              to={destination}
-              onStations={(pickup, dropoff) => setStations({ pickup, dropoff })}
-            />
+            <VlilleCard from={state.from} to={destination} />
           )}
 
           {mode === 'transit' ? (
@@ -228,11 +207,11 @@ export default function RoutePreviewScreen() {
             />
           ) : (
             <GradientButton
-              title={vlilleReady ? 'Y aller en V’Lille' : 'Démarrer'}
+              title="Y aller avec Google Maps"
               icon="navigate"
               onPress={onStart}
               disabled={!selected?.available}
-              accessibilityLabel="Démarrer le guidage"
+              accessibilityLabel="Ouvrir l’itinéraire dans Google Maps"
             />
           )}
         </View>

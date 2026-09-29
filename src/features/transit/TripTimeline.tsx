@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { colors, font, fonts, radius, spacing } from '@/src/theme';
 import { formatDistance } from '@/shared/format';
 import { formatClock } from '@/shared/trip';
 import type { TransitItinerary, TripSegment } from '@/shared/types';
@@ -12,24 +12,17 @@ import { useStopRealtime } from './useStopRealtime';
 interface Props {
   itinerary: TransitItinerary;
   destinationName: string;
-  /** Tronçon en cours (pendant le trajet). */
-  current?: number;
-  /** À bord du véhicule de l'étape en cours : arrêts restant avant de descendre. */
-  onboard?: { stopsLeft: number };
-  /** « Y aller » : guidage à pied jusqu'au bout d'un tronçon. */
-  onGuideWalk?: (segment: Extract<TripSegment, { kind: 'walk' }>) => void;
 }
 
 const minutes = (s: number) => `${Math.max(1, Math.round(s / 60))} min`;
 
 /** Étapes du trajet, façon feuille de route. */
-export function TripTimeline({ itinerary, destinationName, current, onboard, onGuideWalk }: Props) {
+export function TripTimeline({ itinerary, destinationName }: Props) {
   return (
     <View style={styles.list}>
       {itinerary.segments.map((seg, i) => {
-        const state = current === undefined ? 'todo' : i < current ? 'done' : i === current ? 'now' : 'todo';
         return (
-          <View key={i} style={[styles.row, state === 'done' && { opacity: 0.45 }]}>
+          <View key={i} style={styles.row}>
             <View style={styles.rail}>
               <View
                 style={[
@@ -40,7 +33,7 @@ export function TripTimeline({ itinerary, destinationName, current, onboard, onG
                 ]}
               />
             </View>
-            <View style={[styles.body, state === 'now' && styles.now]}>
+            <View style={styles.body}>
               {seg.kind === 'walk' ? (
                 <>
                   <View style={styles.head}>
@@ -51,16 +44,6 @@ export function TripTimeline({ itinerary, destinationName, current, onboard, onG
                     </Text>
                   </View>
                   <Text style={styles.muted}>jusqu’à {seg.toName}</Text>
-                  {onGuideWalk && state !== 'done' && (
-                    <Pressable
-                      onPress={() => onGuideWalk(seg)}
-                      style={({ pressed }) => [styles.guide, pressed && { opacity: 0.7 }]}
-                      accessibilityRole="button"
-                    >
-                      <Ionicons name="navigate" size={15} color={colors.accent} />
-                      <Text style={styles.guideText}>Y aller</Text>
-                    </Pressable>
-                  )}
                 </>
               ) : (
                 <>
@@ -73,11 +56,7 @@ export function TripTimeline({ itinerary, destinationName, current, onboard, onG
                       Direction {seg.headsign}
                     </Text>
                   </View>
-                  {state === 'now' && onboard ? (
-                    <OnBoard stopsLeft={onboard.stopsLeft} color={seg.line.color} />
-                  ) : (
-                    state !== 'done' && <Realtime ride={seg} />
-                  )}
+                  <Realtime ride={seg} />
                   <Text style={styles.muted}>
                     {seg.stopCount} arrêt{seg.stopCount > 1 ? 's' : ''} · {minutes(seg.durationSeconds)}
                   </Text>
@@ -104,17 +83,6 @@ export function TripTimeline({ itinerary, destinationName, current, onboard, onG
   );
 }
 
-/** Dans le véhicule : combien d'arrêts avant de descendre. */
-function OnBoard({ stopsLeft, color }: { stopsLeft: number; color: string }) {
-  const label = stopsLeft <= 1 ? 'Descendez au prochain arrêt' : `À bord · encore ${stopsLeft} arrêts`;
-  return (
-    <View style={[styles.onboard, { borderColor: color }]} accessibilityLiveRegion="polite">
-      <Ionicons name={stopsLeft <= 1 ? 'exit-outline' : 'train-outline'} size={16} color={colors.text} />
-      <Text style={styles.onboardText}>{label}</Text>
-    </View>
-  );
-}
-
 /** Temps réel Ilévia à l'arrêt de montée (masqué s'il n'est pas disponible). */
 function Realtime({ ride }: { ride: Extract<TripSegment, { kind: 'ride' }> }) {
   const mins = useStopRealtime(ride.departureStop.name, ride.line.short, ride.headsign);
@@ -133,39 +101,13 @@ const styles = StyleSheet.create({
   live: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.open },
   liveText: { color: colors.open, fontSize: font.small, fontWeight: '800' },
-  onboard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    borderWidth: 2,
-    backgroundColor: colors.surfaceRaised,
-  },
-  onboardText: { color: colors.text, fontSize: font.small, fontWeight: '800' },
   list: { gap: 2 },
   row: { flexDirection: 'row', gap: spacing.md },
   rail: { width: 22, alignItems: 'center' },
   bar: { flex: 1, minHeight: 40, borderRadius: 3 },
   body: { flex: 1, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, gap: 4, borderRadius: radius.sm },
-  now: { backgroundColor: 'rgba(217, 80, 47, 0.14)' },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   title: { flex: 1, color: colors.text, fontSize: font.body, fontWeight: '700' },
   stop: { color: colors.text, fontFamily: fonts.displayMedium, fontSize: font.body },
   muted: { color: colors.textMuted, fontSize: font.small, fontWeight: '400' },
-  guide: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    minHeight: TOUCH_TARGET - 12,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    marginTop: spacing.xs,
-  },
-  guideText: { color: colors.accent, fontSize: font.small, fontWeight: '700' },
 });

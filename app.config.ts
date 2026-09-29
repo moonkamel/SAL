@@ -24,7 +24,7 @@ const TRACKING_USAGE =
 const LOCATION_WHEN_IN_USE =
   'Sortir à Lille utilise votre position pour vous proposer les lieux les plus proches et calculer le trajet pour y aller.';
 const LOCATION_ALWAYS =
-  'Pendant le guidage, Sortir à Lille continue d’utiliser votre position quand l’écran est verrouillé pour vous indiquer le chemin. La localisation s’arrête à l’arrivée.';
+  'Sortir à Lille utilise votre position pour vous proposer les lieux les plus proches et calculer le trajet pour y aller.';
 
 const config: ExpoConfig = {
   name: 'Sortir à Lille',
@@ -53,14 +53,9 @@ const config: ExpoConfig = {
       backgroundImage: './assets/android-icon-background.png',
       monochromeImage: './assets/android-icon-monochrome.png',
     },
-    // Le guidage tourne dans un service de premier plan (notification « Guidage en cours ») :
-    // pas besoin de ACCESS_BACKGROUND_LOCATION, soumis à un examen strict sur Google Play.
     permissions: [
       'ACCESS_COARSE_LOCATION',
       'ACCESS_FINE_LOCATION',
-      'FOREGROUND_SERVICE',
-      'FOREGROUND_SERVICE_LOCATION',
-      'POST_NOTIFICATIONS',
     ],
     // Ajoutées par défaut par Expo, inutiles ici.
     blockedPermissions: [
@@ -80,9 +75,8 @@ const config: ExpoConfig = {
       {
         locationWhenInUsePermission: LOCATION_WHEN_IN_USE,
         locationAlwaysAndWhenInUsePermission: LOCATION_ALWAYS,
-        // iOS : mode d'arrière-plan « location » pour poursuivre le guidage écran verrouillé
-        // (l'autorisation « Lorsque l'app est active » suffit, avec l'indicateur bleu).
-        isIosBackgroundLocationEnabled: true,
+        // Pas de guidage dans l'app (il se fait dans Google Maps) : pas d'arrière-plan.
+        isIosBackgroundLocationEnabled: false,
         isAndroidBackgroundLocationEnabled: false,
       },
     ],
@@ -101,8 +95,6 @@ const config: ExpoConfig = {
       },
     ],
     ['expo-tracking-transparency', { userTrackingPermission: TRACKING_USAGE }],
-    // Carte et guidage à pied / à vélo (Mapbox). Aucun jeton secret requis pour la compilation.
-    '@rnmapbox/maps',
     [
       './plugins/withGoogleNavigation',
       { iosApiKey: GOOGLE_MAPS_IOS_API_KEY, androidApiKey: GOOGLE_MAPS_ANDROID_API_KEY },

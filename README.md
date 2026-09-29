@@ -17,7 +17,7 @@ AdMob (react-native-google-mobile-ads) · Claude (reformulation optionnelle).
 | 1 | Recherche + liste de résultats + filtres + historique | ✅ testé avec les vraies données Google, à tester sur téléphone |
 | 2 | Fiche lieu + carte (MapView du Navigation SDK) + favoris | ✅ à tester sur téléphone (nouveau build nécessaire) |
 | 3 | Aperçu d'itinéraire (Routes API) | ✅ testé avec les vraies données Google, à tester sur téléphone |
-| 4 | Navigation guidée intégrée (Google Navigation SDK) | ✅ à tester sur téléphone (nouveau build nécessaire) |
+| 4 | Guidage : ouvert dans Google Maps (le guidage intégré a été retiré) | ✅ |
 | 5 | Publicité AdMob + consentement + lieux sponsorisés | ✅ à tester sur téléphone (nouveau build nécessaire) |
 
 ### Design « Lille la nuit »
@@ -39,9 +39,7 @@ AdMob (react-native-google-mobile-ads) · Claude (reformulation optionnelle).
   « Horaires et trajet détaillé ») : propositions avec heure de départ et d'arrivée,
   lignes aux couleurs officielles (M1 jaune, M2 rouge…), marche, prix du ticket et départs
   suivants ; étapes détaillées (arrêt de montée, direction, nombre d'arrêts, arrêt de
-  descente). « C'est parti » lance l'**accompagnement en direct** : position suivie sur
-  la carte, étape en cours, compte à rebours avant le départ, vibration pour « pressez le
-  pas » et « descendez au prochain arrêt », guidage vocal à pied jusqu'à l'arrêt. Données
+  descente). « Y aller avec Google Maps » ouvre le trajet dans Google Maps. Données
   Google Routes API (horaires prévus d'Ilévia, tarif indiqué par Google).
 - **Prochains passages Ilévia** (métro, tram, bus) : « Départs près de vous » en mode
   transports, et « Pour rentrer en transports » sur la fiche d'un lieu. Données temps réel
@@ -88,8 +86,9 @@ AdMob (react-native-google-mobile-ads) · Claude (reformulation optionnelle).
 - **Carte** : le composant `MapView` du Navigation SDK remplace `react-native-maps`. Les deux
   embarquent le Maps SDK Google et ne peuvent pas cohabiter dans la même app (symboles
   dupliqués sur iOS, classes dupliquées sur Android).
-- **Modes de guidage** : marche (par défaut), vélo, voiture. Le Navigation SDK ne guide pas
-  en transports en commun : ce mode sera proposé en aperçu uniquement.
+- **Guidage** : l'app affiche temps de trajet, tracés et étapes, puis « Y aller avec Google
+  Maps » ouvre Google Maps (à pied, vélo, voiture ou transports). Pas de guidage intégré :
+  le Navigation SDK ne sert plus qu'à la carte.
 - **Avis Google** : chargés seulement dans la fiche lieu (Place Details). Les demander dans
   chaque recherche ferait passer toutes les recherches dans la tranche Places la plus chère.
 - **Temps à pied dans la liste** : estimation (distance × 1,3 à 4,8 km/h), affichée « ~12 min ».
@@ -110,8 +109,6 @@ app/                 écrans (Expo Router) + routes API (*+api.ts)
   api/vlille+api.ts  GET  /api/vlille?near=lat,lng → stations V'Lille proches (temps réel)
   api/transit+api.ts GET  /api/transit?near=lat,lng → prochains passages Ilévia
   route/[id].tsx     aperçu d'itinéraire : tracé, choix du mode, durée, « Démarrer »
-  navigate/[id].tsx  guidage plein écran (Navigation SDK), « Arrêter », aucune publicité
-  arrived/[id].tsx   « Vous êtes arrivé » : noter le lieu, nouvelle recherche
 plugins/withGoogleNavigation.js  plugin Expo : clés Maps, désugarage Android, Jetifier,
                      modes d'arrière-plan iOS (location, audio)
 server/              logique backend (testable seule)
@@ -129,7 +126,7 @@ server/              logique backend (testable seule)
 shared/              types, géo et formatage communs à l'app et au serveur
 src/                 composants, localisation, historique, favoris, thème
   features/ads/      consentement UMP + ATT, bannière, pub native, interstitiel, règles
-  features/navigation/  guidage (Navigation SDK), état « guidage actif »
+  features/navigation/  contexte du Navigation SDK (carte), liens Google Maps
   features/lille/    V’Lille, Ilévia, pastilles d’ambiance
   features/moment/   Surprends-moi, carte météo, rubriques de l'accueil
   features/admin/    espace partenaires (/admin)
@@ -221,41 +218,6 @@ Pour la production :
 
 Le lien « Confidentialité et publicité » de l'accueil permet de modifier ses choix
 (obligatoire dans l'UE).
-
-### Mapbox (guidage à pied et à vélo)
-
-Le guidage pas à pas **à pied et à vélo** utilise Mapbox : carte « Standard » en 3D
-(ambiance jour ou nuit selon l'heure), flèche qui suit la boussole, grande carte
-d'instruction façon Citymapper (« ↰ 140 m · Rue de la Monnaie »), voix en français,
-recalcul automatique en cas d'écart. Le guidage **en voiture** reste celui de Google
-(Navigation SDK). La recherche, les fiches et les trajets en transports restent sur Google.
-
-1. Créez un compte sur <https://console.mapbox.com>, page *Tokens* : copiez le
-   **Default public token** (il commence par `pk.`).
-2. Ajoutez-le dans `.env.local` (et dans les variables d'environnement EAS) :
-
-```
-EXPO_PUBLIC_MAPBOX_TOKEN=pk.…
-```
-
-Ce jeton public est prévu pour être embarqué dans l'app ; aucun jeton secret n'est
-nécessaire pour compiler. Mapbox propose une offre gratuite (cartes mobiles et
-itinéraires) puis facture à l'usage : vérifiez les quotas sur <https://www.mapbox.com/pricing>.
-Les itinéraires Mapbox ne sont affichés que sur la carte Mapbox (et inversement pour
-Google), conformément aux conditions de chaque fournisseur.
-
-**Voyages guidés de bout en bout** (écran `/journey`) : après « Y aller » sur un trajet en
-transports, ou « Y aller en V’Lille » en mode vélo, toutes les étapes s'enchaînent
-automatiquement dans un seul écran : marche guidée jusqu'à l'arrêt → « Prenez le bus L1
-direction… dans 3 min (temps réel) » → « Restez dans le bus » → « Descendez au prochain
-arrêt » → marche guidée jusqu'au lieu ; ou marche jusqu'à la station V'Lille (vélos
-disponibles) → vélo guidé jusqu'à la station d'arrivée (places libres) → marche. La voix
-annonce chaque changement d'étape ; un bouton « Étape suivante » sert de secours si le GPS
-ne capte plus (métro souterrain). Les tracés Google (bus, métro) ne sont jamais dessinés
-sur la carte Mapbox : seuls les chemins à pied et à vélo calculés par Mapbox le sont.
-
-**Nouveau module natif : il faut refaire l'app de développement**
-(`npm run build:dev:android`).
 
 ### Clés Maps de l'application (étape 2+)
 
@@ -478,7 +440,6 @@ doit rester allumé).
 
    ```bash
    eas env:set --name EXPO_PUBLIC_API_URL --value "https://sortir-a-lille.expo.app" --visibility plaintext --environment preview --environment production
-   eas env:set --name EXPO_PUBLIC_MAPBOX_TOKEN --value "pk.…" --visibility plaintext --environment preview --environment production
    eas env:set --name GOOGLE_MAPS_ANDROID_API_KEY --value "…" --visibility sensitive --environment preview --environment production
    ```
 
@@ -538,26 +499,10 @@ Coût : chaque aperçu interroge Routes API pour les 4 modes (mis en cache 5 min
 
 ## 7. Checklist de test : étape 4
 
-Il faut **refaire un build** (`npm run build:dev:android`) : localisation en arrière-plan,
-guidage vocal et nouvelles autorisations. La clé Maps de l'app doit avoir **Navigation SDK**
-activé.
-
-Testez dehors, à pied, vers un lieu proche (quelques centaines de mètres).
-
-- [ ] « Démarrer » affiche d'abord (une seule fois) l'explication de l'utilisation de la position
-      pendant le guidage, puis les **conditions d'utilisation Google** à accepter.
-- [ ] Android 13+ : l'app demande l'autorisation d'afficher des notifications.
-- [ ] Le guidage démarre en plein écran : instructions en haut, voix en français, barre en bas
-      avec temps restant, distance et heure d'arrivée.
-- [ ] Écran verrouillé, les instructions vocales continuent (iOS : pastille bleue ;
-      Android : notification « guidage en cours »).
-- [ ] « Arrêter » (ou le bouton retour Android) demande confirmation puis revient à l'aperçu.
-- [ ] À l'arrivée : écran « Vous êtes arrivé ! », notation en étoiles, « Publier un avis sur
-      Google » (ouvert dans l'app), « Nouvelle recherche » revient à l'accueil.
-- [ ] Mode vélo et voiture : le guidage démarre aussi ; « Transports » n'a pas de bouton Démarrer.
-
-Coût : chaque guidage appelle une fois `setDestinations` (facturé à la destination,
-1 000 gratuites par mois) ; les recalculs en cours de route ne sont pas refacturés.
+- [ ] Aperçu d'itinéraire, mode à pied, vélo ou voiture : « Y aller avec Google Maps » ouvre
+      Google Maps avec le guidage vers le lieu (nom du lieu affiché).
+- [ ] « Horaires et trajet détaillé » (transports) : trajets, étapes et temps réel Ilévia ;
+      « Y aller avec Google Maps » ouvre le trajet en transports dans Google Maps.
 
 ## 8. Checklist de test : étape 5
 
@@ -570,7 +515,6 @@ Il faut **refaire un build** (`npm run build:dev:android`) : AdMob ajoute du cod
 - [ ] Résultats en liste : une **annonce native** (badge « Annonce ») après le 5e et le 10e lieu.
 - [ ] La 1re recherche n'affiche pas d'interstitiel ; la 2e en affiche un (test),
       les suivantes plus jamais pendant la session.
-- [ ] Pendant le guidage : aucune publicité.
 - [ ] « Confidentialité et publicité » (accueil) rouvre le formulaire de consentement.
 - [ ] Sponsorisé : copiez `server/sponsored.example.json` dans `server/sponsored.json`,
       mettez des dates qui incluent aujourd'hui, relancez `npm start` et cherchez
