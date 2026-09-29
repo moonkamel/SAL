@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build:dev:android": "eas build --profile development --platform android",
-    "build:dev:ios": "eas build --profile development --platform ios"
+    "build:dev:ios": "eas build --profile development --platform ios",
+    "build:preview:android": "eas build --profile preview --platform android",
+    "deploy:api": "expo export --platform web && eas deploy --prod --environment production"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

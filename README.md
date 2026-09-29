@@ -432,7 +432,7 @@ npm run build:dev:ios                 # nécessite un compte Apple Developer ;
 ```
 
 Installez le build sur le téléphone (QR code / lien fourni par EAS), puis lancez le
-serveur de développement **sur le même réseau Wi-Fi** :
+serveur de développement **sur le même réseau Wi-Fi** (ou en mode tunnel, voir plus bas) :
 
 ```bash
 npm start
@@ -444,15 +444,52 @@ routes API (`/api/search`). La clé Google reste donc sur votre ordinateur.
 > Un nouveau build EAS n'est nécessaire que si on ajoute ou modifie un module natif
 > (ce sera le cas aux étapes 2, 4 et 5). Le reste se met à jour à chaud.
 
-### Mise en ligne du backend (plus tard)
+### Tester hors du Wi-Fi : mode tunnel
 
 ```bash
-npx expo export --platform web
-eas deploy                   # EAS Hosting, puis définissez les variables d'environnement serveur
+npx expo start --dev-client --tunnel
 ```
 
-Renseignez ensuite `EXPO_PUBLIC_API_URL` avec l'URL obtenue pour les builds preview et
-production.
+Le téléphone peut être en 4G : l'app et les routes API passent par le tunnel (l'ordinateur
+doit rester allumé).
+
+### Version autonome (sans ordinateur) : backend en ligne + APK « preview »
+
+1. Variables serveur dans EAS (une commande par variable, valeurs copiées depuis `.env.local`) :
+
+   ```bash
+   eas env:set --name GOOGLE_PLACES_API_KEY --value "…" --visibility sensitive --environment production
+   eas env:set --name OPENAGENDA_KEY --value "…" --visibility sensitive --environment production
+   ```
+
+   (idem pour `MEL_API_KEY`, `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+   `ANTHROPIC_API_KEY` si vous les utilisez.)
+
+2. Mise en ligne du backend (EAS Hosting) :
+
+   ```bash
+   npm run deploy:api
+   ```
+
+   Au premier déploiement, choisissez le sous-domaine (ex. `sortir-a-lille` →
+   `https://sortir-a-lille.expo.app`). Vérifiez : `https://sortir-a-lille.expo.app/api/weather`.
+
+3. Variables de l'app (lues au moment du build, pour preview et production) :
+
+   ```bash
+   eas env:set --name EXPO_PUBLIC_API_URL --value "https://sortir-a-lille.expo.app" --visibility plaintext --environment preview --environment production
+   eas env:set --name EXPO_PUBLIC_MAPBOX_TOKEN --value "pk.…" --visibility plaintext --environment preview --environment production
+   eas env:set --name GOOGLE_MAPS_ANDROID_API_KEY --value "…" --visibility sensitive --environment preview --environment production
+   ```
+
+4. APK installable sans ordinateur :
+
+   ```bash
+   npm run build:preview:android
+   ```
+
+Après une modification du code serveur, relancez `npm run deploy:api` ; après une
+modification de l'app, relancez le build preview.
 
 ## 4. Checklist de test : étape 1
 
