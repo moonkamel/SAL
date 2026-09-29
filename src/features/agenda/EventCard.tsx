@@ -4,6 +4,7 @@ import type { ComponentProps } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/src/components/PressableScale';
+import { tx, useI18n } from '@/src/i18n';
 import { colors, font, fonts, palette, radius, spacing } from '@/src/theme';
 import { useTone } from '@/src/theme/tone';
 import { formatDistance } from '@/shared/format';
@@ -13,13 +14,13 @@ export const CATEGORY_INFO: Record<
   EventCategory,
   { label: string; icon: ComponentProps<typeof Ionicons>['name'] }
 > = {
-  concert: { label: 'Concert', icon: 'musical-notes' },
-  soiree: { label: 'Soirée', icon: 'sparkles' },
-  expo: { label: 'Expo', icon: 'color-palette' },
-  spectacle: { label: 'Spectacle', icon: 'film' },
-  marche: { label: 'Marché', icon: 'basket' },
-  sport: { label: 'Sport', icon: 'football' },
-  autre: { label: 'Sortie', icon: 'calendar' },
+  concert: { label: tx('Concert'), icon: 'musical-notes' },
+  soiree: { label: tx('Soirée'), icon: 'sparkles' },
+  expo: { label: tx('Expo'), icon: 'color-palette' },
+  spectacle: { label: tx('Spectacle'), icon: 'film' },
+  marche: { label: tx('Marché'), icon: 'basket' },
+  sport: { label: tx('Sport'), icon: 'football' },
+  autre: { label: tx('Sortie'), icon: 'calendar' },
 };
 
 interface Props {
@@ -33,6 +34,7 @@ export function EventCard({ event, onPress, compact }: Props) {
   const cat = CATEGORY_INFO[event.category];
   const { tone, c } = useTone();
   const day = tone === 'day';
+  const { t, lang } = useI18n();
   return (
     <PressableScale
       onPress={onPress}
@@ -42,7 +44,7 @@ export function EventCard({ event, onPress, compact }: Props) {
         day && { backgroundColor: c.surface, boxShadow: c.cardShadow },
       ]}
       accessibilityRole="button"
-      accessibilityLabel={`${event.featured ? 'À la une. ' : ''}${cat.label} : ${event.title}, ${event.timeLabel}, ${event.venueName}`}
+      accessibilityLabel={`${event.featured ? `${t('À la une')}. ` : ''}${t(cat.label)} : ${event.title}, ${event.timeLabel}, ${event.venueName}`}
     >
       {event.imageUrl ? (
         <Image
@@ -67,7 +69,7 @@ export function EventCard({ event, onPress, compact }: Props) {
           <Text style={[styles.time, { color: c.gold }]}>{event.timeLabel}</Text>
           {event.featured && (
             <View style={styles.featured}>
-              <Text style={styles.featuredText}>À la une</Text>
+              <Text style={styles.featuredText}>{t('À la une')}</Text>
             </View>
           )}
         </View>
@@ -75,12 +77,12 @@ export function EventCard({ event, onPress, compact }: Props) {
           {event.title}
         </Text>
         <Text style={[styles.venue, { color: c.text }]} numberOfLines={1}>
-          {event.venueName} · {formatDistance(event.distanceMeters)}
+          {event.venueName} · {formatDistance(event.distanceMeters, lang)}
         </Text>
         {!compact && (
           <Text style={[styles.muted, { color: c.textMuted }]} numberOfLines={1}>
-            {[cat.label, ...(event.genres ?? []).map((g) => GENRE_LABELS[g])].join(' · ')}
-            {event.free ? <Text style={styles.free}> · Gratuit</Text> : null}
+            {[t(cat.label), ...(event.genres ?? []).map((g) => t(GENRE_LABELS[g]))].join(' · ')}
+            {event.free ? <Text style={styles.free}> · {t('Gratuit')}</Text> : null}
           </Text>
         )}
       </View>

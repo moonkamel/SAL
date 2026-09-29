@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useT } from '@/src/i18n';
 import { colors, font, radius, spacing } from '@/src/theme';
 import { AMBIANCE_LABELS, type Ambiance } from '@/shared/types';
 
@@ -9,6 +10,7 @@ import { AMBIANCE_ICONS } from './pickers';
 
 /** Pastilles « Terrasse », « Musique live »… confirmées par Google. */
 export function AmbianceTags({ ambiance }: { ambiance?: Ambiance[] }) {
+  const t = useT();
   if (!ambiance?.length) return null;
   return (
     <View style={styles.row}>
@@ -19,7 +21,7 @@ export function AmbianceTags({ ambiance }: { ambiance?: Ambiance[] }) {
             size={13}
             color={colors.gold}
           />
-          <Text style={styles.text}>{AMBIANCE_LABELS[a]}</Text>
+          <Text style={styles.text}>{t(AMBIANCE_LABELS[a])}</Text>
         </View>
       ))}
     </View>

@@ -10,6 +10,7 @@ import type { StopDeparturesResponse, TransitDeparture } from '@/shared/types';
 
 import { TtlCache } from './cache';
 import { PlacesError } from './places';
+import { tx } from '@/shared/i18n';
 
 export const ILEVIA_PASSAGES_URL =
   process.env.ILEVIA_PASSAGES_URL ??
@@ -177,11 +178,11 @@ async function allPassages(): Promise<unknown[]> {
       signal: AbortSignal.timeout(8000),
     });
   } catch {
-    throw new PlacesError('Horaires Ilévia injoignables', 502);
+    throw new PlacesError(tx('Horaires Ilévia injoignables'), 502);
   }
   if (!res.ok) {
     console.error('[ilevia] prochains passages indisponibles', res.status, await res.text().catch(() => ''));
-    throw new PlacesError('Horaires Ilévia indisponibles', 502);
+    throw new PlacesError(tx('Horaires Ilévia indisponibles'), 502);
   }
   const records = recordsOf(await res.json());
   cache.set('all', records);

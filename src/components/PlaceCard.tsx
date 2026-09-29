@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AmbianceTags } from '@/src/features/lille/AmbianceTags';
+import { useI18n } from '@/src/i18n';
 import { photoUrl } from '@/src/lib/api';
 import { colors, font, fonts, gradients, radius, shadows, spacing } from '@/src/theme';
 import {
@@ -28,6 +29,7 @@ interface Props {
 export function PlaceCard({ place, onPress, compact }: Props) {
   const photoAuthor = place.photo?.attributions[0]?.displayName;
   const photoHeight = compact ? 110 : 190;
+  const { t, lang } = useI18n();
 
   return (
     <PressableScale
@@ -58,7 +60,7 @@ export function PlaceCard({ place, onPress, compact }: Props) {
           {place.sponsored ? (
             <View style={styles.sponsoredBadge}>
               <Ionicons name="sparkles" size={12} color={colors.background} />
-              <Text style={styles.sponsoredText}>Sponsorisé</Text>
+              <Text style={styles.sponsoredText}>{t('Sponsorisé')}</Text>
             </View>
           ) : (
             <View />
@@ -66,9 +68,9 @@ export function PlaceCard({ place, onPress, compact }: Props) {
           {place.rating !== undefined && (
             <View style={styles.ratingPill}>
               <Ionicons name="star" size={13} color={colors.star} />
-              <Text style={styles.ratingText}>{formatRating(place.rating)}</Text>
+              <Text style={styles.ratingText}>{formatRating(place.rating, lang)}</Text>
               {place.userRatingCount !== undefined && (
-                <Text style={styles.ratingCount}>{formatRatingCount(place.userRatingCount)}</Text>
+                <Text style={styles.ratingCount}>{formatRatingCount(place.userRatingCount, lang)}</Text>
               )}
             </View>
           )}
@@ -80,7 +82,7 @@ export function PlaceCard({ place, onPress, compact }: Props) {
           </Text>
           {photoAuthor && (
             <Text style={styles.photoCredit} numberOfLines={1}>
-              Photo : {photoAuthor}
+              {t('Photo : {author}', { author: photoAuthor })}
             </Text>
           )}
         </View>
@@ -94,11 +96,11 @@ export function PlaceCard({ place, onPress, compact }: Props) {
           <View style={styles.meta}>
             <Ionicons name="walk" size={15} color={colors.gold} />
             <Text style={styles.metaText}>
-              {formatDistance(place.distanceMeters)} · {formatWalk(place.walkMinutes)}
+              {formatDistance(place.distanceMeters, lang)} · {formatWalk(place.walkMinutes, lang)}
             </Text>
           </View>
           {place.priceLevel !== undefined && (
-            <Text style={styles.price}>{formatPrice(place.priceLevel)}</Text>
+            <Text style={styles.price}>{formatPrice(place.priceLevel, lang)}</Text>
           )}
         </View>
         <AmbianceTags ambiance={place.ambiance} />
@@ -116,7 +118,7 @@ export function PlaceCard({ place, onPress, compact }: Props) {
                 { color: place.opening.openNow ? colors.open : colors.closed },
               ]}
             >
-              {formatOpening(place.opening)}
+              {formatOpening(place.opening, lang)}
             </Text>
           </View>
         )}

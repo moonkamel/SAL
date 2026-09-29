@@ -1,3 +1,5 @@
+import { tx } from './i18n';
+
 // Types partagés entre l'application et le backend.
 
 export interface LatLng {
@@ -156,13 +158,13 @@ export type Ambiance =
   | 'accessible';
 
 export const AMBIANCE_LABELS: Record<Ambiance, string> = {
-  terrace: 'Terrasse',
-  liveMusic: 'Musique live',
-  groups: 'En groupe',
-  kids: 'Avec enfants',
-  cocktails: 'Cocktails',
-  vegetarian: 'Végétarien',
-  accessible: 'Accès fauteuil',
+  terrace: tx('Terrasse'),
+  liveMusic: tx('Musique live'),
+  groups: tx('En groupe'),
+  kids: tx('Avec enfants'),
+  cocktails: tx('Cocktails'),
+  vegetarian: tx('Végétarien'),
+  accessible: tx('Accès fauteuil'),
 };
 
 // --- V'Lille (vélos en libre-service, temps réel GBFS) ---
@@ -301,14 +303,14 @@ export type MusicGenre =
   | 'folk';
 
 export const GENRE_LABELS: Record<MusicGenre, string> = {
-  jazz: 'Jazz & blues',
-  rock: 'Rock & métal',
-  electro: 'Électro',
-  rap: 'Rap & hip-hop',
-  classique: 'Classique',
-  chanson: 'Chanson & pop',
-  monde: 'Musiques du monde',
-  folk: 'Folk & acoustique',
+  jazz: tx('Jazz & blues'),
+  rock: tx('Rock & métal'),
+  electro: tx('Électro'),
+  rap: tx('Rap & hip-hop'),
+  classique: tx('Classique'),
+  chanson: tx('Chanson & pop'),
+  monde: tx('Musiques du monde'),
+  folk: tx('Folk & acoustique'),
 };
 
 export type AgendaWhen = 'today' | 'tomorrow' | 'weekend';

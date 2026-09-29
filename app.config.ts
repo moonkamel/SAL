@@ -35,6 +35,13 @@ const config: ExpoConfig = {
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'dark',
+  // Textes des autorisations iPhone (localisation, suivi publicitaire) dans chaque langue.
+  locales: {
+    en: './locales/ios/en.json',
+    nl: './locales/ios/nl.json',
+    de: './locales/ios/de.json',
+    es: './locales/ios/es.json',
+  },
   backgroundColor: '#0B0B12',
   ios: {
     bundleIdentifier: IOS_BUNDLE_ID,

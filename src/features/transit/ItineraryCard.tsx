@@ -3,6 +3,7 @@ import { Fragment } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/src/components/PressableScale';
+import { useT } from '@/src/i18n';
 import { colors, font, fonts, radius, spacing } from '@/src/theme';
 import { formatDuration } from '@/shared/format';
 import { formatClock, minutesUntil } from '@/shared/trip';
@@ -21,15 +22,18 @@ interface Props {
 export function ItineraryCard({ itinerary, selected, onPress, now }: Props) {
   const firstRide = itinerary.segments.find((s) => s.kind === 'ride');
   const leaveIn = minutesUntil(itinerary.departureTime, now);
+  const t = useT();
   return (
     <PressableScale
       onPress={onPress}
       style={[styles.card, selected && styles.selected]}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={`Départ ${formatClock(itinerary.departureTime)}, arrivée ${formatClock(
-        itinerary.arrivalTime,
-      )}, ${formatDuration(itinerary.durationSeconds)}`}
+      accessibilityLabel={t('Départ {dep}, arrivée {arr}, {duration}', {
+        dep: formatClock(itinerary.departureTime),
+        arr: formatClock(itinerary.arrivalTime),
+        duration: formatDuration(itinerary.durationSeconds),
+      })}
     >
       <View style={styles.top}>
         <Text style={styles.times}>
@@ -55,13 +59,17 @@ export function ItineraryCard({ itinerary, selected, onPress, now }: Props) {
       </View>
 
       <Text style={styles.meta}>
-        {leaveIn <= 0 ? 'Partez maintenant' : `Partez dans ${leaveIn} min`}
-        {firstRide?.kind === 'ride' ? ` · depuis ${firstRide.departureStop.name}` : ''}
+        {leaveIn <= 0 ? t('Partez maintenant') : t('Partez dans {n} min', { n: leaveIn })}
+        {firstRide?.kind === 'ride'
+          ? ` · ${t('depuis {stop}', { stop: firstRide.departureStop.name })}`
+          : ''}
         {itinerary.fare ? ` · ${itinerary.fare}` : ''}
       </Text>
       {itinerary.nextDepartures?.length ? (
         <Text style={styles.next}>
-          Départs suivants : {itinerary.nextDepartures.map((d) => formatClock(d)).join(' · ')}
+          {t('Départs suivants : {times}', {
+            times: itinerary.nextDepartures.map((d) => formatClock(d)).join(' · '),
+          })}
         </Text>
       ) : null}
     </PressableScale>

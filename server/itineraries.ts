@@ -7,6 +7,7 @@ import type { LatLng, TransitItinerary, TripSegment } from '@/shared/types';
 import { TtlCache } from './cache';
 import { PlacesError } from './places';
 import { MAX_ROUTE_METERS } from './routes';
+import { tx } from '@/shared/i18n';
 
 const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
 
@@ -24,16 +25,16 @@ const FIELD_MASK = [
 ].join(',');
 
 const VEHICLE_LABEL: Record<string, string> = {
-  SUBWAY: 'Métro',
-  METRO_RAIL: 'Métro',
-  TRAM: 'Tram',
-  LIGHT_RAIL: 'Tram',
-  BUS: 'Bus',
-  TROLLEYBUS: 'Bus',
-  HEAVY_RAIL: 'Train',
-  RAIL: 'Train',
-  COMMUTER_TRAIN: 'Train',
-  HIGH_SPEED_TRAIN: 'Train',
+  SUBWAY: tx('Métro'),
+  METRO_RAIL: tx('Métro'),
+  TRAM: tx('Tram'),
+  LIGHT_RAIL: tx('Tram'),
+  BUS: tx('Bus'),
+  TROLLEYBUS: tx('Bus'),
+  HEAVY_RAIL: tx('Train'),
+  RAIL: tx('Train'),
+  COMMUTER_TRAIN: tx('Train'),
+  HIGH_SPEED_TRAIN: tx('Train'),
 };
 
 interface GLatLng {
@@ -232,14 +233,14 @@ export async function transitItineraries(
   destinationName: string,
 ): Promise<TransitItinerary[]> {
   if (haversineMeters(from, to) > MAX_ROUTE_METERS) {
-    throw new PlacesError('Destination trop éloignée', 400);
+    throw new PlacesError(tx('Destination trop éloignée'), 400);
   }
   const key = [from.lat, from.lng, to.lat, to.lng].map((v) => v.toFixed(4)).join(',');
   const hit = cache.get(key);
   if (hit) return hit;
 
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-  if (!apiKey) throw new PlacesError('GOOGLE_PLACES_API_KEY manquante côté serveur', 500);
+  if (!apiKey) throw new PlacesError(tx('GOOGLE_PLACES_API_KEY manquante côté serveur'), 500);
 
   const res = await fetch(ROUTES_URL, {
     method: 'POST',
@@ -260,7 +261,7 @@ export async function transitItineraries(
   });
   if (!res.ok) {
     console.error('[itineraries] Routes API', res.status, await res.text());
-    throw new PlacesError('Trajets en transports indisponibles', 502);
+    throw new PlacesError(tx('Trajets en transports indisponibles'), 502);
   }
   const json = (await res.json()) as { routes?: GRoute[] };
   const itineraries = pickItineraries((json.routes ?? []).map((r) => mapItinerary(r, destinationName)));

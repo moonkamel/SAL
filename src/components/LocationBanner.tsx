@@ -3,18 +3,20 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { colors, font, radius, spacing } from '@/src/theme';
+import { useT } from '@/src/i18n';
 import { useTone } from '@/src/theme/tone';
 
 /** Affiché quand on n'a pas la position : les résultats sont centrés sur la Grand-Place. */
 export function LocationBanner() {
   const { status, isFallback, requestPermission } = useUserLocation();
   const { c } = useTone();
+  const t = useT();
   if (status === 'pending' || !isFallback) return null;
 
   const message =
     status === 'denied'
-      ? 'Localisation désactivée : résultats autour de la Grand-Place. Touchez pour l’activer.'
-      : 'Position introuvable : résultats autour de la Grand-Place.';
+      ? t('Localisation désactivée : résultats autour de la Grand-Place. Touchez pour l’activer.')
+      : t('Position introuvable : résultats autour de la Grand-Place.');
 
   return (
     <Pressable

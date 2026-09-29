@@ -1,5 +1,7 @@
 // Dates et heures à Lille (Europe/Paris), quel que soit le fuseau du serveur.
 
+import { type Lang, LANG_INFO } from '@/shared/i18n';
+
 const TZ = 'Europe/Paris';
 
 const partsFmt = new Intl.DateTimeFormat('en-GB', {
@@ -72,4 +74,20 @@ const dayTimeFmt = new Intl.DateTimeFormat('fr-FR', {
 });
 
 export const formatParisTime = (d: Date) => timeFmt.format(d);
-export const formatParisDayTime = (d: Date) => dayTimeFmt.format(d);
+const dayTimeFmts = new Map<Lang, Intl.DateTimeFormat>([['fr', dayTimeFmt]]);
+
+/** « sam. 21:00 » dans la langue demandée (toujours sur 24 h). */
+export function formatParisDayTime(d: Date, lang: Lang = 'fr'): string {
+  let f = dayTimeFmts.get(lang);
+  if (!f) {
+    f = new Intl.DateTimeFormat(LANG_INFO[lang].locale, {
+      timeZone: TZ,
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    });
+    dayTimeFmts.set(lang, f);
+  }
+  return f.format(d);
+}

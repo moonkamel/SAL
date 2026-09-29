@@ -3,6 +3,8 @@
 // Mémoire locale à chaque instance du serveur : c'est un garde-fou, pas une garantie.
 // La vraie limite dure se règle dans Google Cloud (quotas par jour, voir README).
 
+import { tx } from '@/shared/i18n';
+
 interface Bucket {
   count: number;
   resetAt: number;
@@ -49,7 +51,7 @@ export function allow(name: LimitName, key: string, now: number = Date.now()): b
 export function rateLimited(name: LimitName, request: Request): Response | null {
   if (allow(name, clientIp(request))) return null;
   return Response.json(
-    { error: 'Trop de demandes d’un coup. Patientez une minute et réessayez.' },
+    { error: tx('Trop de demandes d’un coup. Patientez une minute et réessayez.') },
     { status: 429, headers: { 'Retry-After': '60' } },
   );
 }

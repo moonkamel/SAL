@@ -5,6 +5,7 @@ import { useLiveData } from '@/src/features/lille/useLiveData';
 import { refreshKey } from '@/src/features/moment/HomeRails';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { OfferCard } from '@/src/features/offers/OfferCard';
+import { useI18n } from '@/src/i18n';
 import { getOffers } from '@/src/lib/api';
 import { colors, font, spacing } from '@/src/theme';
 import type { OffersResponse } from '@/shared/types';
@@ -12,17 +13,18 @@ import type { OffersResponse } from '@/shared/types';
 /** Tous les bons plans du jour autour de soi. */
 export default function OffersScreen() {
   const { coords } = useUserLocation();
+  const { t, lang } = useI18n();
   const { data, error } = useLiveData<OffersResponse>(
     (signal) => getOffers(coords, signal),
     5 * 60_000,
-    refreshKey(coords),
+    [...refreshKey(coords), lang],
   );
 
   if (!data) {
     return (
       <View style={[styles.screen, styles.center]}>
         {error ? (
-          <Text style={styles.muted}>Bons plans momentanément indisponibles.</Text>
+          <Text style={styles.muted}>{t('Bons plans momentanément indisponibles.')}</Text>
         ) : (
           <ActivityIndicator color={colors.accent} />
         )}
@@ -38,10 +40,10 @@ export default function OffersScreen() {
       keyExtractor={(o) => o.id}
       ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
       ListHeaderComponent={
-        <Text style={styles.intro}>Offres des établissements partenaires, valables aujourd’hui.</Text>
+        <Text style={styles.intro}>{t('Offres des établissements partenaires, valables aujourd’hui.')}</Text>
       }
       ListEmptyComponent={
-        <Text style={styles.muted}>Pas de bon plan autour de vous aujourd’hui. Revenez ce soir !</Text>
+        <Text style={styles.muted}>{t('Pas de bon plan autour de vous aujourd’hui. Revenez ce soir !')}</Text>
       }
       renderItem={({ item }) => (
         <OfferCard

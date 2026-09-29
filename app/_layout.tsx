@@ -12,6 +12,8 @@ import { AdsProvider } from '@/src/features/ads/AdsProvider';
 import { FavoritesProvider } from '@/src/features/favorites/FavoritesProvider';
 import { LocationProvider } from '@/src/features/location/LocationProvider';
 import { AppNavigationProvider } from '@/src/features/navigation/AppNavigationProvider';
+import { LanguageProvider, useI18n } from '@/src/i18n';
+import { LanguagePicker } from '@/src/i18n/LanguagePicker';
 import { colors, fonts } from '@/src/theme';
 
 // L'écran de démarrage reste affiché le temps de charger la police de titre.
@@ -45,39 +47,63 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider value={theme}>
-        <AppNavigationProvider>
-          <LocationProvider>
-            <FavoritesProvider>
-              <AdsProvider>
-                <StatusBar style="light" />
-                <Stack
-                  screenOptions={{
-                    headerTintColor: colors.text,
-                    headerStyle: { backgroundColor: colors.background },
-                    headerTitleStyle: { fontFamily: fonts.displayMedium, fontSize: 19 },
-                    headerShadowVisible: false,
-                    animation: 'ios_from_right',
-                    headerBackButtonDisplayMode: 'minimal',
-                    contentStyle: { backgroundColor: colors.background },
-                  }}
-                >
-                  <Stack.Screen name="index" options={{ headerShown: false }} />
-                  <Stack.Screen name="results" options={{ title: 'Résultats' }} />
-                  <Stack.Screen name="place/[id]" options={{ title: '' }} />
-                  <Stack.Screen name="favorites" options={{ title: 'Favoris' }} />
-                  <Stack.Screen name="route/[id]" options={{ title: 'Itinéraire' }} />
-                  <Stack.Screen name="transit/[id]" options={{ title: 'En transports' }} />
-                  <Stack.Screen name="offers" options={{ title: 'Bons plans' }} />
-                  <Stack.Screen name="agenda" options={{ title: 'Agenda' }} />
-                  <Stack.Screen name="event/[id]" options={{ title: '' }} />
-                  <Stack.Screen name="admin" options={{ title: 'Espace partenaires' }} />
-                </Stack>
-              </AdsProvider>
-            </FavoritesProvider>
-          </LocationProvider>
-        </AppNavigationProvider>
-      </ThemeProvider>
+      <LanguageProvider>
+        <ThemeProvider value={theme}>
+          <AppWithLanguage />
+        </ThemeProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
+  );
+}
+
+/** Au premier lancement : choix de la langue (mémorisé), puis l'app. */
+function AppWithLanguage() {
+  const { ready, chosen, t } = useI18n();
+  if (!ready) return null;
+  if (!chosen) {
+    return (
+      <>
+        <StatusBar style="light" />
+        <LanguagePicker />
+      </>
+    );
+  }
+
+  return (
+    <AppNavigationProvider>
+      <LocationProvider>
+        <FavoritesProvider>
+          <AdsProvider>
+            <StatusBar style="light" />
+            <Stack
+              screenOptions={{
+                headerTintColor: colors.text,
+                headerStyle: { backgroundColor: colors.background },
+                headerTitleStyle: { fontFamily: fonts.displayMedium, fontSize: 19 },
+                headerShadowVisible: false,
+                animation: 'ios_from_right',
+                headerBackButtonDisplayMode: 'minimal',
+                contentStyle: { backgroundColor: colors.background },
+              }}
+            >
+              <Stack.Screen name="index" options={{ headerShown: false }} />
+              <Stack.Screen name="results" options={{ title: t('Résultats') }} />
+              <Stack.Screen name="place/[id]" options={{ title: '' }} />
+              <Stack.Screen name="favorites" options={{ title: t('Favoris') }} />
+              <Stack.Screen name="route/[id]" options={{ title: t('Itinéraire') }} />
+              <Stack.Screen name="transit/[id]" options={{ title: t('En transports') }} />
+              <Stack.Screen name="offers" options={{ title: t('Bons plans') }} />
+              <Stack.Screen name="agenda" options={{ title: t('Agenda') }} />
+              <Stack.Screen name="event/[id]" options={{ title: '' }} />
+              <Stack.Screen name="admin" options={{ title: 'Espace partenaires' }} />
+              <Stack.Screen
+                name="language"
+                options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+            </Stack>
+          </AdsProvider>
+        </FavoritesProvider>
+      </LocationProvider>
+    </AppNavigationProvider>
   );
 }

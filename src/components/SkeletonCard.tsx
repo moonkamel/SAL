@@ -8,10 +8,12 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { useT } from '@/src/i18n';
 import { colors, radius, spacing } from '@/src/theme';
 
 /** Carte fantôme pendant le chargement : la mise en page apparaît avant les données. */
 export function SkeletonCard() {
+  const t = useT();
   const pulse = useSharedValue(0.45);
   useEffect(() => {
     pulse.value = withRepeat(
@@ -23,7 +25,7 @@ export function SkeletonCard() {
   const animated = useAnimatedStyle(() => ({ opacity: pulse.value }));
 
   return (
-    <Animated.View style={[styles.card, animated]} accessibilityLabel="Chargement">
+    <Animated.View style={[styles.card, animated]} accessibilityLabel={t('Chargement')}>
       <View style={styles.photo} />
       <View style={styles.body}>
         <View style={[styles.line, { width: '60%', height: 18 }]} />

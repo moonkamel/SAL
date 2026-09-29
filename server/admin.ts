@@ -2,6 +2,7 @@
 // envoyé dans l'en-tête Authorization à chaque appel. Sans ce réglage, l'espace est fermé.
 
 import { rateLimited } from './rateLimit';
+import { tx } from '@/shared/i18n';
 
 export const MIN_PASSWORD_LENGTH = 12;
 
@@ -28,7 +29,7 @@ export function requireAdmin(request: Request): Response | null {
   }
   const given = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? '';
   if (!safeEqual(given, expected)) {
-    return Response.json({ error: 'Mot de passe incorrect' }, { status: 401 });
+    return Response.json({ error: tx('Mot de passe incorrect') }, { status: 401 });
   }
   return null;
 }

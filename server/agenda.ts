@@ -3,7 +3,10 @@
 // - événements publics d'OpenAgenda, si OPENAGENDA_KEY et OPENAGENDA_AGENDAS sont définies.
 
 import { haversineMeters } from '@/shared/geo';
+import { type Lang, LANG_INFO, translate } from '@/shared/i18n';
 import type { AgendaEvent, AgendaWhen, LatLng } from '@/shared/types';
+
+import { translateFields } from './autoTranslate';
 
 import { TtlCache } from './cache';
 import { getContent } from './content';
@@ -49,30 +52,48 @@ function overlaps(start: Date, end: Date | undefined, w: TimeWindow): boolean {
  * Horaire court. « En cours » seulement si c'est commencé MAINTENANT (et pas juste
  * avant le début de la fenêtre, ex. vendredi après-midi pour « ce week-end »).
  */
-export function timeLabel(start: Date, end: Date | undefined, w: TimeWindow, now: Date = new Date()): string {
-  if (start <= now) return end ? `En cours · jusqu’à ${formatParisTime(end)}` : 'En cours';
+export function timeLabel(
+  start: Date,
+  end: Date | undefined,
+  w: TimeWindow,
+  now: Date = new Date(),
+  lang: Lang = 'fr',
+): string {
+  if (start <= now) {
+    return end
+      ? translate(lang, 'En cours · jusqu’à {time}', { time: formatParisTime(end) })
+      : translate(lang, 'En cours');
+  }
   const sameOutingDay = w.end.getTime() - w.start.getTime() <= 30 * 3_600_000;
-  const startLabel = sameOutingDay ? formatParisTime(start) : formatParisDayTime(start);
+  const startLabel = sameOutingDay ? formatParisTime(start) : formatParisDayTime(start, lang);
   return end && end.getTime() - start.getTime() < 24 * 3_600_000
     ? `${startLabel} – ${formatParisTime(end)}`
     : startLabel;
 }
 
-const longDateFmt = new Intl.DateTimeFormat('fr-FR', {
-  timeZone: 'Europe/Paris',
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-});
+const longDateFmts = new Map<Lang, Intl.DateTimeFormat>();
+function longDateFmt(lang: Lang): Intl.DateTimeFormat {
+  let f = longDateFmts.get(lang);
+  if (!f) {
+    f = new Intl.DateTimeFormat(LANG_INFO[lang].locale, {
+      timeZone: 'Europe/Paris',
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    });
+    longDateFmts.set(lang, f);
+  }
+  return f;
+}
 
 /** « samedi 3 octobre · 21:00 – 23:30 ». */
-export function dateLabel(start: Date, end?: Date): string {
-  const day = longDateFmt.format(start);
+export function dateLabel(start: Date, end?: Date, lang: Lang = 'fr'): string {
+  const day = longDateFmt(lang).format(start);
   if (!end) return `${day} · ${formatParisTime(start)}`;
   if (end.getTime() - start.getTime() < 24 * 3_600_000) {
     return `${day} · ${formatParisTime(start)} – ${formatParisTime(end)}`;
   }
-  return `du ${day} au ${longDateFmt.format(end)}`;
+  return translate(lang, 'du {start} au {end}', { start: day, end: longDateFmt(lang).format(end) });
 }
 
 export function fromPartnerEvent(
@@ -80,6 +101,7 @@ export function fromPartnerEvent(
   near: LatLng,
   w: TimeWindow,
   now: Date = new Date(),
+  lang: Lang = 'fr',
 ): AgendaEvent | null {
   if (!item.active) return null;
   const start = new Date(item.start);
@@ -97,8 +119,8 @@ export function fromPartnerEvent(
     address: item.address,
     start: item.start,
     end: item.end,
-    timeLabel: timeLabel(start, end, w, now),
-    dateLabel: dateLabel(start, end),
+    timeLabel: timeLabel(start, end, w, now, lang),
+    dateLabel: dateLabel(start, end, lang),
     ongoing: start <= now,
     price: item.price,
     free: isFree(item.price),
@@ -125,6 +147,15 @@ function text(value: Multilingual): string | undefined {
   if (typeof value === 'string') return value;
   return value.fr ?? Object.values(value).find((v) => !!v);
 }
+
+/** Texte déjà rédigé dans `lang` par l'organisateur (OpenAgenda est multilingue), sinon rien. */
+function nativeText(value: Multilingual, lang: Lang): string | undefined {
+  if (lang === 'fr' || !value || typeof value === 'string') return undefined;
+  return value[lang] || undefined;
+}
+
+// Événements dont les textes sont déjà dans la bonne langue (pas besoin de les traduire).
+const natives = new WeakSet<AgendaEvent>();
 
 interface OpenAgendaEvent {
   uid?: number | string;
@@ -197,6 +228,7 @@ export function fromOpenAgenda(
   w: TimeWindow,
   now: Date = new Date(),
   agendaSlug?: string,
+  lang: Lang = 'fr',
 ): AgendaEvent | null {
   const title = text(ev.title);
   const loc = ev.location;
@@ -222,18 +254,19 @@ export function fromOpenAgenda(
       ? detectGenres(title, description, keywords.join(' '), longDescription)
       : [];
   const ticket = ev.registration?.find((r) => r.type === 'link' && r.value?.startsWith('http'));
-  return {
+  const nativeTitle = nativeText(ev.title, lang);
+  const event: AgendaEvent = {
     id: `oa-${agendaUid}-${ev.uid ?? ev.slug ?? title}`,
-    title,
-    description,
+    title: nativeTitle ?? title,
+    description: nativeTitle ? (nativeText(ev.description, lang) ?? description) : description,
     category,
-    venueName: loc.name ?? 'Lieu à préciser',
+    venueName: loc.name ?? translate(lang, 'Lieu à préciser'),
     location,
     address: loc.address,
     start: timing.start.toISOString(),
     end: timing.end?.toISOString(),
-    timeLabel: timeLabel(timing.start, timing.end, w, now),
-    dateLabel: dateLabel(timing.start, timing.end),
+    timeLabel: timeLabel(timing.start, timing.end, w, now, lang),
+    dateLabel: dateLabel(timing.start, timing.end, lang),
     ongoing: timing.start <= now,
     price: conditions?.slice(0, 60),
     free: isFree(conditions, description),
@@ -246,6 +279,13 @@ export function fromOpenAgenda(
     ...(longDescription && longDescription !== description ? { longDescription } : {}),
     ...(genres.length ? { genres } : {}),
   };
+  if (nativeTitle) {
+    natives.add(event);
+    const nativeLong = plainText(nativeText(ev.longDescription, lang));
+    if (nativeLong) event.longDescription = nativeLong;
+    else delete event.longDescription;
+  }
+  return event;
 }
 
 const openAgendaCache = new TtlCache<OpenAgendaEvent[]>(15 * 60_000, 50);
@@ -338,10 +378,11 @@ export async function agenda(
   near: LatLng,
   when: AgendaWhen,
   now: Date = new Date(),
+  lang: Lang = 'fr',
 ): Promise<AgendaEvent[]> {
   const w = windowFor(when, now);
   const partner = (await getContent('events'))
-    .map((item) => fromPartnerEvent(item, near, w, now))
+    .map((item) => fromPartnerEvent(item, near, w, now, lang))
     .filter((e): e is AgendaEvent => e !== null);
 
   const oa = openAgendaConfig();
@@ -356,7 +397,7 @@ export async function agenda(
               ]);
               return events
                 .filter(isCulturalHighlight)
-                .map((ev) => fromOpenAgenda(ev, uid, near, w, now, slug));
+                .map((ev) => fromOpenAgenda(ev, uid, near, w, now, slug, lang));
             } catch (error) {
               console.error('[agenda] OpenAgenda indisponible', uid, error);
               return [];
@@ -375,5 +416,20 @@ export async function agenda(
     seen.add(key);
     return true;
   });
-  return sortEvents(merged.filter((e) => e.distanceMeters <= RADIUS_METERS)).slice(0, MAX_EVENTS);
+  const events = sortEvents(merged.filter((e) => e.distanceMeters <= RADIUS_METERS)).slice(0, MAX_EVENTS);
+  return lang === 'fr' ? events : localizeEvents(events, lang);
+}
+
+/**
+ * Autre langue que le français : traduction automatique des textes restés en français.
+ * La description longue n'est pas traduite (trop coûteuse) : la fiche affiche alors
+ * la description courte, traduite.
+ */
+async function localizeEvents(events: AgendaEvent[], lang: Lang): Promise<AgendaEvent[]> {
+  const french = events
+    .filter((e) => !natives.has(e))
+    .map(({ longDescription: _long, ...e }): AgendaEvent => e);
+  const translated = await translateFields(french, ['title', 'description', 'price'], lang);
+  const byId = new Map(translated.map((e) => [e.id, e]));
+  return events.map((e) => byId.get(e.id) ?? e);
 }

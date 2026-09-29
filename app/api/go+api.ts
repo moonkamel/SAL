@@ -2,6 +2,7 @@ import { activePartners, findPartner, partnerUrl } from '@/server/affiliates';
 import { recordClick } from '@/server/content';
 import { parseLatLng } from '@/server/params';
 import { PLACE_ID_PATTERN } from '@/server/places';
+import { tx } from '@/shared/i18n';
 
 /**
  * GET /api/go?p=partenaire&place=…&name=…&address=…&lat=…&lng=…
@@ -17,13 +18,13 @@ export async function GET(request: Request): Promise<Response> {
   const address = (q.get('address') ?? '').slice(0, 300);
   const location = parseLatLng(`${q.get('lat')},${q.get('lng')}`);
 
-  if (!partner) return Response.json({ error: 'Partenaire inconnu' }, { status: 404 });
+  if (!partner) return Response.json({ error: tx('Partenaire inconnu') }, { status: 404 });
   if (!PLACE_ID_PATTERN.test(placeId) || !name || !location) {
-    return Response.json({ error: 'Lien invalide' }, { status: 400 });
+    return Response.json({ error: tx('Lien invalide') }, { status: 400 });
   }
 
   const url = partnerUrl(partner, { id: placeId, name, address, location });
-  if (!url) return Response.json({ error: 'Lien indisponible' }, { status: 404 });
+  if (!url) return Response.json({ error: tx('Lien indisponible') }, { status: 404 });
 
   // Une ligne par clic, lisible dans les journaux d'EAS Hosting (sans donnée personnelle).
   console.info(

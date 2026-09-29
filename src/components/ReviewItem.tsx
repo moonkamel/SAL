@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useT } from '@/src/i18n';
 import { colors, font, spacing } from '@/src/theme';
 import type { Review } from '@/shared/types';
 
@@ -13,6 +14,7 @@ const COLLAPSED_LINES = 4;
 export function ReviewItem({ review }: { review: Review }) {
   const [expanded, setExpanded] = useState(false);
   const [truncated, setTruncated] = useState(false);
+  const t = useT();
 
   // Google impose d'afficher l'auteur ; son nom renvoie vers son profil Google Maps.
   const openAuthor = review.authorUri
@@ -53,7 +55,7 @@ export function ReviewItem({ review }: { review: Review }) {
       </Text>
       {truncated && (
         <Pressable onPress={() => setExpanded((v) => !v)} hitSlop={8} accessibilityRole="button">
-          <Text style={styles.more}>{expanded ? 'Réduire' : 'Lire la suite'}</Text>
+          <Text style={styles.more}>{expanded ? t('Réduire') : t('Lire la suite')}</Text>
         </Pressable>
       )}
     </View>

@@ -7,6 +7,7 @@ import { GoogleAttribution } from '@/src/components/GoogleAttribution';
 import { PlaceCard } from '@/src/components/PlaceCard';
 import { useFavorites } from '@/src/features/favorites/FavoritesProvider';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
+import { useI18n } from '@/src/i18n';
 import { getPlace } from '@/src/lib/api';
 import { colors, font, spacing } from '@/src/theme';
 import { detailsToSummary } from '@/shared/summary';
@@ -18,6 +19,7 @@ export default function FavoritesScreen() {
   const [details, setDetails] = useState<Record<string, PlaceDetails>>({});
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(0);
+  const { t } = useI18n();
 
   // Seuls les place_id sont stockés : les infos sont rechargées depuis Google.
   useEffect(() => {
@@ -52,8 +54,8 @@ export default function FavoritesScreen() {
     return (
       <View style={styles.center}>
         <Ionicons name="heart-outline" size={48} color={colors.textFaint} />
-        <Text style={styles.message}>Aucun favori pour l’instant.</Text>
-        <Text style={styles.hint}>Touchez le cœur sur la fiche d’un lieu pour le retrouver ici.</Text>
+        <Text style={styles.message}>{t('Aucun favori pour l’instant.')}</Text>
+        <Text style={styles.hint}>{t('Touchez le cœur sur la fiche d’un lieu pour le retrouver ici.')}</Text>
       </View>
     );
   }
@@ -79,8 +81,8 @@ export default function FavoritesScreen() {
           {failed > 0 && (
             <Text style={styles.hint}>
               {failed === 1
-                ? '1 favori n’a pas pu être chargé.'
-                : `${failed} favoris n’ont pas pu être chargés.`}
+                ? t('1 favori n’a pas pu être chargé.')
+                : t('{n} favoris n’ont pas pu être chargés.', { n: failed })}
             </Text>
           )}
           {places.length > 0 && <GoogleAttribution />}

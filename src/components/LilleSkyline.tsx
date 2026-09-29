@@ -2,6 +2,7 @@ import { memo } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 
+import { useT } from '@/src/i18n';
 import { palette } from '@/src/theme';
 
 import { SILHOUETTE, STARS, WINDOWS } from './skylinePaths';
@@ -25,12 +26,13 @@ function Cloud({ x, y, s }: { x: number; y: number; s: number }) {
 
 function Skyline({ style, tone = 'night' }: Props) {
   const day = tone === 'day';
+  const t = useT();
   return (
     <Svg
       viewBox="0 0 400 140"
       preserveAspectRatio="xMidYMax slice"
       style={style}
-      accessibilityLabel="Silhouette de Lille : beffroi, Vieille Bourse, Opéra et cathédrale"
+      accessibilityLabel={t('Silhouette de Lille : beffroi, Vieille Bourse, Opéra et cathédrale')}
     >
       <Defs>
         {/* Brique lilloise le jour, silhouettes sombres la nuit. */}

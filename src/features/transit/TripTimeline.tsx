@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useI18n, useT } from '@/src/i18n';
 import { colors, font, fonts, radius, spacing } from '@/src/theme';
 import { formatDistance } from '@/shared/format';
 import { formatClock } from '@/shared/trip';
@@ -18,6 +19,7 @@ const minutes = (s: number) => `${Math.max(1, Math.round(s / 60))} min`;
 
 /** Étapes du trajet, façon feuille de route. */
 export function TripTimeline({ itinerary, destinationName }: Props) {
+  const { t, lang } = useI18n();
   return (
     <View style={styles.list}>
       {itinerary.segments.map((seg, i) => {
@@ -39,11 +41,11 @@ export function TripTimeline({ itinerary, destinationName }: Props) {
                   <View style={styles.head}>
                     <Ionicons name="walk" size={18} color={colors.text} />
                     <Text style={styles.title}>
-                      Marcher {minutes(seg.durationSeconds)}
-                      <Text style={styles.muted}> · {formatDistance(seg.distanceMeters)}</Text>
+                      {t('Marcher {duration}', { duration: minutes(seg.durationSeconds) })}
+                      <Text style={styles.muted}> · {formatDistance(seg.distanceMeters, lang)}</Text>
                     </Text>
                   </View>
-                  <Text style={styles.muted}>jusqu’à {seg.toName}</Text>
+                  <Text style={styles.muted}>{t('jusqu’à {place}', { place: seg.toName })}</Text>
                 </>
               ) : (
                 <>
@@ -53,15 +55,16 @@ export function TripTimeline({ itinerary, destinationName }: Props) {
                   <View style={styles.head}>
                     <LineBadge line={seg.line} />
                     <Text style={styles.title} numberOfLines={2}>
-                      Direction {seg.headsign}
+                      {t('Direction {headsign}', { headsign: seg.headsign })}
                     </Text>
                   </View>
                   <Realtime ride={seg} />
                   <Text style={styles.muted}>
-                    {seg.stopCount} arrêt{seg.stopCount > 1 ? 's' : ''} · {minutes(seg.durationSeconds)}
+                    {seg.stopCount > 1 ? t('{n} arrêts', { n: seg.stopCount }) : t('1 arrêt')} ·{' '}
+                    {minutes(seg.durationSeconds)}
                   </Text>
                   <Text style={styles.stop}>
-                    {formatClock(seg.arrivalTime)} · Descendre à {seg.arrivalStop.name}
+                    {formatClock(seg.arrivalTime)} · {t('Descendre à {stop}', { stop: seg.arrivalStop.name })}
                   </Text>
                 </>
               )}
@@ -86,12 +89,15 @@ export function TripTimeline({ itinerary, destinationName }: Props) {
 /** Temps réel Ilévia à l'arrêt de montée (masqué s'il n'est pas disponible). */
 function Realtime({ ride }: { ride: Extract<TripSegment, { kind: 'ride' }> }) {
   const mins = useStopRealtime(ride.departureStop.name, ride.line.short, ride.headsign);
+  const t = useT();
   if (!mins?.length) return null;
   return (
-    <View style={styles.live} accessible accessibilityLabel={`Temps réel : dans ${mins.join(', ')} minutes`}>
+    <View style={styles.live} accessible accessibilityLabel={t('Temps réel : dans {list} minutes', { list: mins.join(', ') })}>
       <View style={styles.liveDot} />
       <Text style={styles.liveText}>
-        Temps réel : {mins.map((m) => (m <= 0 ? 'à quai' : `${m} min`)).join(' · ')}
+        {t('Temps réel : {list}', {
+          list: mins.map((m) => (m <= 0 ? t('à quai') : `${m} min`)).join(' · '),
+        })}
       </Text>
     </View>
   );

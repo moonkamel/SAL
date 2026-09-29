@@ -5,6 +5,7 @@ import type { LatLng, Weather } from '@/shared/types';
 
 import { TtlCache } from './cache';
 import { PlacesError } from './places';
+import { tx } from '@/shared/i18n';
 
 export const OPEN_METEO_URL = process.env.OPEN_METEO_URL ?? 'https://api.open-meteo.com/v1/forecast';
 
@@ -19,7 +20,7 @@ interface OpenMeteoCurrent {
 export function parseWeather(body: unknown): Weather {
   const c = (body as OpenMeteoCurrent)?.current;
   if (typeof c?.temperature_2m !== 'number' || typeof c.weather_code !== 'number') {
-    throw new PlacesError('Réponse météo invalide', 502);
+    throw new PlacesError(tx('Réponse météo invalide'), 502);
   }
   return {
     temperature: c.temperature_2m,
@@ -43,7 +44,7 @@ export async function currentWeather(near: LatLng): Promise<Weather> {
   try {
     res = await fetch(url, { signal: AbortSignal.timeout(5000) });
   } catch {
-    throw new PlacesError('Météo injoignable', 502);
+    throw new PlacesError(tx('Météo injoignable'), 502);
   }
   if (!res.ok) throw new PlacesError(`Open-Meteo ${res.status}`, 502);
   const weather = parseWeather(await res.json());

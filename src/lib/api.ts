@@ -18,6 +18,9 @@ import type {
   VlilleResponse,
   WeatherResponse,
 } from '@/shared/types';
+import { translate } from '@/shared/i18n';
+
+import { currentLang } from '@/src/i18n';
 
 /**
  * Origine du backend :
@@ -37,15 +40,21 @@ function apiOrigin(): string {
 export class ApiRequestError extends Error {}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const lang = currentLang();
   let res: Response;
   try {
-    res = await fetch(`${apiOrigin()}${path}`, init);
+    // Le serveur répond dans la langue choisie (Google, agenda, textes).
+    res = await fetch(`${apiOrigin()}${path}`, {
+      ...init,
+      headers: { ...(init?.headers as Record<string, string> | undefined), 'Accept-Language': lang },
+    });
   } catch {
-    throw new ApiRequestError('Connexion impossible. Vérifiez votre réseau.');
+    throw new ApiRequestError(translate(lang, 'Connexion impossible. Vérifiez votre réseau.'));
   }
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as ApiError | null;
-    throw new ApiRequestError(body?.error ?? 'Une erreur est survenue. Réessayez.');
+    // Messages d'erreur du serveur rédigés en français : traduits ici.
+    throw new ApiRequestError(translate(lang, body?.error ?? 'Une erreur est survenue. Réessayez.'));
   }
   return (await res.json()) as T;
 }
@@ -80,14 +89,17 @@ export async function getPlace(
   signal?: AbortSignal,
 ): Promise<PlaceDetails> {
   // Une fiche complète sert aussi de résumé.
-  const hit = cachedPlace(`full|${id}`) ?? (mode === 'summary' ? cachedPlace(`summary|${id}`) : undefined);
+  const lang = currentLang();
+  const hit =
+    cachedPlace(`full|${lang}|${id}`) ??
+    (mode === 'summary' ? cachedPlace(`summary|${lang}|${id}`) : undefined);
   if (hit) return hit;
   const query = mode === 'summary' ? '?fields=summary' : '';
   const value = await request<PlaceDetails>(`/api/place/${encodeURIComponent(id)}${query}`, {
     signal,
   });
   if (placeCache.size > 200) placeCache.clear();
-  placeCache.set(`${mode}|${id}`, { value, expiresAt: Date.now() + PLACE_TTL_MS });
+  placeCache.set(`${mode}|${lang}|${id}`, { value, expiresAt: Date.now() + PLACE_TTL_MS });
   return value;
 }
 

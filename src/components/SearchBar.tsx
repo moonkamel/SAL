@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { colors, font, gradients, radius, shadows, spacing, TOUCH_TARGET } from '@/src/theme';
+import { useT } from '@/src/i18n';
 import { useTone } from '@/src/theme/tone';
 
 interface Props {
@@ -16,6 +17,7 @@ export function SearchBar({ initialValue = '', autoFocus, onSubmit }: Props) {
   const [value, setValue] = useState(initialValue);
   const [focused, setFocused] = useState(false);
   const { tone, c } = useTone();
+  const t = useT();
   const submit = () => {
     const q = value.trim();
     if (q) onSubmit(q);
@@ -38,19 +40,19 @@ export function SearchBar({ initialValue = '', autoFocus, onSubmit }: Props) {
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         selectionColor={c.gold}
-        placeholder="Manger japonais, aller danser…"
+        placeholder={t('Manger japonais, aller danser…')}
         placeholderTextColor={c.textFaint}
         returnKeyType="search"
         autoFocus={autoFocus}
         autoCorrect={false}
-        accessibilityLabel="Rechercher un lieu"
+        accessibilityLabel={t('Rechercher un lieu')}
         maxLength={120}
       />
       {value.length > 0 && (
         <Pressable
           onPress={() => setValue('')}
           hitSlop={12}
-          accessibilityLabel="Effacer la recherche"
+          accessibilityLabel={t('Effacer la recherche')}
         >
           <Ionicons name="close-circle" size={22} color={c.textFaint} />
         </Pressable>
@@ -59,7 +61,7 @@ export function SearchBar({ initialValue = '', autoFocus, onSubmit }: Props) {
         onPress={submit}
         style={({ pressed }) => [styles.goWrap, pressed && { opacity: 0.85 }]}
         accessibilityRole="button"
-        accessibilityLabel="Lancer la recherche"
+        accessibilityLabel={t('Lancer la recherche')}
       >
         <LinearGradient colors={gradients.brick} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.go}>
           <Ionicons name="arrow-forward" size={24} color={colors.accentText} />

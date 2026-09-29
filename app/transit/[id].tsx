@@ -11,6 +11,7 @@ import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { googleMapsDirections } from '@/src/features/navigation/googleMaps';
 import { ItineraryCard } from '@/src/features/transit/ItineraryCard';
 import { TripTimeline } from '@/src/features/transit/TripTimeline';
+import { useT } from '@/src/i18n';
 import { ApiRequestError, getItineraries } from '@/src/lib/api';
 import { colors, font, fonts, radius, spacing } from '@/src/theme';
 import { segmentPoints } from '@/shared/trip';
@@ -33,6 +34,7 @@ export default function TransitTripScreen() {
   );
   const insets = useSafeAreaInsets();
   const { refresh, status } = useUserLocation();
+  const t = useT();
 
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -54,11 +56,11 @@ export default function TransitTripScreen() {
         setState({
           kind: 'error',
           message:
-            error instanceof ApiRequestError ? error.message : 'Impossible de calculer les trajets.',
+            error instanceof ApiRequestError ? error.message : t('Impossible de calculer les trajets.'),
         });
       }
     },
-    [refresh, destination, name],
+    [refresh, destination, name, t],
   );
 
   useEffect(() => {
@@ -111,7 +113,7 @@ export default function TransitTripScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: 'En transports' }} />
+      <Stack.Screen options={{ title: t('En transports') }} />
       <View style={styles.mapWrap}>
         {shown ? (
           <PlacesMap
@@ -127,19 +129,19 @@ export default function TransitTripScreen() {
             {state.kind === 'loading' ? (
               <>
                 <ActivityIndicator size="large" color={colors.accent} />
-                <Text style={styles.muted}>Recherche des trajets…</Text>
+                <Text style={styles.muted}>{t('Recherche des trajets…')}</Text>
               </>
             ) : state.kind === 'error' ? (
               <>
                 <Ionicons name="alert-circle-outline" size={44} color={colors.textFaint} />
                 <Text style={styles.message}>{state.message}</Text>
                 <Pressable style={styles.retry} onPress={() => void load()}>
-                  <Text style={styles.retryText}>Réessayer</Text>
+                  <Text style={styles.retryText}>{t('Réessayer')}</Text>
                 </Pressable>
               </>
             ) : (
               <Text style={styles.message}>
-                Aucun trajet en transports pour le moment. C’est peut-être plus rapide à pied !
+                {t('Aucun trajet en transports pour le moment. C’est peut-être plus rapide à pied !')}
               </Text>
             )}
           </View>
@@ -162,19 +164,20 @@ export default function TransitTripScreen() {
           ))}
           {shown && (
             <>
-              <Text style={styles.section}>Étapes</Text>
+              <Text style={styles.section}>{t('Étapes')}</Text>
               <TripTimeline itinerary={shown} destinationName={name} />
               {shown.fare && (
                 <Text style={styles.fare}>
-                  Tarif : {shown.fare} (ticket Ilévia, selon Google). Horaires prévus, susceptibles
-                  de changer.
+                  {t('Tarif : {fare} (ticket Ilévia, selon Google). Horaires prévus, susceptibles de changer.', {
+                    fare: shown.fare,
+                  })}
                 </Text>
               )}
               <GradientButton
-                title="Y aller avec Google Maps"
+                title={t('Y aller avec Google Maps')}
                 icon="navigate"
                 onPress={openGoogleMaps}
-                accessibilityLabel="Ouvrir le trajet en transports dans Google Maps"
+                accessibilityLabel={t('Ouvrir le trajet en transports dans Google Maps')}
               />
             </>
           )}

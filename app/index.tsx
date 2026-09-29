@@ -29,6 +29,8 @@ import { SurpriseCard } from '@/src/features/moment/SurpriseCard';
 import { useDaytime } from '@/src/features/moment/useDaytime';
 import { WeatherCard } from '@/src/features/moment/WeatherCard';
 import { weatherIcon } from '@/src/features/moment/weatherIcons';
+import { tx, useI18n } from '@/src/i18n';
+import { LANG_INFO } from '@/shared/i18n';
 import { getWeather } from '@/src/lib/api';
 import { momentLabel } from '@/src/lib/moment';
 import {
@@ -49,12 +51,12 @@ type IconName = ComponentProps<typeof Ionicons>['name'];
 
 // Suggestions : celles du cahier des charges + l'estaminet, incontournable lillois.
 const CATEGORIES: { label: string; query: string; icon: IconName; tint: string }[] = [
-  { label: 'Estaminet', query: 'estaminet', icon: 'beer', tint: palette.gold },
-  { label: 'Resto japonais', query: 'Resto japonais', icon: 'restaurant', tint: palette.brick },
-  { label: 'Afterwork', query: 'Afterwork', icon: 'people', tint: palette.gold },
-  { label: 'Boîte de nuit', query: 'Boîte de nuit', icon: 'musical-notes', tint: palette.brick },
-  { label: 'Brunch', query: 'Brunch', icon: 'cafe', tint: palette.gold },
-  { label: 'Bar à cocktails', query: 'Bar à cocktails', icon: 'wine', tint: palette.brick },
+  { label: tx('Estaminet'), query: 'estaminet', icon: 'beer', tint: palette.gold },
+  { label: tx('Resto japonais'), query: 'Resto japonais', icon: 'restaurant', tint: palette.brick },
+  { label: tx('Afterwork'), query: 'Afterwork', icon: 'people', tint: palette.gold },
+  { label: tx('Boîte de nuit'), query: 'Boîte de nuit', icon: 'musical-notes', tint: palette.brick },
+  { label: tx('Brunch'), query: 'Brunch', icon: 'cafe', tint: palette.gold },
+  { label: tx('Bar à cocktails'), query: 'Bar à cocktails', icon: 'wine', tint: palette.brick },
 ];
 
 const SKY_HEIGHT = 280;
@@ -65,7 +67,8 @@ export default function HomeScreen() {
   const { onSearch, privacyOptionsRequired, showPrivacyOptions } = useAds();
   // Le jour (6 h – 19 h) : « aujourd'hui » et tonalité jour ; le soir : la nuit lilloise.
   const day = useDaytime();
-  const t = TONES[day ? 'day' : 'night'];
+  const tone = TONES[day ? 'day' : 'night'];
+  const { t: tr, lang } = useI18n();
 
   // Barre d'état sombre sur le ciel clair ; les autres écrans restent en tonalité nuit.
   useFocusEffect(
@@ -82,7 +85,7 @@ export default function HomeScreen() {
   const { data: weather } = useLiveData<WeatherResponse>(
     (signal) => getWeather({ lat, lng }, signal),
     10 * 60_000,
-    [lat, lng],
+    [lat, lng, lang],
   );
 
   const search = (query: string, ambiance?: Suggestion['ambiance']) => {
@@ -97,7 +100,7 @@ export default function HomeScreen() {
 
   return (
     <ToneProvider value={day ? 'day' : 'night'}>
-      <View style={[styles.screen, { backgroundColor: t.background }]}>
+      <View style={[styles.screen, { backgroundColor: tone.background }]}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -109,46 +112,57 @@ export default function HomeScreen() {
           >
             {/* Ciel (bleu le jour, nocturne le soir) et silhouette de Lille. */}
             <LinearGradient
-              colors={t.sky}
+              colors={tone.sky}
               style={[styles.sky, { paddingTop: insets.top + spacing.md }]}
             >
               <LilleSkyline style={styles.skyline} tone={day ? 'day' : 'night'} />
 
               <Animated.View entering={FadeInDown.duration(motion.slow)} style={styles.topBar}>
                 <View style={styles.momentRow}>
-                  <Text style={[styles.moment, day && { color: t.text }]}>{momentLabel()}</Text>
+                  <Text style={[styles.moment, day && { color: tone.text }]}>{momentLabel(new Date(), lang)}</Text>
                   {weather && (
                     <View
-                      style={[styles.weatherChip, { backgroundColor: t.glass }]}
+                      style={[styles.weatherChip, { backgroundColor: tone.glass }]}
                       accessible
-                      accessibilityLabel={`${Math.round(weather.weather.temperature)} degrés`}
+                      accessibilityLabel={tr('{n} degrés', { n: Math.round(weather.weather.temperature) })}
                     >
-                      <Ionicons name={weatherIcon(weather.weather)} size={13} color={t.gold} />
-                      <Text style={[styles.weatherText, { color: t.text }]}>
+                      <Ionicons name={weatherIcon(weather.weather)} size={13} color={tone.gold} />
+                      <Text style={[styles.weatherText, { color: tone.text }]}>
                         {Math.round(weather.weather.temperature)}°
                       </Text>
                     </View>
                   )}
                 </View>
+                <View style={styles.topActions}>
+                <PressableScale
+                  onPress={() => router.push('/language')}
+                  style={[styles.langButton, { backgroundColor: tone.glass, borderColor: tone.glassBorder }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr('Changer de langue ({name})', { name: LANG_INFO[lang].name })}
+                >
+                  <Text style={styles.langFlag}>{LANG_INFO[lang].flags[0]}</Text>
+                  <Text style={[styles.favText, { color: tone.text }]}>{lang.toUpperCase()}</Text>
+                </PressableScale>
                 <PressableScale
                   onPress={() => router.push('/favorites')}
-                  style={[styles.favButton, { backgroundColor: t.glass, borderColor: t.glassBorder }]}
+                  style={[styles.favButton, { backgroundColor: tone.glass, borderColor: tone.glassBorder }]}
                   accessibilityRole="button"
-                  accessibilityLabel="Mes favoris"
+                  accessibilityLabel={tr('Mes favoris')}
                 >
                   <Ionicons name="heart" size={18} color={colors.accent} />
-                  <Text style={[styles.favText, { color: t.text }]}>Favoris</Text>
+                  <Text style={[styles.favText, { color: tone.text }]}>{tr('Favoris')}</Text>
                 </PressableScale>
+                </View>
               </Animated.View>
 
               <Animated.Text
                 entering={FadeInDown.delay(motion.stagger).duration(motion.slow)}
-                style={[styles.hero, { color: t.text }, day && styles.heroDay]}
+                style={[styles.hero, { color: tone.text }, day && styles.heroDay]}
               >
-                On fait quoi {day ? 'aujourd’hui' : 'ce soir'}{' '}
-                <Text style={[styles.heroAccent, { color: t.highlight }]}>à Lille</Text>
+                {day ? tr('On fait quoi aujourd’hui') : tr('On fait quoi ce soir')}{' '}
+                <Text style={[styles.heroAccent, { color: tone.highlight }]}>{tr('à Lille')}</Text>
                 {/* Espace insécable : le « ? » ne se retrouve jamais seul sur une ligne. */}
-                {'\u00A0?'}
+                {lang === 'fr' ? '\u00A0?' : '?'}
               </Animated.Text>
             </LinearGradient>
 
@@ -173,7 +187,7 @@ export default function HomeScreen() {
             <OffersRail near={coords} />
 
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: t.text }]}>Envie de…</Text>
+              <Text style={[styles.sectionTitle, { color: tone.text }]}>{tr('Envie de…')}</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -188,16 +202,16 @@ export default function HomeScreen() {
                       onPress={() => search(c.query)}
                       style={[
                         styles.category,
-                        { backgroundColor: t.surface, borderColor: t.border, boxShadow: t.cardShadow },
+                        { backgroundColor: tone.surface, borderColor: tone.border, boxShadow: tone.cardShadow },
                       ]}
                       accessibilityRole="button"
-                      accessibilityLabel={`Rechercher : ${c.label}`}
+                      accessibilityLabel={tr('Rechercher : {q}', { q: tr(c.label) })}
                     >
                       <View style={[styles.categoryIcon, { backgroundColor: `${c.tint}26` }]}>
                         <Ionicons name={c.icon} size={24} color={c.tint} />
                       </View>
-                      <Text style={[styles.categoryLabel, { color: t.text }]} numberOfLines={2}>
-                        {c.label}
+                      <Text style={[styles.categoryLabel, { color: tone.text }]} numberOfLines={2}>
+                        {tr(c.label)}
                       </Text>
                     </PressableScale>
                   </Animated.View>
@@ -215,29 +229,29 @@ export default function HomeScreen() {
                 style={[styles.section, styles.padded]}
               >
                 <View style={styles.historyHeader}>
-                  <Text style={[styles.sectionTitleInline, { color: t.text }]}>Recherches récentes</Text>
+                  <Text style={[styles.sectionTitleInline, { color: tone.text }]}>{tr('Recherches récentes')}</Text>
                   <Pressable onPress={clear} hitSlop={12} accessibilityRole="button">
-                    <Text style={styles.clear}>Effacer</Text>
+                    <Text style={styles.clear}>{tr('Effacer')}</Text>
                   </Pressable>
                 </View>
-                <View style={[styles.historyCard, { backgroundColor: t.surface }]}>
+                <View style={[styles.historyCard, { backgroundColor: tone.surface }]}>
                   {history.map((q, i) => (
                     <Pressable
                       key={q}
                       onPress={() => search(q)}
                       style={({ pressed }) => [
                         styles.historyItem,
-                        i > 0 && [styles.historySeparator, { borderTopColor: t.border }],
-                        pressed && { backgroundColor: t.surfaceRaised },
+                        i > 0 && [styles.historySeparator, { borderTopColor: tone.border }],
+                        pressed && { backgroundColor: tone.surfaceRaised },
                       ]}
                       accessibilityRole="button"
-                      accessibilityLabel={`Relancer la recherche ${q}`}
+                      accessibilityLabel={tr('Relancer la recherche {q}', { q })}
                     >
-                      <Ionicons name="time-outline" size={20} color={t.textFaint} />
-                      <Text style={[styles.historyText, { color: t.text }]} numberOfLines={1}>
+                      <Ionicons name="time-outline" size={20} color={tone.textFaint} />
+                      <Text style={[styles.historyText, { color: tone.text }]} numberOfLines={1}>
                         {q}
                       </Text>
-                      <Ionicons name="arrow-forward" size={18} color={t.textFaint} />
+                      <Ionicons name="arrow-forward" size={18} color={tone.textFaint} />
                     </Pressable>
                   ))}
                 </View>
@@ -252,7 +266,7 @@ export default function HomeScreen() {
               hitSlop={8}
               accessibilityRole="button"
             >
-              <Text style={[styles.privacyText, { color: t.textFaint }]}>Confidentialité et publicité</Text>
+              <Text style={[styles.privacyText, { color: tone.textFaint }]}>{tr('Confidentialité et publicité')}</Text>
             </Pressable>
           )}
           <View style={{ paddingBottom: insets.bottom }}>
@@ -303,6 +317,17 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(245, 238, 226, 0.18)',
   },
+  topActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  langButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    minHeight: TOUCH_TARGET - 4,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  langFlag: { fontSize: 16 },
   favText: { color: colors.text, fontSize: font.small, fontWeight: '700' },
   hero: {
     color: colors.text,

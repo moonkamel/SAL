@@ -12,6 +12,8 @@
     "build:dev:android": "eas build --profile development --platform android",
     "build:dev:ios": "eas build --profile development --platform ios",
     "build:preview:android": "eas build --profile preview --platform android",
+    "translate": "node scripts/translate.mjs",
+    "translate:check": "node scripts/translate.mjs --check",
     "deploy:api": "expo export --platform web && eas deploy --prod --environment production"
   },
   "dependencies": {

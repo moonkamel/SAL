@@ -11,6 +11,7 @@ import { openEvent } from '@/src/features/agenda/openEvent';
 import { useLiveData } from '@/src/features/lille/useLiveData';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { refreshKey } from '@/src/features/moment/HomeRails';
+import { tx, useI18n } from '@/src/i18n';
 import { getAgenda } from '@/src/lib/api';
 import { colors, font, motion, spacing } from '@/src/theme';
 import {
@@ -23,20 +24,20 @@ import {
 } from '@/shared/types';
 
 const WHEN: { key: AgendaWhen; label: string }[] = [
-  { key: 'today', label: 'Ce soir' },
-  { key: 'tomorrow', label: 'Demain' },
-  { key: 'weekend', label: 'Ce week-end' },
+  { key: 'today', label: tx('Ce soir') },
+  { key: 'tomorrow', label: tx('Demain') },
+  { key: 'weekend', label: tx('Ce week-end') },
 ];
 
 const CATEGORY_ORDER: EventCategory[] = ['concert', 'expo', 'spectacle', 'soiree', 'marche', 'sport', 'autre'];
 const CATEGORY_PLURAL: Record<EventCategory, string> = {
-  concert: 'Concerts',
-  expo: 'Expos',
-  spectacle: 'Spectacles',
-  soiree: 'Soirées',
-  marche: 'Marchés',
-  sport: 'Sport',
-  autre: 'Autres',
+  concert: tx('Concerts'),
+  expo: tx('Expos'),
+  spectacle: tx('Spectacles'),
+  soiree: tx('Soirées'),
+  marche: tx('Marchés'),
+  sport: tx('Sport'),
+  autre: tx('Autres'),
 };
 const NEAR_METERS = 2000;
 
@@ -66,10 +67,11 @@ export default function AgendaScreen() {
   const [when, setWhen] = useState<AgendaWhen>(params.when ?? 'today');
   const [filters, setFilters] = useState<Filters>(NO_FILTER);
   const { coords } = useUserLocation();
+  const { t, lang } = useI18n();
   const { data, error } = useLiveData<AgendaResponse>(
     (signal) => getAgenda(coords, when, signal),
     10 * 60_000,
-    [...refreshKey(coords), when],
+    [...refreshKey(coords), when, lang],
   );
 
   const events = data?.events ?? [];
@@ -103,18 +105,18 @@ export default function AgendaScreen() {
       <View style={styles.filters}>
         <View style={styles.row}>
           {WHEN.map((w) => (
-            <Chip key={w.key} label={w.label} selected={when === w.key} onPress={() => setWhen(w.key)} />
+            <Chip key={w.key} label={t(w.label)} selected={when === w.key} onPress={() => setWhen(w.key)} />
           ))}
         </View>
 
         {events.length > 0 && (
           <>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
-              <Chip label="Tout" selected={!filters.category} onPress={() => set({ category: null, genre: null })} />
+              <Chip label={t('Tout')} selected={!filters.category} onPress={() => set({ category: null, genre: null })} />
               {CATEGORY_ORDER.filter((c) => categoryCounts.get(c)).map((c) => (
                 <Chip
                   key={c}
-                  label={`${CATEGORY_PLURAL[c]} · ${categoryCounts.get(c)}`}
+                  label={`${t(CATEGORY_PLURAL[c])} · ${categoryCounts.get(c)}`}
                   selected={filters.category === c}
                   onPress={() => set({ category: filters.category === c ? null : c, genre: null })}
                 />
@@ -130,7 +132,7 @@ export default function AgendaScreen() {
                     .map((g) => (
                       <Chip
                         key={g}
-                        label={`${GENRE_LABELS[g]} · ${genreCounts.get(g)}`}
+                        label={`${t(GENRE_LABELS[g])} · ${genreCounts.get(g)}`}
                         selected={filters.genre === g}
                         onPress={() => set({ genre: filters.genre === g ? null : g })}
                       />
@@ -140,11 +142,11 @@ export default function AgendaScreen() {
             )}
 
             <View style={styles.row}>
-              <Chip label="Gratuit" selected={filters.free} onPress={() => set({ free: !filters.free })} />
-              <Chip label="À moins de 2 km" selected={filters.near} onPress={() => set({ near: !filters.near })} />
+              <Chip label={t('Gratuit')} selected={filters.free} onPress={() => set({ free: !filters.free })} />
+              <Chip label={t('À moins de 2 km')} selected={filters.near} onPress={() => set({ near: !filters.near })} />
               {active && (
                 <Pressable onPress={() => set(NO_FILTER)} hitSlop={10} style={styles.reset} accessibilityRole="button">
-                  <Text style={styles.resetText}>Effacer</Text>
+                  <Text style={styles.resetText}>{t('Effacer')}</Text>
                 </Pressable>
               )}
             </View>
@@ -155,7 +157,7 @@ export default function AgendaScreen() {
       {!data ? (
         <View style={styles.center}>
           {error ? (
-            <Text style={styles.muted}>Agenda momentanément indisponible.</Text>
+            <Text style={styles.muted}>{t('Agenda momentanément indisponible.')}</Text>
           ) : (
             <ActivityIndicator color={colors.accent} />
           )}
@@ -171,16 +173,21 @@ export default function AgendaScreen() {
           ListHeaderComponent={
             events.length > 0 ? (
               <Text style={styles.count}>
-                {shown.length} sortie{shown.length > 1 ? 's' : ''}
-                {active ? ' correspondent' : ''}
+                {active
+                  ? shown.length > 1
+                    ? t('{n} sorties correspondent', { n: shown.length })
+                    : t('{n} sortie correspond', { n: shown.length })
+                  : shown.length > 1
+                    ? t('{n} sorties', { n: shown.length })
+                    : t('{n} sortie', { n: shown.length })}
               </Text>
             ) : null
           }
           ListEmptyComponent={
             <Text style={styles.muted}>
               {events.length
-                ? 'Aucune sortie avec ces filtres. Essayez d’en retirer un.'
-                : 'Rien de prévu dans l’agenda pour le moment.'}
+                ? t('Aucune sortie avec ces filtres. Essayez d’en retirer un.')
+                : t('Rien de prévu dans l’agenda pour le moment.')}
             </Text>
           }
           renderItem={({ item }) => (

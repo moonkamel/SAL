@@ -178,6 +178,28 @@ requête Places plus des filtres (type, ouvert maintenant, prix).
    Pour une latence et un coût plus bas, vous pouvez essayer `claude-haiku-4-5`.
    Si Claude ne répond pas en 6 s ou échoue, l'app utilise la requête brute.
 
+### Langues (français, anglais, néerlandais, allemand, espagnol)
+
+Au premier lancement, l'app demande la langue (liste de drapeaux) et la mémorise ; le
+bouton drapeau de l'accueil permet d'en changer. Les langues proposées correspondent aux
+visiteurs étrangers les plus nombreux à Lille : Belges (néerlandais et français),
+Britanniques, Allemands, Néerlandais et Espagnols.
+
+- **Textes de l'app** : le français sert de clé (`t('Favoris')`). Les traductions sont dans
+  `shared/i18n/locales/*.json`. Après avoir ajouté ou modifié des textes, lancez
+  `npm run translate` : le script repère les nouveaux textes et les fait traduire par
+  Claude (clé `ANTHROPIC_API_KEY` dans `.env.local`). Les traductions existantes ne sont
+  jamais écrasées : vous pouvez les corriger à la main. `npm run translate:check` vérifie
+  qu'il ne manque rien (c'est aussi testé par `npm test`).
+- **Données Google** (noms, avis, horaires, jours) : demandées directement dans la langue
+  choisie.
+- **Agenda et bons plans** (textes saisis en français) : traduits automatiquement par le
+  serveur avec Claude (`claude-haiku-4-5`), gardés en mémoire 24 h. Les textes déjà rédigés
+  dans la langue sur OpenAgenda sont utilisés tels quels. Sans clé Anthropic, ils restent
+  en français. `ENABLE_AUTO_TRANSLATE=false` coupe cette traduction.
+- **Demandes d'autorisation iPhone** : `locales/ios/*.json` (nouveau build nécessaire).
+- L'espace partenaires reste en français.
+
 ### AdMob (publicité)
 
 **En développement, rien à faire** : l'app utilise automatiquement les IDs de test de

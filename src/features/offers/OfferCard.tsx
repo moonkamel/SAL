@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/src/components/PressableScale';
+import { useI18n } from '@/src/i18n';
 import { colors, font, fonts, radius, spacing } from '@/src/theme';
 import { useTone } from '@/src/theme/tone';
 import { formatDistance } from '@/shared/format';
@@ -18,16 +19,17 @@ interface Props {
 /** Bon plan d'un établissement partenaire (« 1 verre offert avant 20 h »). */
 export function OfferCard({ offer, showPlace, onPress, compact }: Props) {
   const { tone, c } = useTone();
+  const { t, lang } = useI18n();
   const dayStyle = tone === 'day' && { backgroundColor: c.surface, boxShadow: c.cardShadow, borderColor: c.gold };
   const body = (
     <>
       <View style={styles.top}>
         <View style={[styles.badge, { backgroundColor: c.gold }]}>
           <Ionicons name="pricetag" size={12} color={colors.background} />
-          <Text style={styles.badgeText}>Bon plan</Text>
+          <Text style={styles.badgeText}>{t('Bon plan')}</Text>
         </View>
         <Text style={[styles.schedule, { color: offer.live ? colors.open : c.textMuted }]}>
-          {offer.live ? 'En ce moment' : offer.schedule}
+          {offer.live ? t('En ce moment') : offer.schedule}
         </Text>
       </View>
       <Text style={[styles.title, { color: c.text }]} numberOfLines={compact ? 2 : undefined}>
@@ -37,7 +39,7 @@ export function OfferCard({ offer, showPlace, onPress, compact }: Props) {
         <Text style={[styles.place, { color: c.text }]} numberOfLines={1}>
           {offer.placeName}
           {offer.distanceMeters !== undefined && (
-            <Text style={styles.muted}> · {formatDistance(offer.distanceMeters)}</Text>
+            <Text style={styles.muted}> · {formatDistance(offer.distanceMeters, lang)}</Text>
           )}
         </Text>
       )}
@@ -57,7 +59,7 @@ export function OfferCard({ offer, showPlace, onPress, compact }: Props) {
       onPress={onPress}
       style={[styles.card, compact && styles.compact, dayStyle]}
       accessibilityRole="button"
-      accessibilityLabel={`Bon plan chez ${offer.placeName} : ${offer.title}. ${offer.schedule}`}
+      accessibilityLabel={t('Bon plan chez {place} : {title}. {schedule}', { place: offer.placeName, title: offer.title, schedule: offer.schedule })}
     >
       {body}
     </PressableScale>

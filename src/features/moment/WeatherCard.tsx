@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/src/components/PressableScale';
+import { useT } from '@/src/i18n';
 import { colors, font, fonts, radius, shadows, spacing } from '@/src/theme';
 import { useTone } from '@/src/theme/tone';
 import type { Suggestion, WeatherResponse } from '@/shared/types';
@@ -17,12 +18,13 @@ interface Props {
 export function WeatherCard({ data, onPress }: Props) {
   const { weather, suggestion } = data;
   const { c } = useTone();
+  const t = useT();
   return (
     <PressableScale
       onPress={() => onPress(suggestion)}
       style={[styles.card, { backgroundColor: c.surface, borderColor: c.border, boxShadow: c.cardShadow }]}
       accessibilityRole="button"
-      accessibilityLabel={`${Math.round(weather.temperature)} degrés, ${WEATHER_LABELS[weather.condition]}. ${suggestion.title}. ${suggestion.subtitle} Rechercher : ${suggestion.query}`}
+      accessibilityLabel={`${t('{n} degrés', { n: Math.round(weather.temperature) })}, ${t(WEATHER_LABELS[weather.condition])}. ${suggestion.title}. ${suggestion.subtitle} ${t('Rechercher : {q}', { q: t(suggestion.query) })}`}
     >
       <View style={styles.weather}>
         <Ionicons name={weatherIcon(weather)} size={28} color={c.gold} />
@@ -32,8 +34,10 @@ export function WeatherCard({ data, onPress }: Props) {
         <Text style={[styles.title, { color: c.text }]}>{suggestion.title}</Text>
         <Text style={[styles.subtitle, { color: c.textMuted }]}>{suggestion.subtitle}</Text>
         <Text style={[styles.cta, { color: c.gold }]}>
-          Voir : {suggestion.query}
-          {suggestion.ambiance?.includes('terrace') ? ' en terrasse' : ''} →
+          {suggestion.ambiance?.includes('terrace')
+            ? t('Voir : {q} en terrasse', { q: t(suggestion.query) })
+            : t('Voir : {q}', { q: t(suggestion.query) })}{' '}
+          →
         </Text>
       </View>
     </PressableScale>

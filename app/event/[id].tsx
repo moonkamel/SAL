@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GradientButton } from '@/src/components/GradientButton';
 import { CATEGORY_INFO } from '@/src/features/agenda/EventCard';
+import { useI18n } from '@/src/i18n';
 import { getKnownEvent } from '@/src/lib/api';
 import { colors, font, fonts, gradients, palette, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { formatDistance } from '@/shared/format';
@@ -19,14 +20,15 @@ export default function EventScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const event = getKnownEvent(id);
+  const { t, lang } = useI18n();
 
   if (!event) {
     return (
       <View style={[styles.screen, styles.center]}>
-        <Stack.Screen options={{ title: 'Événement' }} />
-        <Text style={styles.muted}>Cet événement n’est plus disponible.</Text>
+        <Stack.Screen options={{ title: t('Événement') }} />
+        <Text style={styles.muted}>{t('Cet événement n’est plus disponible.')}</Text>
         <Pressable style={styles.secondary} onPress={() => router.back()}>
-          <Text style={styles.secondaryText}>Retour</Text>
+          <Text style={styles.secondaryText}>{t('Retour')}</Text>
         </Pressable>
       </View>
     );
@@ -45,7 +47,7 @@ export default function EventScreen() {
     });
   const share = () =>
     void Share.share({
-      message: [event.title, event.dateLabel, event.venueName, event.url, '', 'Trouvé avec Sortir à Lille']
+      message: [event.title, event.dateLabel, event.venueName, event.url, '', t('Trouvé avec Sortir à Lille')]
         .filter((l) => l !== undefined)
         .join('\n'),
     }).catch(() => {});
@@ -67,10 +69,10 @@ export default function EventScreen() {
 
         <View style={styles.body}>
           <View style={styles.tags}>
-            {event.featured && <Tag label="À la une" color={palette.brick} strong />}
-            <Tag label={cat.label} icon={cat.icon} />
-            {event.genres?.map((g) => <Tag key={g} label={GENRE_LABELS[g]} />)}
-            {event.free && <Tag label="Gratuit" color={colors.open} />}
+            {event.featured && <Tag label={t('À la une')} color={palette.brick} strong />}
+            <Tag label={t(cat.label)} icon={cat.icon} />
+            {event.genres?.map((g) => <Tag key={g} label={t(GENRE_LABELS[g])} />)}
+            {event.free && <Tag label={t('Gratuit')} color={colors.open} />}
           </View>
 
           <Text style={styles.title}>{event.title}</Text>
@@ -80,7 +82,7 @@ export default function EventScreen() {
             <Info
               icon="location-outline"
               text={`${event.venueName}${event.address ? `\n${event.address}` : ''}`}
-              extra={formatDistance(event.distanceMeters)}
+              extra={formatDistance(event.distanceMeters, lang)}
             />
             {event.price && <Info icon="pricetag-outline" text={event.price} />}
           </View>
@@ -91,28 +93,28 @@ export default function EventScreen() {
 
           <View style={styles.links}>
             {event.ticketUrl && (
-              <LinkButton icon="ticket-outline" label="Billets / réservation" onPress={() => void WebBrowser.openBrowserAsync(event.ticketUrl!)} />
+              <LinkButton icon="ticket-outline" label={t('Billets / réservation')} onPress={() => void WebBrowser.openBrowserAsync(event.ticketUrl!)} />
             )}
             {event.placeId && (
               <LinkButton
                 icon="storefront-outline"
-                label="Fiche du lieu"
+                label={t('Fiche du lieu')}
                 onPress={() => router.push({ pathname: '/place/[id]', params: { id: event.placeId! } })}
               />
             )}
-            <LinkButton icon="share-social-outline" label="Partager" onPress={share} />
+            <LinkButton icon="share-social-outline" label={t('Partager')} onPress={share} />
             {event.url && (
-              <LinkButton icon="open-outline" label="Voir sur OpenAgenda" onPress={() => void WebBrowser.openBrowserAsync(event.url!)} />
+              <LinkButton icon="open-outline" label={t('Voir sur OpenAgenda')} onPress={() => void WebBrowser.openBrowserAsync(event.url!)} />
             )}
           </View>
           {event.source === 'openagenda' && (
-            <Text style={styles.source}>Source : agenda de la Ville de Lille (OpenAgenda).</Text>
+            <Text style={styles.source}>{t('Source : agenda de la Ville de Lille (OpenAgenda).')}</Text>
           )}
         </View>
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-        <GradientButton title="Y aller" icon="navigate" onPress={goThere} />
+        <GradientButton title={t('Y aller')} icon="navigate" onPress={goThere} />
       </View>
     </View>
   );

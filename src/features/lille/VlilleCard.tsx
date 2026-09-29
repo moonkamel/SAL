@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useI18n, useT } from '@/src/i18n';
 import { getVlille } from '@/src/lib/api';
 import { colors, font, fonts, palette, radius, spacing } from '@/src/theme';
 import { formatDistance } from '@/shared/format';
@@ -27,6 +28,7 @@ export function VlilleCard({ from, to }: Props) {
     [to.lat, to.lng],
   );
 
+  const t = useT();
   const pickupStation = start.data ? pickStation(start.data.stations, 'bikes') : undefined;
   const dropoffStation = end.data ? pickStation(end.data.stations, 'docks') : undefined;
 
@@ -34,7 +36,7 @@ export function VlilleCard({ from, to }: Props) {
     return (
       <View style={styles.card}>
         <Header />
-        <Text style={styles.muted}>Disponibilités V’Lille momentanément indisponibles.</Text>
+        <Text style={styles.muted}>{t('Disponibilités V’Lille momentanément indisponibles.')}</Text>
       </View>
     );
   }
@@ -49,31 +51,32 @@ export function VlilleCard({ from, to }: Props) {
       <Header />
       <Row
         icon="bicycle"
-        label="Prendre un vélo"
+        label={t('Prendre un vélo')}
         station={pickup}
         count={pickup?.bikes}
-        unit="vélo"
-        empty="Aucun vélo disponible à proximité"
+        unit="bike"
+        empty={t('Aucun vélo disponible à proximité')}
       />
       <Row
         icon="flag"
-        label="Le déposer"
+        label={t('Le déposer')}
         station={dropoff}
         count={dropoff?.docks}
-        unit="place"
-        empty="Aucune place libre près du lieu"
+        unit="dock"
+        empty={t('Aucune place libre près du lieu')}
       />
     </View>
   );
 }
 
 function Header() {
+  const t = useT();
   return (
     <View style={styles.header}>
       <View style={styles.logo}>
         <Ionicons name="bicycle" size={16} color={colors.background} />
       </View>
-      <Text style={styles.title}>V’Lille en direct</Text>
+      <Text style={styles.title}>{t('V’Lille en direct')}</Text>
     </View>
   );
 }
@@ -90,26 +93,34 @@ function Row({
   label: string;
   station?: VlilleStation;
   count?: number;
-  unit: string;
+  unit: 'bike' | 'dock';
   empty: string;
 }) {
+  const { t, lang } = useI18n();
   if (!station || count === undefined) {
     return <Text style={styles.muted}>{empty}</Text>;
   }
   const tone = count >= 3 ? colors.open : palette.gold;
+  const amount =
+    unit === 'bike'
+      ? count > 1
+        ? t('{n} vélos', { n: count })
+        : t('{n} vélo', { n: count })
+      : count > 1
+        ? t('{n} places', { n: count })
+        : t('{n} place', { n: count });
   return (
-    <View style={styles.row} accessible accessibilityLabel={`${label} : station ${station.name}, ${count} ${unit}${count > 1 ? 's' : ''}`}>
+    <View style={styles.row} accessible accessibilityLabel={t('{label} : station {station}, {amount}', { label, station: station.name, amount })}>
       <Ionicons name={icon} size={18} color={colors.textMuted} />
       <View style={{ flex: 1 }}>
         <Text style={styles.rowLabel}>{label}</Text>
         <Text style={styles.station} numberOfLines={1}>
-          {station.name} · {formatDistance(station.distanceMeters)}
+          {station.name} · {formatDistance(station.distanceMeters, lang)}
         </Text>
       </View>
       <View style={[styles.badge, { borderColor: tone }]}>
         <Text style={[styles.badgeText, { color: tone }]}>
-          {count} {unit}
-          {count > 1 ? 's' : ''}
+          {amount}
         </Text>
       </View>
     </View>

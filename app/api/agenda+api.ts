@@ -1,6 +1,7 @@
 import { agenda } from '@/server/agenda';
 import { parseLatLng } from '@/server/params';
 import type { AgendaResponse, AgendaWhen } from '@/shared/types';
+import { langFromHeader, tx } from '@/shared/i18n';
 
 const WHEN: AgendaWhen[] = ['today', 'tomorrow', 'weekend'];
 
@@ -10,13 +11,14 @@ export async function GET(request: Request): Promise<Response> {
   const near = parseLatLng(q.get('near'));
   const when = (q.get('when') ?? 'today') as AgendaWhen;
   if (!near || !WHEN.includes(when)) {
-    return Response.json({ error: 'Paramètres invalides' }, { status: 400 });
+    return Response.json({ error: tx('Paramètres invalides') }, { status: 400 });
   }
   try {
-    const body: AgendaResponse = { events: await agenda(near, when) };
+    const lang = langFromHeader(request.headers.get('accept-language'));
+    const body: AgendaResponse = { events: await agenda(near, when, new Date(), lang) };
     return Response.json(body);
   } catch (error) {
     console.error('[api/agenda]', error);
-    return Response.json({ error: 'Agenda momentanément indisponible' }, { status: 500 });
+    return Response.json({ error: tx('Agenda momentanément indisponible') }, { status: 500 });
   }
 }
