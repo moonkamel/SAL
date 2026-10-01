@@ -62,9 +62,13 @@ export function LanguagePicker({ onDone }: { onDone?: () => void }) {
                 accessibilityLabel={`${info.name}, ${info.countries}`}
                 accessibilityState={{ selected: active }}
               >
-                <Text style={styles.flags} accessibilityElementsHidden importantForAccessibility="no">
-                  {info.flags.join(' ')}
-                </Text>
+                <View style={styles.flags} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                  {info.flags.map((f) => (
+                    <Text key={f} style={[styles.flag, info.flags.length > 1 && styles.flagSmall]}>
+                      {f}
+                    </Text>
+                  ))}
+                </View>
                 <View style={styles.names}>
                   <Text style={styles.name}>{info.name}</Text>
                   <Text style={styles.countries}>{info.countries}</Text>
@@ -83,19 +87,21 @@ export function LanguagePicker({ onDone }: { onDone?: () => void }) {
   );
 }
 
+const SKYLINE = 96;
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   sky: {
-    minHeight: 250,
     paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxl * 2,
+    // Le texte reste au-dessus de la silhouette de la ville.
+    paddingBottom: SKYLINE + spacing.md,
     gap: spacing.sm,
     overflow: 'hidden',
   },
-  skyline: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 130 },
+  skyline: { position: 'absolute', left: 0, right: 0, bottom: 0, height: SKYLINE },
   title: { color: colors.text, fontFamily: fonts.display, fontSize: font.hero - 4, marginTop: spacing.sm },
   subtitle: { color: colors.textMuted, fontSize: font.small, lineHeight: 20 },
-  list: { padding: spacing.lg, gap: spacing.md, marginTop: -spacing.xl },
+  list: { padding: spacing.lg, gap: spacing.md },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -109,7 +115,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   rowActive: { borderColor: colors.gold, backgroundColor: colors.surfaceRaised },
-  flags: { fontSize: 28, minWidth: 72 },
+  // Colonne fixe : les noms des langues sont alignés, avec un ou deux drapeaux.
+  flags: { width: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  flag: { fontSize: 30 },
+  flagSmall: { fontSize: 24 },
   names: { flex: 1, gap: 2 },
   name: { color: colors.text, fontSize: font.body + 1, fontWeight: '800' },
   countries: { color: colors.textMuted, fontSize: font.small },
