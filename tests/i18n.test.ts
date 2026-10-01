@@ -51,7 +51,7 @@ describe('traductions', () => {
     expect(formatRatingCount(1200, 'en')).toBe('1.2k reviews');
     expect(formatOpening({ openNow: true, closesAt: '23:00' }, 'de')).toBe('Geöffnet · schließt um 23:00');
     expect(momentLabel(new Date(2026, 8, 26, 21), 'en')).toBe('SATURDAY EVENING · LILLE');
-    expect(momentLabel(new Date(2026, 8, 26, 21), 'nl')).toBe('ZATERDAGAVOND · LILLE');
+    expect(momentLabel(new Date(2026, 8, 26, 21), 'nl')).toBe('ZATERDAG AVOND · LILLE');
   });
 
   it('traduit l’idée météo mais garde la recherche en français', () => {

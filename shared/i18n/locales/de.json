@@ -1,5 +1,5 @@
 {
-  "{day} {moment} · LILLE": "{day}{moment} · LILLE",
+  "{day} {moment} · LILLE": "{day} {moment} · LILLE",
   "{distance} · arrivée vers {time}": "{distance} · Ankunft gegen {time}",
   "{label} : station {station}, {amount}": "{label}: Station {station}, {amount}",
   "{label} avec {partner}, lien partenaire": "{label} mit {partner}, Partnerlink",

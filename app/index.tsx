@@ -119,7 +119,9 @@ export default function HomeScreen() {
 
               <Animated.View entering={FadeInDown.duration(motion.slow)} style={styles.topBar}>
                 <View style={styles.momentRow}>
-                  <Text style={[styles.moment, day && { color: tone.text }]}>{momentLabel(new Date(), lang)}</Text>
+                  <Text style={[styles.moment, day && { color: tone.text }]} numberOfLines={2}>
+                    {momentLabel(new Date(), lang)}
+                  </Text>
                   {weather && (
                     <View
                       style={[styles.weatherChip, { backgroundColor: tone.glass }]}
@@ -141,7 +143,6 @@ export default function HomeScreen() {
                   accessibilityLabel={tr('Changer de langue ({name})', { name: LANG_INFO[lang].name })}
                 >
                   <Text style={styles.langFlag}>{LANG_INFO[lang].flags[0]}</Text>
-                  <Text style={[styles.favText, { color: tone.text }]}>{lang.toUpperCase()}</Text>
                 </PressableScale>
                 <PressableScale
                   onPress={() => router.push('/favorites')}
@@ -291,9 +292,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing.sm,
     marginBottom: spacing.xl,
   },
-  momentRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  // Se réduit (sur 2 lignes si besoin) pour laisser la place aux boutons sur les petits écrans.
+  momentRow: { flex: 1, flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   weatherChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -305,7 +308,7 @@ const styles = StyleSheet.create({
   },
   weatherText: { color: colors.text, fontSize: font.tiny, fontWeight: '800' },
   moments: { marginTop: spacing.lg, gap: spacing.md },
-  moment: { color: colors.gold, fontSize: font.tiny, fontWeight: '800', letterSpacing: 1.6 },
+  moment: { flexShrink: 1, color: colors.gold, fontSize: font.tiny, fontWeight: '800', letterSpacing: 1.6 },
   favButton: {
     flexDirection: 'row',
     alignItems: 'center',

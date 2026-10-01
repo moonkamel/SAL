@@ -240,6 +240,9 @@ export function formatLocalTime(iso: string, now: Date = new Date(), lang: Lang 
   const date = new Date(iso);
   const time = hourFormat.format(date);
   if (dateKeyFormat.format(date) === dateKeyFormat.format(now)) return time;
+  // Fermeture dans la nuit (minuit, 2 h…) : « ferme à 02:00 », pas « sam. 02:00 ».
+  const hours = (date.getTime() - now.getTime()) / 3_600_000;
+  if (hours > 0 && hours < 12 && Number.parseInt(time, 10) < 6) return time;
   return `${dayFormat(lang).format(date)} ${time}`;
 }
 

@@ -158,6 +158,13 @@ describe('horaires (heure de Lille)', () => {
     expect(formatLocalTime('2026-09-29T10:00:00Z', now)).toBe('mar. 12:00');
   });
 
+  it('fermeture dans la nuit : l’heure seule', () => {
+    // Lundi 02:00 à Lille, dans 6 h : « ferme à 02:00 ».
+    expect(formatLocalTime('2026-09-28T00:00:00Z', now)).toBe('02:00');
+    // Lundi 09:00 : un autre jour, on garde le jour.
+    expect(formatLocalTime('2026-09-28T07:00:00Z', now)).toBe('lun. 09:00');
+  });
+
   it('ouvert / fermé', () => {
     expect(
       toOpeningStatus({ openNow: true, nextCloseTime: '2026-09-27T21:30:00Z' }, now),
