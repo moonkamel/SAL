@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Tableau des allergènes</title>
+  <meta name="description" content="Créez le tableau des 14 allergènes de votre restaurant, imprimable et consultable par QR code.">
+  <meta name="theme-color" content="#9c3d2a">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%BE%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <div class="logo">🌾 <span>Allergènes</span> <small class="muted" id="restaurant-title"></small></div>
+      <nav class="tabs" role="tablist" aria-label="Sections">
+        <button class="tab" role="tab" data-tab="carte" aria-selected="true">Ma carte</button>
+        <button class="tab" role="tab" data-tab="ingredients" aria-selected="false">Ingrédients</button>
+        <button class="tab" role="tab" data-tab="tableau" aria-selected="false">Tableau</button>
+        <button class="tab" role="tab" data-tab="qr" aria-selected="false">QR code</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Ma carte -->
+    <section class="panel" id="panel-carte" role="tabpanel">
+      <div class="card">
+        <div class="grid-2">
+          <label class="field">Nom de l’établissement
+            <input id="restaurant-name" autocomplete="organization" placeholder="Brasserie du Beffroi">
+          </label>
+          <label class="field">Adresse ou mention (facultatif)
+            <input id="restaurant-info" placeholder="12 place du Théâtre, Lille">
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row spread">
+          <h2>Plats</h2>
+          <div class="row">
+            <button class="btn primary" id="add-dish">+ Ajouter un plat</button>
+          </div>
+        </div>
+        <div id="dish-list"></div>
+      </div>
+
+      <div class="card no-print">
+        <h3>Sauvegarde</h3>
+        <p class="muted">Vos données restent sur cet appareil. Exportez-les pour les garder en sécurité ou les passer sur un autre appareil.</p>
+        <div class="row">
+          <button class="btn" id="export-json">Exporter (.json)</button>
+          <label class="btn">Importer…<input type="file" id="import-json" accept="application/json,.json" hidden></label>
+          <button class="btn ghost" id="load-demo">Charger un exemple</button>
+          <button class="btn ghost danger" id="reset-all">Tout effacer</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Ingrédients -->
+    <section class="panel" id="panel-ingredients" role="tabpanel" hidden>
+      <div class="card">
+        <div class="row spread">
+          <h2>Bibliothèque d’ingrédients</h2>
+          <div class="row">
+            <button class="btn primary" id="scan-ingredient">📷 Scanner un produit</button>
+            <button class="btn" id="add-ingredient">+ Ingrédient</button>
+          </div>
+        </div>
+        <p class="muted">Scannez le code-barres de vos produits (sauces, pâtes, charcuterie…) : les allergènes sont repris d’Open Food Facts. Pour le frais, tapez simplement le nom, l’outil propose les allergènes.</p>
+        <input type="search" id="ingredient-search" placeholder="Rechercher un ingrédient…" aria-label="Rechercher un ingrédient">
+        <div id="ingredient-list"></div>
+      </div>
+    </section>
+
+    <!-- Tableau -->
+    <section class="panel" id="panel-tableau" role="tabpanel" hidden>
+      <div class="row spread no-print" style="margin-bottom:12px">
+        <label class="row"><input type="checkbox" id="show-traces" checked> Afficher « peut contenir (traces) »</label>
+        <button class="btn primary" id="print-table">🖨️ Imprimer le tableau</button>
+      </div>
+      <div class="card">
+        <div id="allergen-sheet"></div>
+      </div>
+    </section>
+
+    <!-- QR code -->
+    <section class="panel" id="panel-qr" role="tabpanel" hidden>
+      <div class="card">
+        <h2>Carte des allergènes pour vos clients</h2>
+        <p class="muted">Le client scanne le QR code, choisit ses allergies et voit les plats qu’il peut manger, en français, anglais ou néerlandais. Toute la carte est contenue dans le lien : aucun compte, aucun serveur.</p>
+        <div id="qr-warning"></div>
+        <div class="qr-box">
+          <div class="qr" id="qr-code"></div>
+          <div>
+            <div class="row" style="margin-bottom:10px">
+              <button class="btn primary" id="print-qr">🖨️ Imprimer les chevalets</button>
+              <button class="btn" id="copy-link">Copier le lien</button>
+              <a class="btn" id="open-link" target="_blank" rel="noopener">Voir la carte client</a>
+            </div>
+            <p class="link-out" id="link-out"></p>
+            <div class="notice">Après chaque changement de carte, réimprimez les chevalets : le QR code contient la carte du jour où il a été imprimé.</div>
+            <details>
+              <summary class="muted">Adresse publique de l’outil</summary>
+              <label class="field" style="margin-top:8px">Adresse où l’outil est en ligne (laisser vide pour l’adresse actuelle)
+                <input type="url" id="public-base" placeholder="https://exemple.fr/allergenes/">
+              </label>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Chevalets à imprimer (4 par page A4) -->
+  <section id="qr-tents" class="print-only" aria-hidden="true"></section>
+
+  <!-- Fenêtre : plat -->
+  <dialog id="dish-dialog">
+    <form method="dialog" id="dish-form">
+      <header><h2 id="dish-dialog-title">Plat</h2><button class="btn ghost" value="cancel" aria-label="Fermer">✕</button></header>
+      <div class="grid-2">
+        <label class="field">Nom du plat <input name="name" required placeholder="Carbonnade flamande"></label>
+        <label class="field">Catégorie <input name="category" list="category-options" placeholder="Plats"></label>
+      </div>
+      <datalist id="category-options"></datalist>
+
+      <h3>Ingrédients</h3>
+      <div class="row">
+        <input type="search" id="dish-ingredient-search" placeholder="Chercher ou créer un ingrédient…" style="flex:1;min-width:180px" aria-label="Chercher un ingrédient">
+        <button type="button" class="btn" id="dish-scan">📷 Scanner</button>
+      </div>
+      <div class="picker-list" id="dish-ingredient-picker"></div>
+
+      <h3 style="margin-top:16px">Allergènes du plat</h3>
+      <div id="dish-computed" class="chips"></div>
+      <details style="margin-top:12px">
+        <summary>Ajouter un allergène à la main (garniture, friture partagée…)</summary>
+        <p class="muted" style="margin-top:8px">Touchez une fois pour « contient », deux fois pour « peut contenir ».</p>
+        <div class="allergen-picker" id="dish-extra"></div>
+      </details>
+      <footer>
+        <button type="button" class="btn ghost danger" id="dish-delete">Supprimer</button>
+        <button class="btn" value="cancel">Annuler</button>
+        <button class="btn primary" value="save" id="dish-save">Enregistrer</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Fenêtre : ingrédient -->
+  <dialog id="ingredient-dialog">
+    <form method="dialog" id="ingredient-form">
+      <header><h2 id="ingredient-dialog-title">Ingrédient</h2><button class="btn ghost" value="cancel" aria-label="Fermer">✕</button></header>
+      <div class="off-preview" id="ingredient-preview" hidden></div>
+      <div class="grid-2">
+        <label class="field">Nom <input name="name" required placeholder="Crème fraîche"></label>
+        <label class="field">Marque (facultatif) <input name="brand"></label>
+      </div>
+      <label class="field">Code-barres (facultatif) <input name="barcode" inputmode="numeric" pattern="[0-9]*"></label>
+      <details class="ingredients-text" id="ingredient-text" hidden><summary>Liste d’ingrédients (Open Food Facts)</summary><p></p></details>
+      <p class="muted">Touchez une fois pour « contient », deux fois pour « peut contenir ». Vérifiez toujours avec l’étiquette du produit.</p>
+      <div class="allergen-picker" id="ingredient-allergens"></div>
+      <footer>
+        <button type="button" class="btn ghost danger" id="ingredient-delete">Supprimer</button>
+        <button class="btn" value="cancel">Annuler</button>
+        <button class="btn primary" value="save">Enregistrer</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Fenêtre : scanner -->
+  <dialog id="scan-dialog">
+    <div class="dialog-body">
+      <header><h2>Scanner un produit</h2><button class="btn ghost" id="scan-close" aria-label="Fermer">✕</button></header>
+      <div class="scanner"><video id="scan-video" playsinline muted></video><div class="frame"></div></div>
+      <p class="status" id="scan-status" role="status"></p>
+      <form class="row" id="scan-manual">
+        <input name="code" inputmode="numeric" pattern="[0-9]*" placeholder="…ou tapez le code (13 chiffres)" style="flex:1;min-width:160px" aria-label="Code-barres">
+        <button class="btn">Chercher</button>
+      </form>
+      <p class="muted" style="margin-top:10px;font-size:.8rem">Données <a href="https://fr.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (licence ODbL), base collaborative : vérifiez l’étiquette.</p>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

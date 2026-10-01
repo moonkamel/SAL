@@ -617,3 +617,10 @@ Pas de nouveau build nécessaire : relancez simplement `npm start`.
   aucune publicité pendant la navigation (`src/features/navigation/guidanceState.ts`).
 - Publicité : consentement UMP avant toute annonce, mesure AdMob retardée jusqu'au
   consentement, IDs de test en développement, lieux sponsorisés toujours signalés.
+
+## Autre outil du dépôt : tableau des allergènes
+
+Le dossier [`allergenes/`](allergenes/README.md) contient un outil web indépendant
+pour les restaurants : tableau des 14 allergènes imprimable, scan de code-barres
+(Open Food Facts) et QR code de carte client. Il ne partage rien avec l’application
+mobile hormis les tests (`tests/allergenes.test.ts`).

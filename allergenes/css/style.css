@@ -1,0 +1,234 @@
+:root {
+  --bg: #f7f3ec;
+  --surface: #ffffff;
+  --surface-2: #f1ebe1;
+  --ink: #1f1a16;
+  --muted: #6c625a;
+  --line: #e2d9cc;
+  --brand: #9c3d2a;
+  --brand-ink: #ffffff;
+  --accent: #c9962b;
+  --ok: #2f7a4b;
+  --warn: #b5481f;
+  --contains: #9c3d2a;
+  --traces: #c9962b;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 16px rgb(0 0 0 / 5%);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #171412;
+    --surface: #221e1b;
+    --surface-2: #2b2622;
+    --ink: #f3ece3;
+    --muted: #b3a89c;
+    --line: #3a332d;
+    --brand: #d9674f;
+    --contains: #e57a62;
+    --traces: #e0b24f;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+h1, h2, h3 { line-height: 1.2; margin: 0 0 .5em; }
+h1 { font-size: 1.35rem; }
+h2 { font-size: 1.15rem; }
+h3 { font-size: 1rem; }
+p { margin: 0 0 .75em; }
+small, .muted { color: var(--muted); }
+a { color: var(--brand); }
+
+.wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+
+/* En-tête et onglets */
+.topbar {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.topbar .wrap { display: flex; align-items: center; gap: 12px; padding-top: 10px; padding-bottom: 0; flex-wrap: wrap; }
+.logo { font-weight: 700; display: flex; align-items: center; gap: 8px; margin-right: auto; padding-bottom: 8px; }
+.logo span { color: var(--brand); }
+.tabs { display: flex; gap: 2px; overflow-x: auto; width: 100%; scrollbar-width: none; }
+.tab {
+  border: 0; background: none; padding: 10px 14px; font: inherit; color: var(--muted);
+  border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap;
+}
+.tab[aria-selected='true'] { color: var(--ink); border-bottom-color: var(--brand); font-weight: 600; }
+
+main { padding: 20px 0 80px; }
+.panel[hidden] { display: none; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 16px; box-shadow: var(--shadow); margin-bottom: 16px;
+}
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row.spread { justify-content: space-between; }
+.grid-2 { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+/* Formulaires */
+label.field { display: block; margin-bottom: 12px; font-size: .9rem; color: var(--muted); }
+label.field > input, label.field > textarea, label.field > select { margin-top: 4px; }
+input[type='text'], input[type='search'], input[type='url'], input:not([type]), textarea, select {
+  width: 100%; font: inherit; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+}
+input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font: inherit; font-weight: 600; border-radius: 10px; padding: 10px 14px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-decoration: none;
+}
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { border-color: transparent; background: none; }
+.btn.danger { color: var(--warn); }
+.btn.small { padding: 6px 10px; font-size: .9rem; }
+.btn:disabled { opacity: .5; cursor: default; }
+
+/* Pastilles d'allergènes */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px; font-size: .82rem; line-height: 1;
+  padding: 6px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2);
+  white-space: nowrap;
+}
+.chip.contains { background: color-mix(in srgb, var(--contains) 14%, transparent); border-color: var(--contains); }
+.chip.traces { background: transparent; border: 1px dashed var(--traces); color: var(--muted); }
+.chip.none { color: var(--ok); border-color: var(--ok); background: none; }
+
+/* Sélecteur à trois états : rien → contient → traces */
+.allergen-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.allergen-picker button {
+  font: inherit; font-size: .88rem; text-align: left; cursor: pointer; display: flex; gap: 6px; align-items: center;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 10px; padding: 8px 10px;
+}
+.allergen-picker button[data-state='contains'] {
+  border-color: var(--contains); background: color-mix(in srgb, var(--contains) 14%, transparent); font-weight: 600;
+}
+.allergen-picker button[data-state='traces'] { border: 1px dashed var(--traces); color: var(--muted); }
+.allergen-picker button small { margin-left: auto; font-size: .72rem; }
+
+/* Listes */
+.list { list-style: none; margin: 0; padding: 0; }
+.list > li {
+  display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--line);
+}
+.list > li:first-child { border-top: 0; }
+.list .grow { flex: 1; min-width: 0; }
+.list .title { font-weight: 600; }
+.thumb { width: 44px; height: 44px; border-radius: 8px; object-fit: contain; background: #fff; border: 1px solid var(--line); flex: none; }
+.thumb.placeholder { display: grid; place-items: center; font-size: 22px; }
+.category-title { margin: 18px 0 4px; font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.empty { text-align: center; padding: 28px 12px; color: var(--muted); }
+
+/* Fenêtres */
+dialog {
+  border: 0; border-radius: 16px; padding: 0; width: min(640px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px); background: var(--surface); color: var(--ink); box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
+}
+dialog::backdrop { background: rgb(20 15 10 / 55%); }
+dialog form, dialog .dialog-body { padding: 18px; }
+dialog header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+dialog header h2 { margin: 0; }
+dialog footer { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 16px; }
+
+.picker-list { max-height: 260px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; margin-top: 6px; }
+.picker-list label { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-top: 1px solid var(--line); cursor: pointer; }
+.picker-list label:first-child { border-top: 0; }
+.picker-list label span.grow { flex: 1; }
+.picker-list input { width: 18px; height: 18px; accent-color: var(--brand); }
+
+/* Scanner */
+.scanner { position: relative; background: #000; border-radius: 12px; overflow: hidden; aspect-ratio: 4 / 3; }
+.scanner video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.scanner .frame {
+  position: absolute; inset: 30% 12%; border: 3px solid rgb(255 255 255 / 85%); border-radius: 12px;
+  box-shadow: 0 0 0 999px rgb(0 0 0 / 35%);
+}
+.scanner .frame::after {
+  content: ''; position: absolute; left: 6%; right: 6%; top: 50%; height: 2px; background: #ff5a3c;
+  animation: scanline 1.6s ease-in-out infinite;
+}
+@keyframes scanline { 0%, 100% { transform: translateY(-28px); } 50% { transform: translateY(28px); } }
+@media (prefers-reduced-motion: reduce) { .scanner .frame::after { animation: none; } }
+.status { margin: 10px 0; min-height: 1.4em; font-size: .92rem; }
+.status.error { color: var(--warn); }
+.status.ok { color: var(--ok); }
+.off-preview { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
+.off-preview img { width: 64px; height: 64px; object-fit: contain; background: #fff; border-radius: 8px; border: 1px solid var(--line); }
+details.ingredients-text { font-size: .85rem; color: var(--muted); margin-bottom: 12px; }
+
+/* Tableau des allergènes */
+.table-scroll { overflow-x: auto; }
+table.allergen-table { border-collapse: collapse; width: 100%; font-size: .9rem; background: var(--surface); }
+.allergen-table th, .allergen-table td { border: 1px solid var(--line); padding: 6px; text-align: center; }
+.allergen-table th.dish, .allergen-table td.dish { text-align: left; min-width: 180px; }
+.allergen-table thead th { vertical-align: bottom; background: var(--surface-2); }
+.allergen-table thead th .vlabel { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; font-size: .8rem; margin: 0 auto; }
+.allergen-table thead th .icon { display: block; font-size: 1.1rem; margin-top: 4px; }
+.allergen-table tr.cat td { background: var(--surface-2); font-weight: 700; text-align: left; text-transform: uppercase; font-size: .78rem; letter-spacing: .06em; }
+.allergen-table td.yes { color: var(--contains); font-weight: 700; font-size: 1.1rem; }
+.allergen-table td.maybe { color: var(--traces); font-size: 1.05rem; }
+.sheet-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.sheet-head h2 { margin: 0; font-size: 1.4rem; }
+.legal { font-size: .78rem; color: var(--muted); margin-top: 10px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: .85rem; margin-top: 10px; }
+
+/* QR code */
+.qr-box { display: grid; gap: 16px; grid-template-columns: minmax(180px, 260px) 1fr; align-items: start; }
+@media (max-width: 640px) { .qr-box { grid-template-columns: 1fr; } }
+.qr-box .qr { background: #fff; padding: 10px; border-radius: 12px; border: 1px solid var(--line); }
+.qr svg { width: 100%; height: auto; display: block; }
+.link-out { word-break: break-all; font-size: .8rem; color: var(--muted); max-height: 5.5em; overflow: hidden; }
+.notice { background: color-mix(in srgb, var(--accent) 14%, transparent); border: 1px solid var(--accent); border-radius: 10px; padding: 10px 12px; font-size: .9rem; margin: 10px 0; }
+
+.tents { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tent {
+  border: 1px dashed #999; border-radius: 10px; padding: 14px; text-align: center; background: #fff; color: #1f1a16;
+}
+.tent .qr-small svg { width: 55%; margin: 8px auto; display: block; }
+.tent strong { display: block; font-size: 1.1rem; }
+.tent .langs { font-size: .78rem; color: #6c625a; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+  padding: 10px 16px; border-radius: 999px; font-size: .92rem; z-index: 50; box-shadow: var(--shadow);
+}
+
+.print-only { display: none; }
+
+@page { size: A4; margin: 10mm; }
+@page paysage { size: A4 landscape; margin: 8mm; }
+
+@media print {
+  :root { --bg: #fff; --surface: #fff; --surface-2: #f2f2f2; --ink: #000; --muted: #444; --line: #999; }
+  body { background: #fff; font-size: 11pt; }
+  .no-print, .topbar, .panel, dialog, .toast, main { display: none !important; }
+  body[data-print='tableau'] main,
+  body[data-print='tableau'] #panel-tableau,
+  body[data-print='qr'] #qr-tents { display: block !important; }
+  main { padding: 0; }
+  #panel-tableau .card { border: 0; box-shadow: none; padding: 0; }
+  #panel-tableau { page: paysage; }
+  .table-scroll { overflow: visible; }
+  .allergen-table { font-size: 9pt; }
+  .allergen-table th, .allergen-table td { padding: 3px 4px; }
+  .allergen-table tr { break-inside: avoid; }
+  .tent { break-inside: avoid; height: 128mm; display: flex; flex-direction: column; justify-content: center; }
+}

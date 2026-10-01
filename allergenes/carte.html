@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Allergènes de la carte</title>
+  <meta name="theme-color" content="#9c3d2a">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%BE%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .lang { display: flex; gap: 4px; }
+    .lang button { font: inherit; font-size: .85rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 4px 8px; cursor: pointer; }
+    .lang button[aria-pressed='true'] { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+    .filter button { font: inherit; font-size: .88rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 7px 11px; cursor: pointer; }
+    .filter button[aria-pressed='true'] { background: var(--contains); border-color: var(--contains); color: #fff; font-weight: 600; }
+    .dish { padding: 12px 0; border-top: 1px solid var(--line); }
+    .dish:first-of-type { border-top: 0; }
+    .dish.blocked .title { text-decoration: line-through; color: var(--muted); }
+    .dish .verdict { font-size: .85rem; font-weight: 600; margin-top: 4px; }
+    .dish .verdict.ok { color: var(--ok); }
+    .dish .verdict.no { color: var(--warn); }
+    .dish .verdict.maybe { color: var(--traces); }
+    .hero { padding: 22px 0 6px; }
+    .hero h1 { font-size: 1.6rem; margin-bottom: 2px; }
+  </style>
+</head>
+<body>
+  <main class="wrap" style="max-width:720px">
+    <div class="row spread hero">
+      <div>
+        <small id="kicker"></small>
+        <h1 id="name"></h1>
+        <small id="info"></small>
+      </div>
+      <div class="lang" id="lang"></div>
+    </div>
+    <div id="app"><p class="muted">…</p></div>
+  </main>
+  <script type="module" src="js/carte.js"></script>
+</body>
+</html>
