@@ -10,14 +10,26 @@ Outil web pour les restaurateurs : le chef saisit ses plats et leurs ingrédient
 
 Aucun compte, aucun serveur, aucune clé d’API : tout tourne dans le navigateur.
 
-## Fonctionnement
+## Fonctionnement : une carte complète en 5 minutes
+
+1. **Coller sa carte** : le chef copie le texte de son menu (site, Word, PDF) et le
+   colle. Titres de catégories (Entrées, PLATS…) et prix sont reconnus, chaque ligne
+   devient un plat. Les ingrédients peuvent suivre après « : » ou entre parenthèses.
+2. **Recettes types** : ~130 plats courants (brasserie, spécialités du Nord, pizzas,
+   burgers, desserts…) se remplissent tout seuls : « Carbonnade », « Croque-monsieur »,
+   « Tarte au sucre »… Le chef ajuste au lieu de tout taper.
+3. **Vérifier chaque plat** sur une seule page, sans fenêtres : ajout d’ingrédients au
+   clavier (Entrée ou virgule, retour arrière pour retirer), rangée des 14 allergènes
+   à toucher (une fois = contient, deux fois = peut contenir), bouton « Vérifier ».
+   Une barre de progression mène au plat suivant. Suppression annulable.
+4. **Imprimer** : liste de contrôle avant impression, tableau A4 paysage sur une page,
+   QR code et chevalets.
 
 | Onglet | Rôle |
 | --- | --- |
-| Ma carte | Nom de l’établissement, plats par catégorie (Entrées, Plats, Desserts…), sauvegarde |
-| Ingrédients | Bibliothèque d’ingrédients réutilisables, scan de code-barres |
-| Tableau | Matrice plats × 14 allergènes : ● contient, ○ peut contenir (traces) |
-| QR code | Lien et QR code de la carte client, impression des chevalets |
+| Ma carte | Saisie rapide, carte collée, vérification plat par plat |
+| Ingrédients | Corriger un ingrédient une fois pour tous les plats (ils repassent « à vérifier ») |
+| Imprimer & QR | Liste de contrôle, tableau, QR code, chevalets |
 
 - **Scan de code-barres** (EAN-13, EAN-8, UPC) avec la caméra du téléphone :
   `BarcodeDetector` natif sur Chrome/Android, sinon la bibliothèque ZXing embarquée
@@ -77,7 +89,8 @@ renseigner l’adresse publique dans l’onglet QR code.
 | --- | --- |
 | `index.html`, `js/app.js` | Outil du chef |
 | `carte.html`, `js/carte.js` | Carte client ouverte par le QR code |
-| `js/core.js` | Logique métier sans DOM : 14 allergènes, détection, Open Food Facts, encodage du lien (testé dans `tests/allergenes.test.ts`) |
+| `js/core.js` | Logique métier sans DOM : 14 allergènes, détection, lecture d’une carte collée, Open Food Facts, encodage du lien (testé dans `tests/allergenes.test.ts`) |
+| `js/presets.js` | Recettes types des plats courants |
 | `js/scanner.js` | Caméra + lecture de code-barres |
 | `vendor/` | ZXing 0.23.0 (Apache-2.0), qrcode-generator 2.0.4 (MIT) |
 
@@ -91,4 +104,5 @@ npx vitest run tests/allergenes.test.ts
   (`/r/nom-du-restaurant`) pour ne plus réimprimer les QR codes à chaque changement.
 - **Coût matière par fiche technique** : prix d’achat et grammage par ingrédient,
   coût et marge par plat.
+- Photo de la carte → texte (OCR) pour éviter même le copier-coller.
 - Comptes multi-appareils (synchronisation), plusieurs établissements, export PDF direct.

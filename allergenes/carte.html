@@ -4,32 +4,46 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Allergènes de la carte</title>
-  <meta name="theme-color" content="#9c3d2a">
+  <meta name="theme-color" content="#e4572e">
   <meta name="robots" content="noindex">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%BE%3C/text%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='26' fill='%23e4572e'/%3E%3Ctext x='50' y='70' font-size='60' text-anchor='middle'%3E%F0%9F%8C%BE%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="css/style.css">
   <style>
-    .lang { display: flex; gap: 4px; }
-    .lang button { font: inherit; font-size: .85rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 4px 8px; cursor: pointer; }
-    .lang button[aria-pressed='true'] { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
-    .filter button { font: inherit; font-size: .88rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 7px 11px; cursor: pointer; }
-    .filter button[aria-pressed='true'] { background: var(--contains); border-color: var(--contains); color: #fff; font-weight: 600; }
-    .dish { padding: 12px 0; border-top: 1px solid var(--line); }
-    .dish:first-of-type { border-top: 0; }
-    .dish.blocked .title { text-decoration: line-through; color: var(--muted); }
-    .dish .verdict { font-size: .85rem; font-weight: 600; margin-top: 4px; }
-    .dish .verdict.ok { color: var(--ok); }
-    .dish .verdict.no { color: var(--warn); }
-    .dish .verdict.maybe { color: var(--traces); }
-    .hero { padding: 22px 0 6px; }
-    .hero h1 { font-size: 1.6rem; margin-bottom: 2px; }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 26px 0 16px; }
+    .top h1 { font-size: clamp(1.6rem, 6vw, 2.2rem); margin: 4px 0 2px; }
+    .lang { display: flex; gap: 2px; padding: 3px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; flex: none; }
+    .lang button { border: 0; background: none; border-radius: 999px; padding: 5px 10px; font-size: .8rem; font-weight: 700; cursor: pointer; color: var(--muted); }
+    .lang button[aria-pressed='true'] { background: var(--ink); color: var(--bg); }
+    .filter-card { box-shadow: var(--shadow); }
+    .filter { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .filter button {
+      display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid var(--line); background: var(--surface);
+      border-radius: 999px; padding: 7px 12px; font-size: .88rem; font-weight: 600; cursor: pointer; transition: all .15s ease;
+    }
+    .filter button[aria-pressed='true'] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+    .result { margin: 12px 0 0; font-weight: 700; color: var(--ok); }
+    .cat-h { font-size: .78rem; font-weight: 800; color: var(--brand); text-transform: uppercase; letter-spacing: .08em; margin: 22px 4px 8px; }
+    .dish { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; margin-bottom: 10px; }
+    .dish .title { font-weight: 700; font-size: 1.04rem; display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+    .dish.blocked { opacity: .55; }
+    .dish.blocked .title span:first-child { text-decoration: line-through; }
+    .dish.fits { border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+    .verdict { font-size: .8rem; font-weight: 700; white-space: nowrap; padding: 3px 9px; border-radius: 999px; }
+    .verdict.ok { color: var(--ok); background: var(--ok-soft); }
+    .verdict.no { color: var(--warn); background: var(--warn-soft); }
+    .verdict.maybe { color: #8a6100; background: var(--traces-soft); }
+    .why { font-size: .85rem; color: var(--muted); margin-top: 4px; }
+    .dish .chips { margin-top: 10px; }
   </style>
 </head>
 <body>
-  <main class="wrap" style="max-width:720px">
-    <div class="row spread hero">
+  <main class="wrap" style="max-width:720px;padding-top:0">
+    <div class="top">
       <div>
-        <small id="kicker"></small>
+        <div class="kicker" id="kicker"></div>
         <h1 id="name"></h1>
         <small id="info"></small>
       </div>

@@ -1,3 +1,5 @@
+import { findPreset } from './presets.js';
+
 // Logique métier du générateur de tableau des allergènes.
 // Aucun accès au DOM ici : ce module est partagé par l'outil du chef,
 // la carte publique (QR code) et les tests unitaires.
@@ -13,12 +15,12 @@ export const ALLERGENS = [
   { id: 'oeufs', icon: '🥚', off: ['en:eggs'] },
   { id: 'poissons', icon: '🐟', off: ['en:fish'] },
   { id: 'arachides', icon: '🥜', off: ['en:peanuts'] },
-  { id: 'soja', icon: '🫘', off: ['en:soybeans'] },
+  { id: 'soja', icon: '🌱', off: ['en:soybeans'] },
   { id: 'lait', icon: '🥛', off: ['en:milk'] },
   { id: 'fruits_coque', icon: '🌰', off: ['en:nuts'] },
   { id: 'celeri', icon: '🥬', off: ['en:celery'] },
-  { id: 'moutarde', icon: '🟡', off: ['en:mustard'] },
-  { id: 'sesame', icon: '⚪', off: ['en:sesame-seeds'] },
+  { id: 'moutarde', icon: '🌭', off: ['en:mustard'] },
+  { id: 'sesame', icon: '🥯', off: ['en:sesame-seeds'] },
   { id: 'sulfites', icon: '🍷', off: ['en:sulphur-dioxide-and-sulphites'] },
   { id: 'lupin', icon: '🌼', off: ['en:lupin'] },
   { id: 'mollusques', icon: '🦪', off: ['en:molluscs'] },
@@ -113,7 +115,7 @@ const RULES = {
     ],
     exclude: [
       /farines? de (riz|mais|sarrasin|chataigne|pois chiches?|lentilles?|coco|amande|noisette|teff|manioc|quinoa|lupin)/,
-      /semoule de mais/, /nouilles de riz/, /pates? (d'amandes?|de fruits?|a tartiner)/, /sans gluten/,
+      /semoule de mais/, /nouilles de riz/, /pates? (d'amandes?|de fruits?|a tartiner|de curry|d'arachide)/, /sans gluten/,
       /ble noir/, /pain de (mie )?sans gluten/,
     ],
   },
@@ -462,10 +464,128 @@ export function sanitizeState(raw) {
         ingredientIds: (Array.isArray(d.ingredientIds) ? d.ingredientIds : []).map(String),
         extraAllergens: ids(d.extraAllergens),
         extraTraces: ids(d.extraTraces),
+        checked: d.checked === true,
       })),
     settings: { publicBase: String(raw.settings?.publicBase ?? '') },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Saisie rapide : une ligne de texte ou une carte entière collée d'un coup
+
+const CATEGORY_LINE =
+  /^(les |nos )?(entrees?|plats?( principaux| du jour)?|desserts?|boissons?|fromages?|menus?( enfants?)?|accompagnements?|pizzas?|burgers?|salades?|starters?|mains?|aperitifs?|vins?|bieres?|planches?|a partager|suggestions?|formules?|grillades?|poissons?|viandes?|pates?|sandwichs?|tapas|desserts? maison|douceurs|specialites( du nord| regionales)?)\s*:?$/;
+const PRICE = /\s*[-–—:|]?\s*(\d+([.,]\d{1,2})?\s*(€|eur|euros?)|€\s*\d+([.,]\d{1,2})?)\s*$/i;
+
+function capitalize(text) {
+  const t = text.trim();
+  return t ? t[0].toLocaleUpperCase('fr') + t.slice(1) : t;
+}
+
+/** Découpe « crème, lardons et œufs » en ingrédients, sans couper les parenthèses. */
+export function splitIngredients(text) {
+  const parts = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of String(text ?? '')) {
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth = Math.max(0, depth - 1);
+    if (depth === 0 && (ch === ',' || ch === ';' || ch === '+' || ch === '/')) {
+      parts.push(current);
+      current = '';
+    } else current += ch;
+  }
+  parts.push(current);
+  return parts
+    .flatMap((p) => (/\(/.test(p) ? [p] : p.split(/\s+et\s+|\s+&\s+/i)))
+    .map((p) => capitalize(p.replace(/^[\s.·•\-–]+|[\s.]+$/g, '')))
+    .filter((p) => p.length > 1);
+}
+
+/**
+ * Lit une carte collée (une ligne par plat). Formats acceptés :
+ *   « Entrées » (titre de catégorie), « Welsh - 14 € », « Carbonnade : bœuf, bière »,
+ *   « Tarte au sucre (farine, cassonade, crème) ». Sans ingrédients, la recette type
+ *   du plat est proposée quand elle existe.
+ * @returns {{ name: string, category: string, ingredients: string[], preset: boolean }[]}
+ */
+export function parseMenuText(text, defaultCategory = 'Plats') {
+  const dishes = [];
+  let category = null;
+  for (const raw of String(text ?? '').split(/\r?\n/)) {
+    let line = raw.replace(/^[\s•*·\-–—>]+/, '').replace(/\t+/g, ' ').trim();
+    line = line.replace(PRICE, '').trim();
+    if (!line || /^[\d\s.,€]+$/.test(line)) continue;
+    const n = normalize(line).replace(/[!.]+$/, '');
+    const isHeading =
+      CATEGORY_LINE.test(n) || (/:$/.test(line) && !line.slice(0, -1).includes(',')) || (line === line.toUpperCase() && /[A-Z]/.test(line) && line.length <= 30 && !line.includes(','));
+    if (isHeading) {
+      category = capitalize(line.replace(/:$/, '').toLocaleLowerCase('fr'));
+      continue;
+    }
+    let name = line;
+    let ingredientsText = '';
+    const paren = line.match(/^([^(]+)\((.+)\)\s*$/);
+    const sep = line.match(/^(.+?)\s*(?:\s:\s?|:\s|\s[-–—]\s|\s\|\s)(.+)$/);
+    if (paren) [, name, ingredientsText] = paren;
+    else if (sep) [, name, ingredientsText] = sep;
+    name = capitalize(name.replace(/[:\-–—\s]+$/, ''));
+    let ingredients = splitIngredients(ingredientsText);
+    const preset = findPreset(name);
+    const usePreset = !ingredients.length && !!preset;
+    if (usePreset) ingredients = preset.ingredients;
+    dishes.push({
+      name,
+      category: category ?? preset?.category ?? defaultCategory,
+      ingredients,
+      preset: usePreset,
+    });
+  }
+  return dishes;
+}
+
+/** Retrouve un ingrédient par son nom, ou le crée avec ses allergènes devinés. */
+export function findOrCreateIngredient(state, name) {
+  const key = normalize(name);
+  const existing = state.ingredients.find((i) => normalize(i.name) === key);
+  if (existing) return existing;
+  const { contains, traces } = detectAllergens(name);
+  const item = {
+    id: uid(),
+    name: capitalize(name),
+    brand: '',
+    barcode: '',
+    allergens: contains,
+    traces,
+    ingredientsText: '',
+    image: '',
+    source: 'auto',
+  };
+  state.ingredients.push(item);
+  return item;
+}
+
+/** Ajoute un plat et ses ingrédients (créés au besoin) à la carte. */
+export function addDish(state, { name, category = 'Plats', ingredients = [] }) {
+  const ingredientIds = [];
+  for (const ingName of ingredients) {
+    const id = findOrCreateIngredient(state, ingName).id;
+    if (!ingredientIds.includes(id)) ingredientIds.push(id);
+  }
+  const dish = {
+    id: uid(),
+    name: capitalize(name),
+    category: category || 'Plats',
+    ingredientIds,
+    extraAllergens: [],
+    extraTraces: [],
+    checked: false,
+  };
+  state.dishes.push(dish);
+  return dish;
+}
+
+export { findPreset };
 
 export function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -517,7 +637,7 @@ export function demoState() {
   const salade = ing('Salade verte', []);
   const vinaigrette = ing('Vinaigrette maison', ['moutarde', 'sulfites']);
   const dish = (name, category, ingredientIds) =>
-    state.dishes.push({ id: uid(), name, category, ingredientIds, extraAllergens: [], extraTraces: [] });
+    state.dishes.push({ id: uid(), name, category, ingredientIds, extraAllergens: [], extraTraces: [], checked: false });
   dish('Salade au Maroilles chaud', 'Entrées', [salade, maroilles, vinaigrette, pain]);
   dish('Welsh traditionnel', 'Plats', [pain, cheddar, biere, moutarde, jambon, oeuf, frites]);
   dish('Carbonnade flamande', 'Plats', [boeuf, biere, paindepices, cassonade, moutarde, oignon, frites]);

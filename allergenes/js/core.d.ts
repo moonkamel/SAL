@@ -26,6 +26,7 @@ export interface Dish {
   ingredientIds: string[];
   extraAllergens: AllergenId[];
   extraTraces: AllergenId[];
+  checked: boolean;
 }
 
 export interface State {
@@ -80,3 +81,11 @@ export function emptyState(): State;
 export function sanitizeState(raw: unknown): State;
 export function uid(): string;
 export function demoState(): State;
+
+export interface ParsedDish { name: string; category: string; ingredients: string[]; preset: boolean }
+export interface Preset { key: string; category: string; ingredients: string[] }
+export function splitIngredients(text: string): string[];
+export function parseMenuText(text: string, defaultCategory?: string): ParsedDish[];
+export function findPreset(dishName: string): Preset | null;
+export function findOrCreateIngredient(state: State, name: string): Ingredient;
+export function addDish(state: State, dish: { name: string; category?: string; ingredients?: string[] }): Dish;

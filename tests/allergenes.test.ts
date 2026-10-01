@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ALLERGEN_IDS,
+  addDish,
+  emptyState,
+  findPreset,
+  parseMenuText,
+  splitIngredients,
   buildPublicMenu,
   decodeMenu,
   demoState,
@@ -142,5 +147,62 @@ describe('sanitizeState', () => {
     expect(state.ingredients[0]?.allergens).toEqual(['gluten']);
     expect(state.dishes[0]?.extraAllergens).toEqual([]);
     expect(sanitizeState(null).dishes).toEqual([]);
+  });
+});
+
+describe('saisie rapide', () => {
+  it('propose la recette type d’un plat connu', () => {
+    expect(findPreset('Carbonnade flamande maison')?.category).toBe('Plats');
+    expect(findPreset('Tartare de saumon')?.key).toBe('tartare de saumon');
+    expect(findPreset('Crêpes au sucre')?.key).toBe('crepe');
+    expect(findPreset('Plat inventé du chef')).toBeNull();
+  });
+
+  it('découpe une liste d’ingrédients sans casser les parenthèses', () => {
+    expect(splitIngredients('crème, lardons et œufs ; béchamel (lait, farine)')).toEqual([
+      'Crème', 'Lardons', 'Œufs', 'Béchamel (lait, farine)',
+    ]);
+  });
+
+  it('lit une carte collée : catégories, prix, ingrédients et recettes types', () => {
+    const dishes = parseMenuText(`ENTRÉES
+- Salade César  12€
+PLATS
+Welsh traditionnel - 16 €
+Carbonnade : joues de bœuf, bière, pain d'épices et moutarde
+Tarte au Maroilles (pâte brisée, maroilles, crème)
+Desserts :
+Merveilleux
+Plat mystère 9,50 €`);
+    expect(dishes.map((d) => [d.name, d.category, d.preset])).toEqual([
+      ['Salade César', 'Entrées', true],
+      ['Welsh traditionnel', 'Plats', true],
+      ['Carbonnade', 'Plats', false],
+      ['Tarte au Maroilles', 'Plats', false],
+      ['Merveilleux', 'Desserts', true],
+      ['Plat mystère', 'Desserts', false],
+    ]);
+    expect(dishes[2]?.ingredients).toEqual(['Joues de bœuf', 'Bière', "Pain d'épices", 'Moutarde']);
+    expect(dishes[5]?.ingredients).toEqual([]);
+  });
+
+  it('réutilise les ingrédients déjà connus en ajoutant un plat', () => {
+    const state = emptyState();
+    addDish(state, { name: 'Welsh', ingredients: ['Cheddar', 'Bière'] });
+    const second = addDish(state, { name: 'Carbonnade', ingredients: ['bière', 'Moutarde'] });
+    expect(state.ingredients.map((i) => i.name)).toEqual(['Cheddar', 'Bière', 'Moutarde']);
+    expect(second.ingredientIds).toHaveLength(2);
+    expect(dishAllergens(second, new Map(state.ingredients.map((i) => [i.id, i]))).contains).toEqual([
+      'gluten', 'moutarde',
+    ]);
+  });
+
+  it('ne dépasse pas les capacités du détecteur sur les recettes types', () => {
+    // Chaque recette type doit produire au moins un allergène quand on s’y attend.
+    const welsh = findPreset('welsh')!;
+    const state = emptyState();
+    const dish = addDish(state, { name: 'Welsh', ingredients: welsh.ingredients });
+    const { contains } = dishAllergens(dish, new Map(state.ingredients.map((i) => [i.id, i])));
+    expect(contains).toEqual(['gluten', 'oeufs', 'lait', 'moutarde']);
   });
 });

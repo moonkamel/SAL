@@ -9,6 +9,9 @@ const T = {
     filter: 'Je ne peux pas manger :',
     clear: 'Tout effacer',
     ok: '✓ Sans vos allergènes',
+    okS: '✓ OK pour vous',
+    noS: '✕ Déconseillé',
+    maybeS: '⚠ Traces',
     no: 'Contient',
     maybe: 'Peut contenir (traces)',
     none: 'Aucun des 14 allergènes',
@@ -23,6 +26,9 @@ const T = {
     filter: 'I can’t eat:',
     clear: 'Clear',
     ok: '✓ Free from your allergens',
+    okS: '✓ OK for you',
+    noS: '✕ Not suitable',
+    maybeS: '⚠ Traces',
     no: 'Contains',
     maybe: 'May contain (traces)',
     none: 'None of the 14 allergens',
@@ -37,6 +43,9 @@ const T = {
     filter: 'Ik mag niet eten:',
     clear: 'Wissen',
     ok: '✓ Zonder uw allergenen',
+    okS: '✓ OK voor u',
+    noS: '✕ Afgeraden',
+    maybeS: '⚠ Sporen',
     no: 'Bevat',
     maybe: 'Kan sporen bevatten',
     none: 'Geen van de 14 allergenen',
@@ -104,35 +113,43 @@ function render() {
   }
   let list = '';
   for (const [cat, dishes] of groups) {
-    list += `<h3 class="category-title">${esc(cat)}</h3>`;
+    list += `<div class="cat-h">${esc(cat)}</div>`;
     for (const dish of dishes) {
       const hits = dish.contains.filter((id) => avoid.has(id));
       const maybe = dish.traces.filter((id) => avoid.has(id));
-      if (!hits.length && !maybe.length) fits += 1;
+      const fitsDish = !hits.length && !maybe.length;
+      if (fitsDish) fits += 1;
       const chips =
         dish.contains.map((id) => `<span class="chip contains">${icon(id)} ${esc(allergenLabel(id, lang))}</span>`).join('') +
         dish.traces.map((id) => `<span class="chip traces" title="${esc(t.maybe)}">${icon(id)} ${esc(allergenLabel(id, lang))} ?</span>`).join('');
       let verdict = '';
+      let why = '';
       if (avoid.size) {
-        if (hits.length) verdict = `<div class="verdict no">✕ ${esc(t.no)}${t.sep}${hits.map((id) => esc(allergenLabel(id, lang))).join(', ')}</div>`;
-        else if (maybe.length) verdict = `<div class="verdict maybe">⚠ ${esc(t.maybe)}${t.sep}${maybe.map((id) => esc(allergenLabel(id, lang))).join(', ')}</div>`;
-        else verdict = `<div class="verdict ok">${esc(t.ok)}</div>`;
+        const names = (ids) => ids.map((id) => esc(allergenLabel(id, lang))).join(', ');
+        if (hits.length) {
+          verdict = `<span class="verdict no">${esc(t.noS)}</span>`;
+          why = `<div class="why">${esc(t.no)}${t.sep}${names(hits)}</div>`;
+        } else if (maybe.length) {
+          verdict = `<span class="verdict maybe">${esc(t.maybeS)}</span>`;
+          why = `<div class="why">${esc(t.maybe)}${t.sep}${names(maybe)}</div>`;
+        } else verdict = `<span class="verdict ok">${esc(t.okS)}</span>`;
       }
-      list += `<div class="dish ${hits.length ? 'blocked' : ''}">
-        <div class="title">${esc(dish.name)}</div>
-        ${verdict}
-        <div class="chips" style="margin-top:6px">${chips || `<span class="chip none">✓ ${esc(t.none)}</span>`}</div>
+      const cls = !avoid.size ? '' : hits.length ? 'blocked' : fitsDish ? 'fits' : '';
+      list += `<div class="dish ${cls}">
+        <div class="title"><span>${esc(dish.name)}</span>${verdict}</div>
+        ${why}
+        <div class="chips">${chips || `<span class="chip none">✓ ${esc(t.none)}</span>`}</div>
       </div>`;
     }
   }
 
   $('#app').innerHTML = `
-    <div class="card">
+    <div class="card filter-card">
       <div class="row spread"><strong>${esc(t.filter)}</strong>${avoid.size ? `<button class="btn small ghost" data-clear>${esc(t.clear)}</button>` : ''}</div>
-      <div class="chips filter" style="margin-top:10px">${filter}</div>
-      ${avoid.size ? `<p class="status ok" style="margin-bottom:0">${esc(t.fits(fits, menu.dishes.length))}</p>` : ''}
+      <div class="filter">${filter}</div>
+      ${avoid.size ? `<p class="result">${esc(t.fits(fits, menu.dishes.length))}</p>` : ''}
     </div>
-    <div class="card">${list}</div>
+    ${list}
     <p class="legal">${esc(t.legal)}</p>`;
 }
 

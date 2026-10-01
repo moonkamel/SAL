@@ -1,20 +1,24 @@
-// Outil du chef : carte, ingrédients, tableau imprimable et QR code.
+// Outil du chef : saisie rapide de la carte, vérification plat par plat,
+// tableau imprimable et QR code.
 
 import {
   ALLERGENS,
+  addDish,
   allergenLabel,
   buildPublicMenu,
   demoState,
   detectAllergens,
-  dishAllergens,
   emptyState,
   encodeMenu,
+  findOrCreateIngredient,
   ingredientFromOffProduct,
   isValidBarcode,
   normalize,
   offProductUrl,
+  parseMenuText,
   sanitizeState,
   sortIds,
+  splitIngredients,
   uid,
 } from './core.js';
 import { startScanner } from './scanner.js';
@@ -22,13 +26,18 @@ import qrcode from '../vendor/qrcode.mjs';
 
 const STORAGE_KEY = 'allergenes:v1';
 const TAB_KEY = 'allergenes:tab';
+const CATEGORY_ORDER = ['Entrées', 'Plats', 'Desserts', 'Boissons'];
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const label = (id) => allergenLabel(id, 'fr');
+const iconOf = (id) => ALLERGENS.find((a) => a.id === id)?.icon ?? '';
+const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
 
 let state = loadState();
+let manualMode = false;
 
 function loadState() {
   try {
@@ -39,179 +48,836 @@ function loadState() {
   }
 }
 
-function save() {
+/** Range les plats par catégorie (Entrées, Plats, Desserts…) puis enregistre. */
+function persist() {
+  const firstSeen = new Map();
+  state.dishes.forEach((d, i) => {
+    const cat = d.category || 'Plats';
+    if (!firstSeen.has(cat)) firstSeen.set(cat, i);
+  });
+  const rank = (cat) => {
+    const i = CATEGORY_ORDER.indexOf(cat || 'Plats');
+    return i >= 0 ? i : 100 + firstSeen.get(cat || 'Plats');
+  };
+  state.dishes = state.dishes
+    .map((d, i) => [d, i])
+    .sort(([a, i], [b, j]) => rank(a.category) - rank(b.category) || i - j)
+    .map(([d]) => d);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    toast('Impossible d’enregistrer sur cet appareil : exportez vos données.');
+    toast('Impossible d’enregistrer sur cet appareil : exportez vos données (menu ⋯).');
   }
-  render();
 }
 
-function toast(message) {
+function toast(message, { action, onAction, duration = 3800 } = {}) {
   $('.toast')?.remove();
   const el = document.createElement('div');
   el.className = 'toast';
   el.setAttribute('role', 'status');
-  el.textContent = message;
+  el.innerHTML = `<span>${esc(message)}</span>${action ? `<button>${esc(action)}</button>` : ''}`;
+  if (action) {
+    $('button', el).onclick = () => {
+      el.remove();
+      onAction();
+    };
+  }
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 3200);
+  setTimeout(() => el.remove(), action ? 6000 : duration);
 }
 
 const ingredientsById = () => new Map(state.ingredients.map((i) => [i.id, i]));
-const label = (id) => allergenLabel(id, 'fr');
-const iconOf = (id) => ALLERGENS.find((a) => a.id === id)?.icon ?? '';
 
-function chipsHtml({ contains, traces }, { emptyText = 'Aucun allergène' } = {}) {
-  if (!contains.length && !traces.length) return `<span class="chip none">✓ ${esc(emptyText)}</span>`;
-  return (
-    contains.map((id) => `<span class="chip contains">${iconOf(id)} ${esc(label(id))}</span>`).join('') +
-    traces.map((id) => `<span class="chip traces" title="Peut contenir">${iconOf(id)} ${esc(label(id))} ?</span>`).join('')
-  );
-}
-
-/** Regroupe les plats par catégorie, dans l'ordre de la carte. */
 function groupedDishes() {
   const groups = new Map();
   for (const dish of state.dishes) {
-    const cat = dish.category.trim() || 'Autres';
+    const cat = dish.category.trim() || 'Plats';
     if (!groups.has(cat)) groups.set(cat, []);
     groups.get(cat).push(dish);
   }
   return groups;
 }
 
-// ---------------------------------------------------------------------------
-// Sélecteur d'allergènes à trois états : rien → contient → peut contenir
+function categories() {
+  return [...new Set([...CATEGORY_ORDER, ...state.dishes.map((d) => d.category).filter(Boolean)])];
+}
 
-function allergenPicker(container, onChange) {
-  const states = new Map();
-  container.innerHTML = ALLERGENS.map(
-    (a) => `<button type="button" data-id="${a.id}" data-state="none"><span>${a.icon}</span>${esc(label(a.id))}<small></small></button>`,
-  ).join('');
-  const paint = () => {
-    for (const btn of $$('button', container)) {
-      const s = states.get(btn.dataset.id) ?? 'none';
-      btn.dataset.state = s;
-      btn.setAttribute('aria-pressed', s === 'none' ? 'false' : 'true');
-      $('small', btn).textContent = s === 'contains' ? 'contient' : s === 'traces' ? 'traces' : '';
-    }
-  };
-  container.onclick = (e) => {
-    const btn = e.target.closest('button[data-id]');
-    if (!btn) return;
-    const next = { none: 'contains', contains: 'traces', traces: 'none' }[states.get(btn.dataset.id) ?? 'none'];
-    states.set(btn.dataset.id, next);
-    paint();
-    onChange?.();
-  };
+/** Détail des allergènes d'un plat : d'où vient chacun (ingrédient ou ajout manuel). */
+function dishDetail(dish, byId = ingredientsById()) {
+  const ingContains = new Map();
+  const ingTraces = new Map();
+  for (const ingId of dish.ingredientIds) {
+    const ing = byId.get(ingId);
+    if (!ing) continue;
+    for (const id of ing.allergens) ingContains.set(id, [...(ingContains.get(id) ?? []), ing.name]);
+    for (const id of ing.traces) ingTraces.set(id, [...(ingTraces.get(id) ?? []), ing.name]);
+  }
+  const cells = {};
+  for (const { id } of ALLERGENS) {
+    const contains = ingContains.has(id) || dish.extraAllergens.includes(id);
+    const traces = !contains && (ingTraces.has(id) || dish.extraTraces.includes(id));
+    cells[id] = {
+      state: contains ? 'contains' : traces ? 'traces' : 'none',
+      locked: ingContains.has(id),
+      from: ingContains.get(id) ?? ingTraces.get(id) ?? [],
+      extra: (contains && !ingContains.has(id)) || (traces && !ingTraces.has(id)),
+    };
+  }
   return {
-    set(contains = [], traces = []) {
-      states.clear();
-      traces.forEach((id) => states.set(id, 'traces'));
-      contains.forEach((id) => states.set(id, 'contains'));
-      paint();
-    },
-    get() {
-      const pick = (s) => sortIds([...states].filter(([, v]) => v === s).map(([k]) => k));
-      return { contains: pick('contains'), traces: pick('traces') };
-    },
+    cells,
+    contains: sortIds(ALLERGENS.filter((a) => cells[a.id].state === 'contains').map((a) => a.id)),
+    traces: sortIds(ALLERGENS.filter((a) => cells[a.id].state === 'traces').map((a) => a.id)),
   };
+}
+
+function stripHtml(cells) {
+  return ALLERGENS.map((a) => {
+    const c = cells[a.id];
+    const what = c.state === 'contains' ? 'contient' : c.state === 'traces' ? 'peut contenir' : 'absent';
+    const from = c.from.length ? ` (${c.from.join(', ')})` : '';
+    return `<button type="button" class="al" data-al="${a.id}" data-state="${c.state}" data-extra="${c.extra ? 1 : 0}"
+      title="${esc(label(a.id))} : ${what}${esc(from)}" aria-label="${esc(label(a.id))} : ${what}"><span>${a.icon}</span></button>`;
+  }).join('');
+}
+
+function summaryHtml(contains, traces) {
+  if (!contains.length && !traces.length) return '<span class="none">✓ Aucun des 14 allergènes</span>';
+  const parts = [];
+  if (contains.length) parts.push(`Contient <b>${contains.map((id) => esc(label(id))).join(', ')}</b>`);
+  if (traces.length) parts.push(`peut contenir <i>${traces.map((id) => esc(label(id))).join(', ')}</i>`);
+  return parts.join(' · ');
 }
 
 // ---------------------------------------------------------------------------
 // Onglets
 
 function showTab(name) {
-  for (const tab of $$('.tab')) tab.setAttribute('aria-selected', String(tab.dataset.tab === name));
+  for (const tab of $$('.step')) tab.setAttribute('aria-selected', String(tab.dataset.tab === name));
   for (const panel of $$('.panel')) panel.hidden = panel.id !== `panel-${name}`;
   try {
     localStorage.setItem(TAB_KEY, name);
   } catch {
     // Préférence non essentielle.
   }
-  if (name === 'qr') renderQr();
+  if (name === 'ingredients') renderIngredients();
+  if (name === 'imprimer') renderOutputs();
+  window.scrollTo({ top: 0 });
 }
-
-for (const tab of $$('.tab')) tab.addEventListener('click', () => showTab(tab.dataset.tab));
+for (const tab of $$('.step')) tab.addEventListener('click', () => showTab(tab.dataset.tab));
+const currentTab = () => $('.step[aria-selected="true"]')?.dataset.tab;
 
 // ---------------------------------------------------------------------------
-// Rendu
+// Rendu général
 
 function render() {
   $('#restaurant-title').textContent = state.restaurant.name ? `· ${state.restaurant.name}` : '';
-  renderDishes();
-  renderIngredients();
-  renderSheet();
-  if (!$('#panel-qr').hidden) renderQr();
+  renderProgress();
+  const empty = !state.dishes.length && !manualMode;
+  $('#onboarding').hidden = !empty;
+  $('#editor').hidden = empty;
+  if (!empty) renderDishes();
+  if (currentTab() === 'ingredients') renderIngredients();
+  if (currentTab() === 'imprimer') renderOutputs();
+  $('#ing-options').innerHTML = state.ingredients.map((i) => `<option value="${esc(i.name)}">`).join('');
+}
+
+function renderProgress() {
+  const total = state.dishes.length;
+  const done = state.dishes.filter((d) => d.checked).length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  $('#progress-pill').hidden = !total;
+  $('#progress-ring').style.setProperty('--p', pct);
+  $('#progress-text').textContent = `${done}/${total}`;
+  const banner = $('#progress-banner');
+  banner.hidden = !total;
+  banner.classList.toggle('done', total > 0 && done === total);
+  $('#progress-bar').style.width = `${pct}%`;
+  $('#progress-banner-text').textContent =
+    done === total ? '🎉 Tous les plats sont vérifiés' : `${done} plat${done > 1 ? 's' : ''} vérifié${done > 1 ? 's' : ''} sur ${total}`;
+  $('#next-unchecked').textContent = done === total ? 'Imprimer →' : 'Vérifier le suivant →';
+}
+
+// ---------------------------------------------------------------------------
+// 1. Ma carte
+
+function dishCardHtml(dish, byId) {
+  const { cells, contains, traces } = dishDetail(dish, byId);
+  const ings = dish.ingredientIds
+    .map((id) => byId.get(id))
+    .filter(Boolean)
+    .map(
+      (i) => `<span class="ing"><span class="nm" data-goto-ing="${esc(i.id)}" title="Modifier cet ingrédient">${esc(i.name)}</span>${
+        i.allergens.length ? `<span class="ic">${i.allergens.map(iconOf).join('')}</span>` : ''
+      }<button type="button" data-remove-ing="${esc(i.id)}" aria-label="Retirer ${esc(i.name)}">×</button></span>`,
+    )
+    .join('');
+  const options = categories()
+    .map((c) => `<option ${c === (dish.category || 'Plats') ? 'selected' : ''}>${esc(c)}</option>`)
+    .join('');
+  return `<article class="dcard ${dish.checked ? 'checked' : ''}" data-dish="${esc(dish.id)}">
+    <div class="dcard-head">
+      <input class="dcard-name" value="${esc(dish.name)}" aria-label="Nom du plat" data-field="name">
+      <select class="cat-select" data-field="category" aria-label="Catégorie">${options}<option value="__new">+ Nouvelle…</option></select>
+      <button type="button" class="check-btn" data-check aria-pressed="${dish.checked}"><span class="box">✓</span><span class="lbl">${dish.checked ? 'Vérifié' : 'Vérifier'}</span></button>
+      <button type="button" class="btn ghost icon small" data-delete aria-label="Supprimer le plat" title="Supprimer">🗑️</button>
+    </div>
+    <div class="ings">
+      ${ings}
+      <span class="ing-add">
+        <input data-add-ing placeholder="${dish.ingredientIds.length ? '+ ingrédient' : 'Ingrédients : crème, lardons, œufs…'}" list="ing-options" aria-label="Ajouter un ingrédient" enterkeyhint="done">
+        <button type="button" class="btn small" data-scan-dish title="Scanner un produit pour ce plat" aria-label="Scanner un produit">📷</button>
+      </span>
+    </div>
+    <div class="astrip">${stripHtml(cells)}</div>
+    <div class="al-summary">${summaryHtml(contains, traces)}</div>
+  </article>`;
 }
 
 function renderDishes() {
-  const list = $('#dish-list');
-  if (!state.dishes.length) {
-    list.innerHTML = `<div class="empty"><p>Aucun plat pour l’instant.</p><p>Ajoutez vos plats avec leurs ingrédients, ou chargez l’exemple de brasserie lilloise en bas de page.</p></div>`;
-    return;
-  }
   const byId = ingredientsById();
   let html = '';
   for (const [cat, dishes] of groupedDishes()) {
-    html += `<h3 class="category-title">${esc(cat)}</h3><ul class="list">`;
-    for (const dish of dishes) {
-      const names = dish.ingredientIds.map((id) => byId.get(id)?.name).filter(Boolean);
-      html += `<li>
-        <div class="grow">
-          <div class="title">${esc(dish.name)}</div>
-          <small>${names.length ? esc(names.join(', ')) : 'Aucun ingrédient renseigné'}</small>
-          <div class="chips" style="margin-top:6px">${chipsHtml(dishAllergens(dish, byId))}</div>
-        </div>
-        <button class="btn small" data-edit-dish="${esc(dish.id)}">Modifier</button>
-      </li>`;
-    }
-    html += '</ul>';
+    html += `<div class="section-title"><h2>${esc(cat)}</h2><small class="muted">${plural(dishes.length, 'plat')}</small></div>`;
+    html += dishes.map((d) => dishCardHtml(d, byId)).join('');
   }
-  list.innerHTML = html;
+  $('#dish-list').innerHTML =
+    html || `<div class="empty">Tapez le nom d’un plat ci-dessus, ou collez votre carte entière.</div>`;
 }
+
+/** Re-dessine une seule carte de plat, en gardant le curseur où il était. */
+function refreshDish(dishId, { focusAdd = false } = {}) {
+  const card = $(`.dcard[data-dish="${CSS.escape(dishId)}"]`);
+  const dish = state.dishes.find((d) => d.id === dishId);
+  if (!card || !dish) return render();
+  const hadFocus = focusAdd || document.activeElement?.matches?.('[data-add-ing]') && card.contains(document.activeElement);
+  const tpl = document.createElement('template');
+  tpl.innerHTML = dishCardHtml(dish, ingredientsById());
+  const next = tpl.content.firstElementChild;
+  card.replaceWith(next);
+  if (hadFocus) $('[data-add-ing]', next).focus();
+  renderProgress();
+  $('#ing-options').innerHTML = state.ingredients.map((i) => `<option value="${esc(i.name)}">`).join('');
+}
+
+const dishOf = (el) => state.dishes.find((d) => d.id === el.closest('.dcard')?.dataset.dish);
+
+function addIngredientsToDish(dish, text) {
+  const names = splitIngredients(text);
+  for (const name of names) {
+    const ing = findOrCreateIngredient(state, name);
+    if (!dish.ingredientIds.includes(ing.id)) dish.ingredientIds.push(ing.id);
+  }
+  if (names.length) dish.checked = false;
+  return names.length;
+}
+
+$('#dish-list').addEventListener('click', (e) => {
+  const dish = dishOf(e.target);
+  if (!dish) return;
+
+  const al = e.target.closest('[data-al]');
+  if (al) {
+    const id = al.dataset.al;
+    const cell = dishDetail(dish).cells[id];
+    if (cell.locked) {
+      toast(`${label(id)} vient de : ${cell.from.join(', ')}. Retirez l’ingrédient ou corrigez-le dans « Ingrédients ».`);
+      return;
+    }
+    // Ajout manuel : rien → contient → peut contenir → rien
+    if (dish.extraAllergens.includes(id)) {
+      dish.extraAllergens = dish.extraAllergens.filter((x) => x !== id);
+      if (!cell.from.length) dish.extraTraces = sortIds([...dish.extraTraces, id]);
+    } else if (dish.extraTraces.includes(id)) {
+      dish.extraTraces = dish.extraTraces.filter((x) => x !== id);
+    } else {
+      dish.extraAllergens = sortIds([...dish.extraAllergens, id]);
+    }
+    dish.checked = false;
+    persist();
+    refreshDish(dish.id);
+    return;
+  }
+
+  if (e.target.closest('[data-check]')) {
+    dish.checked = !dish.checked;
+    persist();
+    refreshDish(dish.id);
+    if (dish.checked && state.dishes.every((d) => d.checked)) {
+      toast('🎉 Carte vérifiée ! Il ne reste plus qu’à imprimer.', { action: 'Imprimer', onAction: () => showTab('imprimer') });
+    }
+    return;
+  }
+
+  const remove = e.target.closest('[data-remove-ing]');
+  if (remove) {
+    dish.ingredientIds = dish.ingredientIds.filter((id) => id !== remove.dataset.removeIng);
+    dish.checked = false;
+    persist();
+    refreshDish(dish.id, { focusAdd: true });
+    return;
+  }
+
+  const goto = e.target.closest('[data-goto-ing]');
+  if (goto) {
+    const ing = state.ingredients.find((i) => i.id === goto.dataset.gotoIng);
+    showTab('ingredients');
+    $('#ingredient-search').value = ing?.name ?? '';
+    renderIngredients();
+    return;
+  }
+
+  if (e.target.closest('[data-scan-dish]')) {
+    openScanner({ dishId: dish.id });
+    return;
+  }
+
+  if (e.target.closest('[data-delete]')) {
+    const index = state.dishes.indexOf(dish);
+    state.dishes.splice(index, 1);
+    persist();
+    render();
+    toast(`« ${dish.name} » supprimé`, {
+      action: 'Annuler',
+      onAction: () => {
+        state.dishes.splice(index, 0, dish);
+        persist();
+        render();
+      },
+    });
+  }
+});
+
+$('#dish-list').addEventListener('keydown', (e) => {
+  if (e.target.matches('[data-add-ing]') && (e.key === 'Enter' || e.key === ',')) {
+    e.preventDefault();
+    const dish = dishOf(e.target);
+    if (dish && addIngredientsToDish(dish, e.target.value)) {
+      persist();
+      refreshDish(dish.id, { focusAdd: true });
+    }
+  } else if (e.target.matches('[data-add-ing]') && e.key === 'Backspace' && !e.target.value) {
+    // Retour arrière dans un champ vide : retire le dernier ingrédient.
+    const dish = dishOf(e.target);
+    if (dish?.ingredientIds.length) {
+      dish.ingredientIds.pop();
+      dish.checked = false;
+      persist();
+      refreshDish(dish.id, { focusAdd: true });
+    }
+  } else if (e.target.matches('.dcard-name') && e.key === 'Enter') {
+    e.target.blur();
+  }
+});
+
+$('#dish-list').addEventListener('change', (e) => {
+  const dish = dishOf(e.target);
+  if (!dish) return;
+  if (e.target.matches('[data-add-ing]')) {
+    // Choix dans la liste de suggestions (sans touche Entrée).
+    if (state.ingredients.some((i) => i.name === e.target.value) && addIngredientsToDish(dish, e.target.value)) {
+      persist();
+      refreshDish(dish.id, { focusAdd: true });
+    }
+    return;
+  }
+  if (e.target.dataset.field === 'name') {
+    const name = e.target.value.trim();
+    if (name) dish.name = name;
+    else e.target.value = dish.name;
+    persist();
+  } else if (e.target.dataset.field === 'category') {
+    let cat = e.target.value;
+    if (cat === '__new') cat = (prompt('Nom de la nouvelle catégorie (ex. Formules, Boissons) :') || '').trim();
+    if (cat) dish.category = cat;
+    persist();
+    render();
+    $(`.dcard[data-dish="${CSS.escape(dish.id)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+});
+
+// Saisie rapide d'un plat
+const composer = $('#composer-name');
+composer.addEventListener('input', () => {
+  const text = composer.value.trim();
+  const hint = $('#composer-hint');
+  if (!text) {
+    hint.innerHTML = 'Astuce : tapez le nom d’un plat connu, ses ingrédients se remplissent tout seuls. Ou « Nom : ingrédient, ingrédient ».';
+    return;
+  }
+  const [parsed] = parseMenuText(text, lastCategory());
+  if (!parsed) return;
+  const icons = sortIds(parsed.ingredients.flatMap((i) => detectAllergens(i).contains)).map(iconOf).join(' ');
+  if (parsed.preset) {
+    hint.innerHTML = `<span class="found">✓ Recette type reconnue</span> · ${plural(parsed.ingredients.length, 'ingrédient')} ${icons} · Entrée pour ajouter`;
+  } else if (parsed.ingredients.length) {
+    hint.innerHTML = `${plural(parsed.ingredients.length, 'ingrédient')} ${icons} · Entrée pour ajouter`;
+  } else {
+    hint.textContent = 'Plat inconnu : vous ajouterez ses ingrédients juste après. Entrée pour ajouter.';
+  }
+});
+
+function lastCategory() {
+  return state.dishes.at(-1)?.category || 'Plats';
+}
+
+$('#composer').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const [parsed] = parseMenuText(composer.value, lastCategory());
+  if (!parsed) {
+    composer.focus();
+    return;
+  }
+  const dish = addDish(state, parsed);
+  persist();
+  composer.value = '';
+  composer.dispatchEvent(new Event('input'));
+  render();
+  const card = $(`.dcard[data-dish="${CSS.escape(dish.id)}"]`);
+  card?.classList.add('flash');
+  if (!dish.ingredientIds.length) {
+    card?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    $('[data-add-ing]', card)?.focus({ preventScroll: true });
+  } else {
+    composer.focus();
+    toast(`« ${dish.name} » ajouté avec ${plural(dish.ingredientIds.length, 'ingrédient')}`, {
+      action: 'Voir',
+      onAction: () => card?.scrollIntoView({ block: 'center', behavior: 'smooth' }),
+    });
+  }
+});
+
+$('#next-unchecked').addEventListener('click', () => {
+  const next = state.dishes.find((d) => !d.checked);
+  if (!next) return showTab('imprimer');
+  const card = $(`.dcard[data-dish="${CSS.escape(next.id)}"]`);
+  card?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  card?.classList.remove('flash');
+  void card?.offsetWidth;
+  card?.classList.add('flash');
+});
+$('#progress-pill').addEventListener('click', () => {
+  showTab('carte');
+  $('#next-unchecked').click();
+});
+
+// Accueil
+$('#onboarding-name').addEventListener('input', (e) => {
+  state.restaurant.name = e.target.value;
+  persist();
+  $('#restaurant-title').textContent = state.restaurant.name ? `· ${state.restaurant.name}` : '';
+});
+
+document.addEventListener('click', (e) => {
+  const action = e.target.closest('[data-action]')?.dataset.action;
+  if (action === 'paste') openPaste();
+  if (action === 'scan') openScanner();
+  if (action === 'demo') loadDemo();
+  if (action === 'manual') {
+    manualMode = true;
+    render();
+    composer.focus();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Coller une carte entière
+
+const pasteDialog = $('#paste-dialog');
+const pasteText = $('#paste-text');
+let pasted = [];
+
+function openPaste() {
+  pasteText.value = '';
+  updatePastePreview();
+  pasteDialog.showModal();
+  pasteText.focus();
+}
+
+function updatePastePreview() {
+  pasted = parseMenuText(pasteText.value, 'Plats');
+  const cats = new Set(pasted.map((d) => d.category));
+  const presets = pasted.filter((d) => d.preset).length;
+  const withIngredients = pasted.filter((d) => d.ingredients.length).length;
+  $('#paste-save').disabled = !pasted.length;
+  $('#paste-save').textContent = pasted.length ? `Ajouter ${plural(pasted.length, 'plat')}` : 'Ajouter les plats';
+  $('#paste-summary').className = `status ${pasted.length ? 'ok' : ''}`;
+  $('#paste-summary').textContent = pasted.length
+    ? `${plural(pasted.length, 'plat')} · ${plural(cats.size, 'catégorie')} · ${withIngredients} avec ingrédients${presets ? ` (dont ${presets} recette${presets > 1 ? 's' : ''} type)` : ''}`
+    : '';
+  const preview = $('#paste-preview');
+  preview.hidden = !pasted.length;
+  let html = '';
+  let cat = null;
+  for (const d of pasted) {
+    if (d.category !== cat) {
+      cat = d.category;
+      html += `<div class="cat">${esc(cat)}</div>`;
+    }
+    const icons = sortIds(d.ingredients.flatMap((i) => detectAllergens(i).contains)).map(iconOf).join(' ');
+    html += `<div class="pp"><span>${esc(d.name)}</span><span>${icons || (d.ingredients.length ? '✓' : '<small class="muted">à compléter</small>')}</span></div>`;
+  }
+  preview.innerHTML = html;
+}
+pasteText.addEventListener('input', updatePastePreview);
+
+$('#paste-form').addEventListener('submit', (e) => {
+  if (e.submitter?.value !== 'save' || !pasted.length) return;
+  for (const d of pasted) addDish(state, d);
+  persist();
+  manualMode = true;
+  showTab('carte');
+  render();
+  const missing = pasted.filter((d) => !d.ingredients.length).length;
+  toast(
+    `${plural(pasted.length, 'plat')} ajouté${pasted.length > 1 ? 's' : ''}.${missing ? ` ${missing} à compléter.` : ''} Vérifiez-les un par un.`,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// 2. Ingrédients
 
 function renderIngredients() {
   const list = $('#ingredient-list');
   const query = normalize($('#ingredient-search').value);
+  const usage = new Map();
+  for (const d of state.dishes) for (const id of d.ingredientIds) usage.set(id, [...(usage.get(id) ?? []), d.name]);
   const items = state.ingredients
     .filter((i) => !query || normalize(`${i.name} ${i.brand} ${i.barcode}`).includes(query))
     .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
   if (!items.length) {
-    list.innerHTML = `<div class="empty">${state.ingredients.length ? 'Aucun résultat.' : 'Aucun ingrédient. Scannez un produit ou ajoutez-en un.'}</div>`;
+    list.innerHTML = `<div class="empty">${state.ingredients.length ? 'Aucun résultat.' : 'Les ingrédients de vos plats apparaîtront ici.'}</div>`;
     return;
   }
-  const usage = new Map();
-  for (const d of state.dishes) for (const id of d.ingredientIds) usage.set(id, (usage.get(id) ?? 0) + 1);
-  list.innerHTML = `<ul class="list">${items
+  list.innerHTML = items
     .map((i) => {
-      const used = usage.get(i.id) ?? 0;
-      const thumb = i.image
-        ? `<img class="thumb" src="${esc(i.image)}" alt="" loading="lazy">`
-        : `<span class="thumb placeholder">${i.barcode ? '🥫' : '🥕'}</span>`;
-      return `<li>
+      const cells = Object.fromEntries(
+        ALLERGENS.map((a) => [
+          a.id,
+          { state: i.allergens.includes(a.id) ? 'contains' : i.traces.includes(a.id) ? 'traces' : 'none', from: [], extra: false },
+        ]),
+      );
+      const used = usage.get(i.id) ?? [];
+      const thumb = i.image ? `<img class="thumb" src="${esc(i.image)}" alt="" loading="lazy">` : `<span class="thumb">${i.barcode ? '🥫' : '🥕'}</span>`;
+      const tag = i.source === 'openfoodfacts' ? '<span class="tag off">Open Food Facts</span>' : i.source === 'auto' ? '<span class="tag auto">deviné</span>' : '';
+      return `<div class="lib-row" data-ing="${esc(i.id)}">
         ${thumb}
-        <div class="grow">
-          <div class="title">${esc(i.name)}${i.brand ? ` <small>· ${esc(i.brand)}</small>` : ''}</div>
-          <small>${used ? `Dans ${used} plat${used > 1 ? 's' : ''}` : 'Utilisé dans aucun plat'}${i.source === 'openfoodfacts' ? ' · Open Food Facts' : ''}</small>
-          <div class="chips" style="margin-top:6px">${chipsHtml({ contains: i.allergens, traces: i.traces })}</div>
+        <div style="min-width:0">
+          <input class="lib-name" value="${esc(i.name)}" aria-label="Nom de l’ingrédient">
+          <div class="row" style="gap:6px;margin-top:2px">${tag}<small title="${esc(used.join(', '))}">${used.length ? `dans ${plural(used.length, 'plat')}` : 'inutilisé'}${i.brand ? ` · ${esc(i.brand)}` : ''}</small></div>
         </div>
-        <button class="btn small" data-edit-ingredient="${esc(i.id)}">Modifier</button>
-      </li>`;
+        <button class="btn ghost icon small" data-delete-ing aria-label="Supprimer l’ingrédient" title="Supprimer">🗑️</button>
+        <div class="astrip">${stripHtml(cells)}</div>
+      </div>`;
     })
-    .join('')}</ul>`;
+    .join('');
 }
+
+$('#ingredient-search').addEventListener('input', renderIngredients);
+const ingOf = (el) => state.ingredients.find((i) => i.id === el.closest('.lib-row')?.dataset.ing);
+
+/** Un ingrédient change : les plats qui l'utilisent sont à revérifier. */
+function uncheckDishesUsing(ingId) {
+  let n = 0;
+  for (const d of state.dishes) {
+    if (d.ingredientIds.includes(ingId) && d.checked) {
+      d.checked = false;
+      n += 1;
+    }
+  }
+  return n;
+}
+
+$('#ingredient-list').addEventListener('click', (e) => {
+  const ing = ingOf(e.target);
+  if (!ing) return;
+  const al = e.target.closest('[data-al]');
+  if (al) {
+    const id = al.dataset.al;
+    if (ing.allergens.includes(id)) {
+      ing.allergens = ing.allergens.filter((x) => x !== id);
+      ing.traces = sortIds([...ing.traces, id]);
+    } else if (ing.traces.includes(id)) {
+      ing.traces = ing.traces.filter((x) => x !== id);
+    } else {
+      ing.allergens = sortIds([...ing.allergens, id]);
+    }
+    if (ing.source === 'auto') ing.source = 'manuel';
+    const n = uncheckDishesUsing(ing.id);
+    persist();
+    renderIngredients();
+    renderProgress();
+    if (n) toast(`${plural(n, 'plat')} à revérifier`);
+    return;
+  }
+  if (e.target.closest('[data-delete-ing]')) {
+    const used = state.dishes.filter((d) => d.ingredientIds.includes(ing.id));
+    const snapshot = used.map((d) => [d, [...d.ingredientIds]]);
+    const index = state.ingredients.indexOf(ing);
+    state.ingredients.splice(index, 1);
+    for (const d of used) d.ingredientIds = d.ingredientIds.filter((id) => id !== ing.id);
+    persist();
+    render();
+    renderIngredients();
+    toast(`« ${ing.name} » supprimé${used.length ? ` de ${plural(used.length, 'plat')}` : ''}`, {
+      action: 'Annuler',
+      onAction: () => {
+        state.ingredients.splice(index, 0, ing);
+        for (const [d, ids] of snapshot) d.ingredientIds = ids;
+        persist();
+        render();
+        renderIngredients();
+      },
+    });
+  }
+});
+
+$('#ingredient-list').addEventListener('change', (e) => {
+  const ing = ingOf(e.target);
+  if (!ing || !e.target.matches('.lib-name')) return;
+  const name = e.target.value.trim();
+  if (!name) {
+    e.target.value = ing.name;
+    return;
+  }
+  ing.name = name;
+  persist();
+  render();
+});
+
+// ---------------------------------------------------------------------------
+// Scanner + Open Food Facts
+
+const scanDialog = $('#scan-dialog');
+const scanStatus = $('#scan-status');
+let stopScan = null;
+let scanContext = {};
+let scanBusy = false;
+
+function setScanStatus(text, kind = '') {
+  scanStatus.textContent = text;
+  scanStatus.className = `status ${kind}`;
+}
+
+async function openScanner(context = {}) {
+  scanContext = context;
+  scanBusy = false;
+  $('#scan-manual').code.value = '';
+  setScanStatus('Ouverture de la caméra…');
+  scanDialog.showModal();
+  try {
+    stopScan = await startScanner($('#scan-video'), {
+      onCode: handleBarcode,
+      onStatus: (t) => setScanStatus(t),
+    });
+    if (!scanDialog.open) stopScan();
+  } catch (err) {
+    setScanStatus(
+      err?.name === 'NotAllowedError'
+        ? 'Accès à la caméra refusé : autorisez-le dans le navigateur, ou tapez le code ci-dessous.'
+        : err?.message || 'Caméra indisponible : tapez le code ci-dessous.',
+      'error',
+    );
+  }
+}
+
+function closeScanner() {
+  stopScan?.();
+  stopScan = null;
+  if (scanDialog.open) scanDialog.close();
+}
+scanDialog.addEventListener('close', () => {
+  stopScan?.();
+  stopScan = null;
+});
+$('#scan-close').addEventListener('click', closeScanner);
+
+async function fetchOffProduct(code) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const res = await fetch(offProductUrl(code), { signal: controller.signal });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Open Food Facts a répondu ${res.status}`);
+    const data = await res.json();
+    return data.status === 1 && data.product ? data.product : null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function attachToDish(ing, dishId) {
+  const dish = state.dishes.find((d) => d.id === dishId);
+  if (!dish) return false;
+  if (!dish.ingredientIds.includes(ing.id)) dish.ingredientIds.push(ing.id);
+  dish.checked = false;
+  return true;
+}
+
+async function handleBarcode(code) {
+  if (scanBusy) return;
+  scanBusy = true;
+  stopScan?.();
+  const context = scanContext;
+  const known = state.ingredients.find((i) => i.barcode === code);
+  if (known) {
+    closeScanner();
+    if (context.dishId && attachToDish(known, context.dishId)) {
+      persist();
+      refreshDish(context.dishId);
+      toast(`« ${known.name} » ajouté au plat`);
+    } else {
+      toast(`Déjà dans vos ingrédients : ${known.name}`);
+      showTab('ingredients');
+      $('#ingredient-search').value = known.name;
+      renderIngredients();
+    }
+    return;
+  }
+  setScanStatus(`Code ${code} — recherche sur Open Food Facts…`);
+  let draft;
+  try {
+    const product = await fetchOffProduct(code);
+    draft = product
+      ? ingredientFromOffProduct(product, code)
+      : { name: '', barcode: code, allergens: [], traces: [], source: 'manuel', notice: 'Produit inconnu d’Open Food Facts : tapez son nom et touchez ses allergènes (voir l’étiquette).' };
+  } catch {
+    draft = { name: '', barcode: code, allergens: [], traces: [], source: 'manuel', notice: 'Open Food Facts injoignable : tapez le nom et les allergènes depuis l’étiquette.' };
+  }
+  closeScanner();
+  openProduct(draft, context);
+}
+
+$('#scan-manual').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const code = e.target.code.value.replace(/\s/g, '');
+  if (!isValidBarcode(code)) {
+    setScanStatus('Code invalide : vérifiez les chiffres sous le code-barres.', 'error');
+    return;
+  }
+  scanBusy = false;
+  handleBarcode(code);
+});
+
+// Fiche du produit scanné
+const productDialog = $('#product-dialog');
+const productForm = $('#product-form');
+let productDraft = null;
+let productContext = {};
+
+function renderProductStrip() {
+  const cells = Object.fromEntries(
+    ALLERGENS.map((a) => [
+      a.id,
+      { state: productDraft.allergens.includes(a.id) ? 'contains' : productDraft.traces.includes(a.id) ? 'traces' : 'none', from: [], extra: false },
+    ]),
+  );
+  $('#product-strip').innerHTML = stripHtml(cells);
+  $('#product-summary').innerHTML = summaryHtml(productDraft.allergens, productDraft.traces);
+}
+
+function openProduct(draft, context) {
+  productDraft = { ...draft, allergens: [...draft.allergens], traces: [...draft.traces] };
+  productContext = context;
+  const dish = state.dishes.find((d) => d.id === context.dishId);
+  $('#product-title').textContent = draft.source === 'openfoodfacts' ? 'Produit trouvé' : 'Nouveau produit';
+  $('#product-head').innerHTML = `${draft.image ? `<img src="${esc(draft.image)}" alt="">` : '<span class="thumb">🥫</span>'}
+    <div><strong>${esc(draft.name || `Code ${draft.barcode}`)}</strong>${draft.brand ? `<br><small>${esc(draft.brand)}</small>` : ''}
+    <div class="status ${draft.notice ? 'error' : 'ok'}" style="margin:4px 0 0">${esc(draft.notice || 'Allergènes repris d’Open Food Facts : vérifiez avec l’étiquette.')}</div></div>`;
+  productForm.name.value = draft.name;
+  $('#product-save').textContent = dish ? `Ajouter à « ${dish.name} »` : 'Ajouter à mes ingrédients';
+  const text = $('#product-text');
+  text.hidden = !draft.ingredientsText;
+  $('p', text).textContent = draft.ingredientsText ?? '';
+  renderProductStrip();
+  productDialog.showModal();
+  if (!draft.name) productForm.name.focus();
+}
+
+$('#product-strip').addEventListener('click', (e) => {
+  const id = e.target.closest('[data-al]')?.dataset.al;
+  if (!id) return;
+  if (productDraft.allergens.includes(id)) {
+    productDraft.allergens = productDraft.allergens.filter((x) => x !== id);
+    productDraft.traces = sortIds([...productDraft.traces, id]);
+  } else if (productDraft.traces.includes(id)) {
+    productDraft.traces = productDraft.traces.filter((x) => x !== id);
+  } else {
+    productDraft.allergens = sortIds([...productDraft.allergens, id]);
+  }
+  renderProductStrip();
+});
+
+productForm.addEventListener('submit', (e) => {
+  if (e.submitter?.value !== 'save') return;
+  const name = productForm.name.value.trim();
+  if (!name) return;
+  const ing = {
+    id: uid(),
+    name,
+    brand: productDraft.brand ?? '',
+    barcode: productDraft.barcode ?? '',
+    allergens: productDraft.allergens,
+    traces: productDraft.traces,
+    ingredientsText: productDraft.ingredientsText ?? '',
+    image: productDraft.image ?? '',
+    source: productDraft.source === 'openfoodfacts' ? 'openfoodfacts' : 'manuel',
+  };
+  state.ingredients.push(ing);
+  const attached = productContext.dishId && attachToDish(ing, productContext.dishId);
+  persist();
+  if (attached) refreshDish(productContext.dishId);
+  else render();
+  if (currentTab() === 'ingredients') renderIngredients();
+  toast(attached ? `« ${name} » ajouté au plat` : `« ${name} » ajouté à vos ingrédients`);
+});
+
+// ---------------------------------------------------------------------------
+// 3. Imprimer & QR
 
 function formatDate(d = new Date()) {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+function renderOutputs() {
+  renderChecklist();
+  renderSheet();
+  renderMiniSheet();
+  renderQr();
+}
+
+function renderChecklist() {
+  const total = state.dishes.length;
+  const unchecked = state.dishes.filter((d) => !d.checked).length;
+  const emptyDishes = state.dishes.filter((d) => !d.ingredientIds.length && !d.extraAllergens.length).length;
+  const items = [
+    [!!state.restaurant.name.trim(), state.restaurant.name.trim() ? `Restaurant : ${esc(state.restaurant.name)}` : 'Nom du restaurant manquant', '<button class="link" data-open-menu>Ajouter</button>'],
+    [total > 0, total ? `${plural(total, 'plat')} sur la carte` : 'Aucun plat', '<button class="link" data-goto="carte">Ajouter des plats</button>'],
+    [total > 0 && !unchecked, unchecked ? `${plural(unchecked, 'plat')} à vérifier` : 'Tous les plats sont vérifiés', '<button class="link" data-goto="verify">Vérifier</button>'],
+  ];
+  if (emptyDishes) items.push([false, `${plural(emptyDishes, 'plat')} sans ingrédient`, '<button class="link" data-goto="verify">Compléter</button>']);
+  $('#checklist').innerHTML = items
+    .map(([ok, text, action]) => `<li class="${ok ? 'ok' : 'todo'}"><span class="dot">${ok ? '✓' : '!'}</span><span>${text}</span>${ok ? '' : action}</li>`)
+    .join('');
+}
+
+$('#checklist').addEventListener('click', (e) => {
+  if (e.target.closest('[data-open-menu]')) openMenu();
+  const goto = e.target.closest('[data-goto]')?.dataset.goto;
+  if (goto === 'carte') {
+    showTab('carte');
+    composer.focus();
+  }
+  if (goto === 'verify') {
+    showTab('carte');
+    $('#next-unchecked').click();
+  }
+});
+
 function renderSheet() {
-  const sheet = $('#allergen-sheet');
+  const sheet = $('#sheet');
   const showTraces = $('#show-traces').checked;
   if (!state.dishes.length) {
-    sheet.innerHTML = `<div class="empty">Ajoutez des plats dans « Ma carte » pour générer le tableau.</div>`;
+    sheet.innerHTML = `<div class="empty">Le tableau apparaîtra ici dès que vous aurez ajouté des plats.</div>`;
     return;
   }
   const byId = ingredientsById();
@@ -222,10 +888,10 @@ function renderSheet() {
   for (const [cat, dishes] of groupedDishes()) {
     body += `<tr class="cat"><td colspan="${ALLERGENS.length + 1}">${esc(cat)}</td></tr>`;
     for (const dish of dishes) {
-      const { contains, traces } = dishAllergens(dish, byId);
+      const { contains, traces } = dishDetail(dish, byId);
       body += `<tr><td class="dish">${esc(dish.name)}</td>${ALLERGENS.map((a) => {
-        if (contains.includes(a.id)) return `<td class="yes" aria-label="contient">●</td>`;
-        if (showTraces && traces.includes(a.id)) return `<td class="maybe" aria-label="peut contenir">○</td>`;
+        if (contains.includes(a.id)) return `<td class="yes" aria-label="contient"></td>`;
+        if (showTraces && traces.includes(a.id)) return `<td class="maybe" aria-label="peut contenir"></td>`;
         return '<td></td>';
       }).join('')}</tr>`;
     }
@@ -233,7 +899,7 @@ function renderSheet() {
   sheet.innerHTML = `
     <div class="sheet-head">
       <div>
-        <small>Information allergènes</small>
+        <div class="kicker">Information allergènes</div>
         <h2>${esc(state.restaurant.name || 'Notre carte')}</h2>
         ${state.restaurant.info ? `<small>${esc(state.restaurant.info)}</small>` : ''}
       </div>
@@ -246,8 +912,8 @@ function renderSheet() {
       </table>
     </div>
     <div class="legend">
-      <span><strong style="color:var(--contains)">●</strong> Contient</span>
-      ${showTraces ? '<span><strong style="color:var(--traces)">○</strong> Peut contenir (traces, contamination croisée)</span>' : ''}
+      <span><span class="d"></span>Contient</span>
+      ${showTraces ? '<span><span class="o"></span>Peut contenir (traces, contamination croisée)</span>' : ''}
     </div>
     <p class="legal">
       Liste des 14 allergènes à déclaration obligatoire — règlement (UE) n° 1169/2011, annexe II ;
@@ -256,8 +922,14 @@ function renderSheet() {
     </p>`;
 }
 
-// ---------------------------------------------------------------------------
-// QR code
+function renderMiniSheet() {
+  const byId = ingredientsById();
+  const rows = state.dishes.slice(0, 9).map((d) => {
+    const { contains } = dishDetail(d, byId);
+    return `<i style="background:#e9e9e9"></i>${ALLERGENS.map((a) => `<i class="${contains.includes(a.id) ? 'y' : ''}"></i>`).join('')}`;
+  });
+  $('#mini-sheet').innerHTML = `<div class="mini-sheet"><div class="l" style="width:45%;height:7px;background:#ddd"></div><div class="l" style="width:25%"></div><div class="g" style="margin-top:6px">${rows.join('') || '<i></i>'.repeat(15)}</div></div>`;
+}
 
 function publicBase() {
   const custom = state.settings.publicBase.trim();
@@ -283,415 +955,56 @@ function qrSvg(text, cellSize = 4) {
 }
 
 let qrToken = 0;
+let currentLink = '';
 async function renderQr() {
   const token = ++qrToken;
-  const warning = $('#qr-warning');
   const box = $('#qr-code');
   if (!state.dishes.length) {
-    box.innerHTML = '';
-    warning.innerHTML = `<div class="notice">Ajoutez d’abord des plats dans « Ma carte ».</div>`;
+    box.innerHTML = '<div class="empty" style="padding:30px 0">Ajoutez des plats</div>';
     $('#link-out').textContent = '';
+    $('#qr-warning').innerHTML = '';
     $('#qr-tents').innerHTML = '';
+    currentLink = '';
     return;
   }
   const url = `${publicBase()}carte.html#${await encodeMenu(buildPublicMenu(state))}`;
   if (token !== qrToken) return;
+  currentLink = url;
 
   const local = !state.settings.publicBase && (location.protocol === 'file:' || /^(localhost|127\.|10\.|192\.168\.|\[::1\])/.test(location.hostname));
-  warning.innerHTML = local
-    ? `<div class="notice">L’outil tourne sur cet ordinateur (${esc(location.host || 'fichier local')}) : les téléphones des clients ne pourront pas ouvrir ce lien. Mettez l’outil en ligne (voir le README) ou indiquez son adresse publique ci-dessous.</div>`
+  $('#qr-warning').innerHTML = local
+    ? `<div class="notice">⚠️ L’outil tourne sur cet ordinateur : les téléphones de vos clients ne pourront pas ouvrir ce QR code. Mettez l’outil en ligne (voir le guide), puis réimprimez.</div>`
     : '';
-
   const svg = qrSvg(url);
-  box.innerHTML = svg ?? `<p class="status error">Carte trop longue pour un QR code. Raccourcissez les noms de plats.</p>`;
+  box.innerHTML = svg ?? '<p class="status error">Carte trop longue pour un QR code : raccourcissez les noms de plats.</p>';
   $('#link-out').textContent = url;
   $('#open-link').href = url;
-  $('#copy-link').onclick = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      toast('Lien copié');
-    } catch {
-      toast('Copie impossible : sélectionnez le lien à la main.');
-    }
-  };
   const name = esc(state.restaurant.name || '');
   const tent = svg
     ? `<div class="tent">
+        <div class="mark">🌾</div>
         <strong>${name}</strong>
-        <div style="font-size:1.4rem;margin-top:6px">🌾 Allergènes</div>
+        <div class="title">Allergènes</div>
         <div class="langs">Allergens · Allergenen</div>
         <div class="qr-small">${qrSvg(url, 6)}</div>
-        <div>Scannez pour voir les allergènes de nos plats</div>
+        <div style="font-weight:600">Scannez pour voir les allergènes de nos plats</div>
         <div class="langs">Scan to check allergens · Scan voor allergenen</div>
-        <div class="langs" style="margin-top:6px">Tableau complet disponible sur demande — ${formatDate()}</div>
+        <div class="langs" style="margin-top:3mm">Tableau complet disponible sur demande · ${formatDate()}</div>
       </div>`
     : '';
   $('#qr-tents').innerHTML = `<div class="tents">${tent.repeat(4)}</div>`;
 }
 
-// ---------------------------------------------------------------------------
-// Fenêtre ingrédient
-
-const ingredientDialog = $('#ingredient-dialog');
-const ingredientForm = $('#ingredient-form');
-let ingredientDraft = null;
-let ingredientOnSaved = null;
-let pickerTouched = false;
-const ingredientPicker = allergenPicker($('#ingredient-allergens'), () => {
-  pickerTouched = true;
-});
-
-function openIngredient(draft, onSaved = null) {
-  ingredientDraft = draft;
-  ingredientOnSaved = onSaved;
-  const isNew = !state.ingredients.some((i) => i.id === draft.id);
-  pickerTouched = !isNew || draft.source === 'openfoodfacts';
-  $('#ingredient-dialog-title').textContent = isNew ? 'Nouvel ingrédient' : 'Modifier l’ingrédient';
-  ingredientForm.name.value = draft.name ?? '';
-  ingredientForm.brand.value = draft.brand ?? '';
-  ingredientForm.barcode.value = draft.barcode ?? '';
-  ingredientPicker.set(draft.allergens ?? [], draft.traces ?? []);
-  $('#ingredient-delete').hidden = isNew;
-
-  const preview = $('#ingredient-preview');
-  preview.hidden = !draft.image && !draft.notice;
-  preview.innerHTML = `${draft.image ? `<img src="${esc(draft.image)}" alt="">` : ''}<div class="status ${draft.notice ? 'error' : 'ok'}">${esc(
-    draft.notice || (isNew ? 'Trouvé sur Open Food Facts : vérifiez les allergènes avec l’étiquette.' : ''),
-  )}</div>`;
-  const text = $('#ingredient-text');
-  text.hidden = !draft.ingredientsText;
-  $('p', text).textContent = draft.ingredientsText ?? '';
-  ingredientDialog.showModal();
-  if (!draft.name) ingredientForm.name.focus();
-}
-
-ingredientForm.name.addEventListener('input', () => {
-  if (pickerTouched) return;
-  const { contains, traces } = detectAllergens(ingredientForm.name.value);
-  ingredientPicker.set(contains, traces);
-});
-
-ingredientForm.addEventListener('submit', (e) => {
-  if (e.submitter?.value !== 'save') return;
-  const name = ingredientForm.name.value.trim();
-  if (!name) return;
-  const { contains, traces } = ingredientPicker.get();
-  const existing = state.ingredients.find((i) => i.id === ingredientDraft.id);
-  const item = {
-    id: ingredientDraft.id ?? uid(),
-    name,
-    brand: ingredientForm.brand.value.trim(),
-    barcode: ingredientForm.barcode.value.trim(),
-    allergens: contains,
-    traces,
-    ingredientsText: ingredientDraft.ingredientsText ?? '',
-    image: ingredientDraft.image ?? '',
-    source: ingredientDraft.source ?? 'manuel',
-  };
-  if (existing) Object.assign(existing, item);
-  else state.ingredients.push(item);
-  save();
-  ingredientOnSaved?.(item);
-  toast(`« ${name} » enregistré`);
-});
-
-$('#ingredient-delete').addEventListener('click', () => {
-  const ing = state.ingredients.find((i) => i.id === ingredientDraft?.id);
-  if (!ing) return;
-  const used = state.dishes.filter((d) => d.ingredientIds.includes(ing.id));
-  const msg = used.length
-    ? `Supprimer « ${ing.name} » ? Il sera retiré de ${used.length} plat(s) : ${used.map((d) => d.name).join(', ')}.`
-    : `Supprimer « ${ing.name} » ?`;
-  if (!confirm(msg)) return;
-  state.ingredients = state.ingredients.filter((i) => i.id !== ing.id);
-  for (const d of used) d.ingredientIds = d.ingredientIds.filter((id) => id !== ing.id);
-  ingredientDialog.close();
-  save();
-});
-
-// ---------------------------------------------------------------------------
-// Scanner + Open Food Facts
-
-const scanDialog = $('#scan-dialog');
-const scanStatus = $('#scan-status');
-let stopScan = null;
-let scanOnSaved = null;
-let scanBusy = false;
-
-function setScanStatus(text, kind = '') {
-  scanStatus.textContent = text;
-  scanStatus.className = `status ${kind}`;
-}
-
-async function openScanner(onSaved = null) {
-  scanOnSaved = onSaved;
-  scanBusy = false;
-  $('#scan-manual').code.value = '';
-  setScanStatus('Ouverture de la caméra…');
-  scanDialog.showModal();
+$('#copy-link').addEventListener('click', async () => {
+  if (!currentLink) return;
   try {
-    stopScan = await startScanner($('#scan-video'), {
-      onCode: handleBarcode,
-      onStatus: (t) => setScanStatus(t),
-    });
-    if (!scanDialog.open) stopScan();
-  } catch (err) {
-    const denied = err?.name === 'NotAllowedError';
-    setScanStatus(
-      denied ? 'Accès à la caméra refusé : autorisez-le dans le navigateur, ou tapez le code ci-dessous.' : err?.message || 'Caméra indisponible : tapez le code ci-dessous.',
-      'error',
-    );
-  }
-}
-
-function closeScanner() {
-  stopScan?.();
-  stopScan = null;
-  if (scanDialog.open) scanDialog.close();
-}
-
-scanDialog.addEventListener('close', () => {
-  stopScan?.();
-  stopScan = null;
-});
-$('#scan-close').addEventListener('click', closeScanner);
-
-async function fetchOffProduct(code) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
-  try {
-    const res = await fetch(offProductUrl(code), { signal: controller.signal });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`Open Food Facts a répondu ${res.status}`);
-    const data = await res.json();
-    return data.status === 1 && data.product ? data.product : null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function handleBarcode(code) {
-  if (scanBusy) return;
-  scanBusy = true;
-  stopScan?.();
-  const onSaved = scanOnSaved;
-  const known = state.ingredients.find((i) => i.barcode === code);
-  if (known) {
-    closeScanner();
-    toast(`Déjà dans vos ingrédients : ${known.name}`);
-    openIngredient({ ...known }, onSaved);
-    return;
-  }
-  setScanStatus(`Code ${code} — recherche sur Open Food Facts…`);
-  let draft;
-  try {
-    const product = await fetchOffProduct(code);
-    draft = product
-      ? { id: uid(), ...ingredientFromOffProduct(product, code) }
-      : { id: uid(), name: '', barcode: code, allergens: [], traces: [], source: 'manuel', notice: `Produit ${code} inconnu d’Open Food Facts : saisissez son nom et ses allergènes depuis l’étiquette.` };
+    await navigator.clipboard.writeText(currentLink);
+    toast('Lien copié');
   } catch {
-    draft = { id: uid(), name: '', barcode: code, allergens: [], traces: [], source: 'manuel', notice: 'Open Food Facts injoignable (connexion ?) : saisissez le produit depuis l’étiquette.' };
-  }
-  closeScanner();
-  openIngredient(draft, onSaved);
-}
-
-$('#scan-manual').addEventListener('submit', (e) => {
-  e.preventDefault();
-  const code = e.target.code.value.replace(/\s/g, '');
-  if (!isValidBarcode(code)) {
-    setScanStatus('Code invalide : vérifiez les chiffres sous le code-barres.', 'error');
-    return;
-  }
-  scanBusy = false;
-  handleBarcode(code);
-});
-
-// ---------------------------------------------------------------------------
-// Fenêtre plat
-
-const dishDialog = $('#dish-dialog');
-const dishForm = $('#dish-form');
-let dishDraft = null;
-const dishExtra = allergenPicker($('#dish-extra'), () => renderDishComputed());
-
-function openDish(dish = null) {
-  const isNew = !dish;
-  dishDraft = {
-    id: dish?.id ?? null,
-    selected: new Set(dish?.ingredientIds ?? []),
-  };
-  $('#dish-dialog-title').textContent = isNew ? 'Nouveau plat' : 'Modifier le plat';
-  dishForm.name.value = dish?.name ?? '';
-  const lastCategory = state.dishes.at(-1)?.category;
-  dishForm.category.value = dish?.category ?? lastCategory ?? 'Plats';
-  dishExtra.set(dish?.extraAllergens ?? [], dish?.extraTraces ?? []);
-  $('#dish-delete').hidden = isNew;
-  $('#dish-ingredient-search').value = '';
-  const cats = new Set(['Entrées', 'Plats', 'Desserts', 'Boissons', ...state.dishes.map((d) => d.category).filter(Boolean)]);
-  $('#category-options').innerHTML = [...cats].map((c) => `<option value="${esc(c)}">`).join('');
-  renderDishPicker();
-  dishDialog.showModal();
-  if (isNew) dishForm.name.focus();
-}
-
-function renderDishPicker() {
-  const raw = $('#dish-ingredient-search').value.trim();
-  const query = normalize(raw);
-  const sorted = [...state.ingredients].sort((a, b) => {
-    const sa = dishDraft.selected.has(a.id) ? 0 : 1;
-    const sb = dishDraft.selected.has(b.id) ? 0 : 1;
-    return sa - sb || a.name.localeCompare(b.name, 'fr');
-  });
-  const items = sorted.filter((i) => !query || normalize(`${i.name} ${i.brand}`).includes(query));
-  const exact = state.ingredients.some((i) => normalize(i.name) === query);
-  let html = '';
-  if (raw && !exact) {
-    const guess = detectAllergens(raw);
-    html += `<label data-create="1"><span>➕</span><span class="grow">Créer « ${esc(raw)} »</span><span class="chips">${chipsHtml(guess)}</span></label>`;
-  }
-  html += items
-    .map(
-      (i) => `<label><input type="checkbox" data-ing="${esc(i.id)}" ${dishDraft.selected.has(i.id) ? 'checked' : ''}>
-        <span class="grow">${esc(i.name)}${i.brand ? ` <small>· ${esc(i.brand)}</small>` : ''}</span>
-        <small>${i.allergens.map(iconOf).join(' ')}</small></label>`,
-    )
-    .join('');
-  if (!html) html = `<div class="empty" style="padding:14px">Tapez un ingrédient (ex. « crème fraîche ») pour le créer.</div>`;
-  $('#dish-ingredient-picker').innerHTML = html;
-  renderDishComputed();
-}
-
-function renderDishComputed() {
-  const extra = dishExtra.get();
-  const result = dishAllergens(
-    { ingredientIds: [...dishDraft.selected], extraAllergens: extra.contains, extraTraces: extra.traces },
-    ingredientsById(),
-  );
-  $('#dish-computed').innerHTML = chipsHtml(result, { emptyText: 'Aucun allergène détecté' });
-}
-
-function createIngredientFromText(raw) {
-  const { contains, traces } = detectAllergens(raw);
-  const item = {
-    id: uid(), name: raw, brand: '', barcode: '', allergens: contains, traces, ingredientsText: '', image: '', source: 'auto',
-  };
-  state.ingredients.push(item);
-  save();
-  return item;
-}
-
-$('#dish-ingredient-search').addEventListener('input', renderDishPicker);
-$('#dish-ingredient-search').addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter') return;
-  e.preventDefault();
-  const raw = e.target.value.trim();
-  if (!raw) return;
-  const match = state.ingredients.find((i) => normalize(i.name) === normalize(raw));
-  const item = match ?? createIngredientFromText(raw);
-  dishDraft.selected.add(item.id);
-  e.target.value = '';
-  renderDishPicker();
-});
-
-$('#dish-ingredient-picker').addEventListener('click', (e) => {
-  const create = e.target.closest('[data-create]');
-  if (create) {
-    e.preventDefault();
-    const raw = $('#dish-ingredient-search').value.trim();
-    const item = createIngredientFromText(raw);
-    dishDraft.selected.add(item.id);
-    $('#dish-ingredient-search').value = '';
-    renderDishPicker();
-    toast(`« ${item.name} » ajouté — allergènes modifiables dans « Ingrédients »`);
+    toast('Copie impossible : sélectionnez le lien à la main.');
   }
 });
 
-$('#dish-ingredient-picker').addEventListener('change', (e) => {
-  const id = e.target.dataset.ing;
-  if (!id) return;
-  if (e.target.checked) dishDraft.selected.add(id);
-  else dishDraft.selected.delete(id);
-  renderDishComputed();
-});
-
-$('#dish-scan').addEventListener('click', () =>
-  openScanner((item) => {
-    if (!dishDialog.open || !dishDraft) return;
-    dishDraft.selected.add(item.id);
-    renderDishPicker();
-  }),
-);
-
-dishForm.addEventListener('submit', (e) => {
-  if (e.submitter?.value !== 'save') return;
-  const name = dishForm.name.value.trim();
-  if (!name) return;
-  const extra = dishExtra.get();
-  const dish = {
-    id: dishDraft.id ?? uid(),
-    name,
-    category: dishForm.category.value.trim(),
-    // On garde l'ordre de la bibliothèque, sans ingrédient supprimé entre-temps.
-    ingredientIds: state.ingredients.filter((i) => dishDraft.selected.has(i.id)).map((i) => i.id),
-    extraAllergens: extra.contains,
-    extraTraces: extra.traces,
-  };
-  const existing = state.dishes.find((d) => d.id === dish.id);
-  if (existing) Object.assign(existing, dish);
-  else state.dishes.push(dish);
-  save();
-});
-
-$('#dish-delete').addEventListener('click', () => {
-  const dish = state.dishes.find((d) => d.id === dishDraft?.id);
-  if (!dish || !confirm(`Supprimer « ${dish.name} » de la carte ?`)) return;
-  state.dishes = state.dishes.filter((d) => d.id !== dish.id);
-  dishDialog.close();
-  save();
-});
-
-// Les boutons « Annuler » ferment sans exiger les champs obligatoires.
-for (const btn of $$('button[value="cancel"]')) btn.formNoValidate = true;
-
-// ---------------------------------------------------------------------------
-// Actions générales
-
-$('#add-dish').addEventListener('click', () => openDish());
-$('#add-ingredient').addEventListener('click', () =>
-  openIngredient({ id: uid(), name: '', allergens: [], traces: [], source: 'manuel' }),
-);
-$('#scan-ingredient').addEventListener('click', () => openScanner());
-$('#ingredient-search').addEventListener('input', renderIngredients);
-
-document.addEventListener('click', (e) => {
-  const dishBtn = e.target.closest('[data-edit-dish]');
-  if (dishBtn) openDish(state.dishes.find((d) => d.id === dishBtn.dataset.editDish));
-  const ingBtn = e.target.closest('[data-edit-ingredient]');
-  if (ingBtn) {
-    const ing = state.ingredients.find((i) => i.id === ingBtn.dataset.editIngredient);
-    if (ing) openIngredient({ ...ing });
-  }
-});
-
-function fillInputs() {
-  $('#restaurant-name').value = state.restaurant.name;
-  $('#restaurant-info').value = state.restaurant.info;
-  $('#public-base').value = state.settings.publicBase;
-}
-
-$('#restaurant-name').addEventListener('input', (e) => {
-  state.restaurant.name = e.target.value;
-  save();
-});
-$('#restaurant-info').addEventListener('input', (e) => {
-  state.restaurant.info = e.target.value;
-  save();
-});
-$('#public-base').addEventListener('change', (e) => {
-  state.settings.publicBase = e.target.value.trim();
-  save();
-});
 $('#show-traces').addEventListener('change', renderSheet);
 
 function printSection(name) {
@@ -703,7 +1016,6 @@ function printSection(name) {
   window.addEventListener('afterprint', done);
   window.print();
 }
-
 $('#print-table').addEventListener('click', () => {
   renderSheet();
   printSection('tableau');
@@ -711,6 +1023,34 @@ $('#print-table').addEventListener('click', () => {
 $('#print-qr').addEventListener('click', async () => {
   await renderQr();
   printSection('qr');
+});
+
+// ---------------------------------------------------------------------------
+// Options et sauvegarde
+
+const menuDialog = $('#menu-dialog');
+function openMenu() {
+  $('#restaurant-name').value = state.restaurant.name;
+  $('#restaurant-info').value = state.restaurant.info;
+  $('#public-base').value = state.settings.publicBase;
+  menuDialog.showModal();
+}
+$('#open-menu').addEventListener('click', openMenu);
+$('[data-close]', menuDialog).addEventListener('click', () => menuDialog.close());
+menuDialog.addEventListener('close', () => render());
+
+$('#restaurant-name').addEventListener('input', (e) => {
+  state.restaurant.name = e.target.value;
+  $('#onboarding-name').value = e.target.value;
+  persist();
+});
+$('#restaurant-info').addEventListener('input', (e) => {
+  state.restaurant.info = e.target.value;
+  persist();
+});
+$('#public-base').addEventListener('change', (e) => {
+  state.settings.publicBase = e.target.value.trim();
+  persist();
 });
 
 $('#export-json').addEventListener('click', () => {
@@ -729,39 +1069,50 @@ $('#import-json').addEventListener('change', async (e) => {
   if (!file) return;
   try {
     const next = sanitizeState(JSON.parse(await file.text()));
-    if (!confirm(`Remplacer la carte actuelle par « ${next.restaurant.name || file.name} » (${next.dishes.length} plats) ?`)) return;
+    if (state.dishes.length && !confirm(`Remplacer la carte actuelle par « ${next.restaurant.name || file.name} » (${plural(next.dishes.length, 'plat')}) ?`)) return;
     state = next;
-    fillInputs();
-    save();
+    persist();
+    menuDialog.close();
+    render();
     toast('Sauvegarde importée');
   } catch {
     toast('Fichier illisible');
   }
 });
 
-$('#load-demo').addEventListener('click', () => {
+function loadDemo() {
   if (state.dishes.length && !confirm('Remplacer votre carte par l’exemple ? Pensez à exporter vos données avant.')) return;
   state = demoState();
-  fillInputs();
-  save();
+  persist();
+  if (menuDialog.open) menuDialog.close();
+  showTab('carte');
+  render();
   toast('Exemple chargé : Brasserie du Beffroi');
-});
+}
+$('#load-demo').addEventListener('click', loadDemo);
 
 $('#reset-all').addEventListener('click', () => {
   if (!confirm('Effacer toute la carte et tous les ingrédients de cet appareil ?')) return;
   state = emptyState();
-  fillInputs();
-  save();
+  manualMode = false;
+  persist();
+  menuDialog.close();
+  showTab('carte');
+  render();
 });
 
 // ---------------------------------------------------------------------------
 
-fillInputs();
-render();
+const datalist = document.createElement('datalist');
+datalist.id = 'ing-options';
+document.body.appendChild(datalist);
+
+$('#onboarding-name').value = state.restaurant.name;
 let initialTab = 'carte';
 try {
   initialTab = localStorage.getItem(TAB_KEY) || 'carte';
 } catch {
   // Préférence non essentielle.
 }
-showTab($(`.tab[data-tab="${initialTab}"]`) ? initialTab : 'carte');
+render();
+showTab($(`.step[data-tab="${initialTab}"]`) && state.dishes.length ? initialTab : 'carte');
