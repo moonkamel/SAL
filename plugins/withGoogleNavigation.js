@@ -74,10 +74,15 @@ dependencies {
   });
 
   return withGradleProperties(config, (cfg) => {
-    const props = cfg.modResults.filter(
-      (p) => !(p.type === 'property' && p.key === 'android.enableJetifier'),
-    );
+    const keys = ['android.enableJetifier', 'org.gradle.jvmargs'];
+    const props = cfg.modResults.filter((p) => !(p.type === 'property' && keys.includes(p.key)));
     props.push({ type: 'property', key: 'android.enableJetifier', value: 'true' });
+    // Build de production (R8 + Jetifier sur le SDK Google) : 2 Go par défaut ne suffisent pas.
+    props.push({
+      type: 'property',
+      key: 'org.gradle.jvmargs',
+      value: '-Xmx6g -XX:MaxMetaspaceSize=1536m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8',
+    });
     cfg.modResults = props;
     return cfg;
   });
@@ -89,10 +94,13 @@ dependencies {
  */
 module.exports = function withGoogleNavigation(config, props = {}) {
   const { iosApiKey, androidApiKey } = props;
-  if (!iosApiKey || !androidApiKey) {
-    console.warn(
-      '[withGoogleNavigation] Clé Maps manquante (GOOGLE_MAPS_IOS_API_KEY / GOOGLE_MAPS_ANDROID_API_KEY) : la carte restera vide.',
-    );
+  // Chaque build ne concerne qu'une plateforme : on ne signale que la clé utile à celle-ci.
+  const platform = process.env.EAS_BUILD_PLATFORM;
+  if (!androidApiKey && platform !== 'ios') {
+    console.warn('[withGoogleNavigation] GOOGLE_MAPS_ANDROID_API_KEY manquante : la carte Android restera vide.');
+  }
+  if (!iosApiKey && platform !== 'android') {
+    console.warn('[withGoogleNavigation] GOOGLE_MAPS_IOS_API_KEY manquante : la carte iPhone restera vide.');
   }
   config = withIosApiKey(config, iosApiKey ?? '');
   config = withAndroidApiKey(config, androidApiKey ?? '');
