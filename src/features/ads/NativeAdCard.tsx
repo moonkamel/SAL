@@ -9,6 +9,7 @@ import {
 } from 'react-native-google-mobile-ads';
 
 import { useGuidanceActive } from '@/src/features/navigation/guidanceState';
+import { useT } from '@/src/i18n';
 import { colors, font, radius, spacing } from '@/src/theme';
 
 import { adUnit } from './adUnits';
@@ -18,6 +19,7 @@ import { useAds } from './AdsProvider';
 export function NativeAdCard() {
   const { canRequestAds } = useAds();
   const guiding = useGuidanceActive();
+  const t = useT();
   const [ad, setAd] = useState<NativeAd | null>(null);
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export function NativeAdCard() {
     <NativeAdView nativeAd={ad} style={styles.card}>
       <View style={styles.header}>
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>Annonce</Text>
+          <Text style={styles.badgeText}>{t('Annonce')}</Text>
         </View>
         {ad.advertiser && (
           <NativeAsset assetType={NativeAssetType.ADVERTISER}>

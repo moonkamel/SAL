@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useUserLocation } from '@/src/features/location/LocationProvider';
+import { useI18n } from '@/src/i18n';
 import { spacing } from '@/src/theme';
 import { formatDistance, formatRating } from '@/shared/format';
 import type { PlaceSummary } from '@/shared/types';
@@ -18,21 +19,22 @@ interface Props {
 export function ResultsMap({ places, onOpen }: Props) {
   const { coords, status } = useUserLocation();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { t, lang } = useI18n();
 
   const pins = useMemo<MapPin[]>(
     () =>
       places.map((p) => ({
         id: p.id,
         position: p.location,
-        title: p.sponsored ? `${p.name} · Sponsorisé` : p.name,
+        title: p.sponsored ? `${p.name} · ${t('Sponsorisé')}` : p.name,
         snippet: [
-          p.rating !== undefined ? `★ ${formatRating(p.rating)}` : null,
-          formatDistance(p.distanceMeters),
+          p.rating !== undefined ? `★ ${formatRating(p.rating, lang)}` : null,
+          formatDistance(p.distanceMeters, lang),
         ]
           .filter(Boolean)
           .join(' · '),
       })),
-    [places],
+    [places, t, lang],
   );
   // Centre figé au moment de l'affichage pour ne pas recentrer la carte à chaque mouvement.
   const [center] = useState(coords);

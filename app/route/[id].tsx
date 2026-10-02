@@ -2,14 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { type ComponentProps, useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GradientButton } from '@/src/components/GradientButton';
-import { TransitCard } from '@/src/features/lille/TransitCard';
 import { VlilleCard } from '@/src/features/lille/VlilleCard';
 import { PlacesMap } from '@/src/components/PlacesMap';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
+import { googleMapsDirections } from '@/src/features/navigation/googleMaps';
+import { tx, useI18n } from '@/src/i18n';
 import { ApiRequestError, getRoutes } from '@/src/lib/api';
 import { colors, font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { formatArrival, formatDistance, formatDuration } from '@/shared/format';
@@ -21,10 +22,10 @@ const MODES: {
   label: string;
   icon: ComponentProps<typeof Ionicons>['name'];
 }[] = [
-  { mode: 'walk', label: 'À pied', icon: 'walk' },
-  { mode: 'bicycle', label: 'Vélo', icon: 'bicycle' },
-  { mode: 'drive', label: 'Voiture', icon: 'car' },
-  { mode: 'transit', label: 'Transports', icon: 'subway' },
+  { mode: 'walk', label: tx('À pied'), icon: 'walk' },
+  { mode: 'bicycle', label: tx('Vélo'), icon: 'bicycle' },
+  { mode: 'drive', label: tx('Voiture'), icon: 'car' },
+  { mode: 'transit', label: tx('Transports'), icon: 'subway' },
 ];
 
 type State =
@@ -43,6 +44,7 @@ export default function RoutePreviewScreen() {
   const [state, setState] = useState<State>({ kind: 'loading' });
   // Marche par défaut : on est en centre-ville.
   const [mode, setMode] = useState<TravelMode>('walk');
+  const { t, lang } = useI18n();
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -62,11 +64,11 @@ export default function RoutePreviewScreen() {
         setState({
           kind: 'error',
           message:
-            error instanceof ApiRequestError ? error.message : 'Impossible de calculer l’itinéraire.',
+            error instanceof ApiRequestError ? error.message : t('Impossible de calculer l’itinéraire.'),
         });
       }
     },
-    [refresh, destination],
+    [refresh, destination, t],
   );
 
   useEffect(() => {
@@ -85,17 +87,15 @@ export default function RoutePreviewScreen() {
     [params.id, params.name, destination],
   );
 
+  // Le guidage (voix, virages) se fait dans Google Maps.
   const onStart = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({
-      pathname: '/navigate/[id]',
-      params: { id: params.id, name: params.name, lat: params.lat, lng: params.lng, mode },
-    });
+    void Linking.openURL(googleMapsDirections(destination, mode, { id: params.id, name: params.name }));
   };
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: params.name ?? 'Itinéraire' }} />
+      <Stack.Screen options={{ title: params.name ?? t('Itinéraire') }} />
 
       <View style={styles.mapWrap}>
         {state.kind === 'done' ? (
@@ -111,14 +111,14 @@ export default function RoutePreviewScreen() {
             {state.kind === 'loading' ? (
               <>
                 <ActivityIndicator size="large" color={colors.accent} />
-                <Text style={styles.muted}>Calcul de l’itinéraire…</Text>
+                <Text style={styles.muted}>{t('Calcul de l’itinéraire…')}</Text>
               </>
             ) : (
               <>
                 <Ionicons name="alert-circle-outline" size={44} color={colors.textFaint} />
                 <Text style={styles.message}>{state.message}</Text>
                 <Pressable style={styles.retry} onPress={() => void load()}>
-                  <Text style={styles.retryText}>Réessayer</Text>
+                  <Text style={styles.retryText}>{t('Réessayer')}</Text>
                 </Pressable>
               </>
             )}
@@ -132,7 +132,7 @@ export default function RoutePreviewScreen() {
             <View style={styles.warning}>
               <Ionicons name="location-outline" size={18} color={colors.star} />
               <Text style={styles.warningText}>
-                Position inconnue : itinéraire calculé depuis la Grand-Place.
+                {t('Position inconnue : itinéraire calculé depuis la Grand-Place.')}
               </Text>
             </View>
           )}
@@ -153,7 +153,7 @@ export default function RoutePreviewScreen() {
                   style={[styles.mode, active && styles.modeActive, disabled && { opacity: 0.4 }]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active, disabled }}
-                  accessibilityLabel={`${label}${
+                  accessibilityLabel={`${t(label)}${
                     option?.durationSeconds ? `, ${formatDuration(option.durationSeconds)}` : ''
                   }`}
                 >
@@ -162,7 +162,7 @@ export default function RoutePreviewScreen() {
                     {option?.durationSeconds ? formatDuration(option.durationSeconds) : '—'}
                   </Text>
                   <Text style={[styles.modeLabel, active && { color: colors.accentText }]}>
-                    {label}
+                    {t(label)}
                   </Text>
                 </Pressable>
               );
@@ -173,8 +173,10 @@ export default function RoutePreviewScreen() {
             <View style={styles.summary}>
               <Text style={styles.duration}>{formatDuration(selected.durationSeconds)}</Text>
               <Text style={styles.muted}>
-                {formatDistance(selected.distanceMeters ?? 0)} · arrivée vers{' '}
-                {formatArrival(selected.durationSeconds)}
+                {t('{distance} · arrivée vers {time}', {
+                  distance: formatDistance(selected.distanceMeters ?? 0, lang),
+                  time: formatArrival(selected.durationSeconds),
+                })}
               </Text>
             </View>
           )}
@@ -190,21 +192,30 @@ export default function RoutePreviewScreen() {
           )}
 
           {/* Temps réel lillois : V'Lille à vélo, prochains passages en transports. */}
-          {mode === 'bicycle' && <VlilleCard from={state.from} to={destination} />}
-          {mode === 'transit' && <TransitCard near={state.from} title="Départs près de vous" />}
+          {mode === 'bicycle' && (
+            <VlilleCard from={state.from} to={destination} />
+          )}
 
           {mode === 'transit' ? (
-            <Text style={styles.note}>
-              Le guidage pas à pas n’est pas disponible en transports en commun. Suivez le tracé
-              sur la carte.
-            </Text>
+            <GradientButton
+              title={t('Horaires et trajet détaillé')}
+              icon="subway"
+              onPress={() =>
+                router.push({
+                  pathname: '/transit/[id]',
+                  params: { id: params.id, name: params.name, lat: params.lat, lng: params.lng },
+                })
+              }
+              disabled={!selected?.available}
+              accessibilityLabel={t('Voir les horaires et le trajet détaillé en transports')}
+            />
           ) : (
             <GradientButton
-              title="Démarrer"
+              title={t('Y aller avec Google Maps')}
               icon="navigate"
               onPress={onStart}
               disabled={!selected?.available}
-              accessibilityLabel="Démarrer le guidage"
+              accessibilityLabel={t('Ouvrir l’itinéraire dans Google Maps')}
             />
           )}
         </View>
@@ -260,5 +271,4 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   lineText: { color: colors.text, fontSize: font.small, fontWeight: '700' },
-  note: { color: colors.textMuted, fontSize: font.small, textAlign: 'center' },
 });

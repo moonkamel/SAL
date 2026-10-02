@@ -1,5 +1,6 @@
 // Idées de sortie selon l'heure et la météo (logique pure, testée).
 
+import { type Lang, translate, tx } from './i18n';
 import type { Ambiance, Suggestion, Weather, WeatherCondition } from './types';
 
 /** Heure locale à Lille (le serveur peut tourner en UTC). */
@@ -40,36 +41,42 @@ export function slotOf(hour: number): Slot {
 }
 
 /** Carte « météo » de l'accueil. */
-export function weatherSuggestion(weather: Weather, hour: number): Suggestion {
-  const slot = slotOf(hour);
+export function weatherSuggestion(weather: Weather, hour: number, lang: Lang = 'fr'): Suggestion {
+  const s = frenchSuggestion(weather, hour);
+  // La requête reste en français (recherche) ; l'app l'affiche traduite.
   const t = Math.round(weather.temperature);
+  return { ...s, title: translate(lang, s.title, { t }), subtitle: translate(lang, s.subtitle) };
+}
+
+function frenchSuggestion(weather: Weather, hour: number): Suggestion {
+  const slot = slotOf(hour);
 
   if (isWet(weather)) {
     const snow = weather.condition === 'snow';
     const byslot: Record<Slot, Pick<Suggestion, 'query' | 'subtitle'>> = {
-      morning: { query: 'salon de thé', subtitle: 'Un chocolat chaud et une gaufre au sec.' },
-      lunch: { query: 'estaminet', subtitle: 'Carbonade et welsh, bien au chaud.' },
-      afternoon: { query: 'salon de thé', subtitle: 'Une gaufre fourrée en attendant l’éclaircie.' },
-      evening: { query: 'estaminet', subtitle: 'Une bière du Nord et un welsh fumant.' },
-      night: { query: 'bar à bières', subtitle: 'Au chaud, entre deux averses.' },
+      morning: { query: tx('salon de thé'), subtitle: tx('Un chocolat chaud et une gaufre au sec.') },
+      lunch: { query: tx('estaminet'), subtitle: tx('Carbonade et welsh, bien au chaud.') },
+      afternoon: { query: tx('salon de thé'), subtitle: tx('Une gaufre fourrée en attendant l’éclaircie.') },
+      evening: { query: tx('estaminet'), subtitle: tx('Une bière du Nord et un welsh fumant.') },
+      night: { query: tx('bar à bières'), subtitle: tx('Au chaud, entre deux averses.') },
     };
     return {
-      title: snow ? 'Il neige sur Lille' : 'Il pleut ? Classique.',
+      title: snow ? tx('Il neige sur Lille') : tx('Il pleut ? Classique.'),
       ...byslot[slot],
     };
   }
 
   if (isTerraceWeather(weather)) {
     const query: Record<Slot, string> = {
-      morning: 'café',
-      lunch: 'restaurant',
-      afternoon: 'bar',
-      evening: 'bar',
-      night: 'bar',
+      morning: tx('café'),
+      lunch: tx('restaurant'),
+      afternoon: tx('bar'),
+      evening: tx('bar'),
+      night: tx('bar'),
     };
     return {
-      title: `${t} °C et du soleil`,
-      subtitle: 'Les terrasses du Vieux-Lille vous attendent.',
+      title: tx('{t} °C et du soleil'),
+      subtitle: tx('Les terrasses du Vieux-Lille vous attendent.'),
       query: query[slot],
       ambiance: ['terrace'],
     };
@@ -77,18 +84,18 @@ export function weatherSuggestion(weather: Weather, hour: number): Suggestion {
 
   if (weather.temperature < 6) {
     return {
-      title: `${t} °C, ça pique`,
-      subtitle: 'Un estaminet bien chauffé et un potjevleesch.',
-      query: 'estaminet',
+      title: tx('{t} °C, ça pique'),
+      subtitle: tx('Un estaminet bien chauffé et un potjevleesch.'),
+      query: tx('estaminet'),
     };
   }
 
   const fallback: Record<Slot, Suggestion> = {
-    morning: { title: 'Bien commencer la journée', subtitle: 'Un brunch près de chez vous.', query: 'brunch' },
-    lunch: { title: 'L’heure du déjeuner', subtitle: 'Un bistrot bien noté à deux pas.', query: 'bistrot' },
-    afternoon: { title: 'Une pause ?', subtitle: 'Café, gaufre ou pâtisserie.', query: 'salon de thé' },
-    evening: { title: 'On sort ce soir', subtitle: 'L’apéro dans un bar à bières lillois.', query: 'bar à bières' },
-    night: { title: 'La nuit est jeune', subtitle: 'Un bar à cocktails encore ouvert.', query: 'bar à cocktails' },
+    morning: { title: tx('Bien commencer la journée'), subtitle: tx('Un brunch près de chez vous.'), query: tx('brunch') },
+    lunch: { title: tx('L’heure du déjeuner'), subtitle: tx('Un bistrot bien noté à deux pas.'), query: tx('bistrot') },
+    afternoon: { title: tx('Une pause ?'), subtitle: tx('Café, gaufre ou pâtisserie.'), query: tx('salon de thé') },
+    evening: { title: tx('On sort ce soir'), subtitle: tx('L’apéro dans un bar à bières lillois.'), query: tx('bar à bières') },
+    night: { title: tx('La nuit est jeune'), subtitle: tx('Un bar à cocktails encore ouvert.'), query: tx('bar à cocktails') },
   };
   return fallback[slot];
 }

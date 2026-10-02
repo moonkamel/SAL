@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useT } from '@/src/i18n';
 import { colors, font, spacing } from '@/src/theme';
 
 /**
@@ -7,10 +8,11 @@ import { colors, font, spacing } from '@/src/theme';
  * ailleurs que sur une carte Google (liste de résultats, fiche lieu).
  */
 export function GoogleAttribution() {
+  const t = useT();
   return (
-    <View style={styles.container} accessibilityLabel="Données fournies par Google Maps">
+    <View style={styles.container} accessibilityLabel={t('Données fournies par Google Maps')}>
       <Text style={styles.text}>
-        Données <Text style={styles.brand}>Google Maps</Text>
+        {t('Données')} <Text style={styles.brand}>Google Maps</Text>
       </Text>
     </View>
   );

@@ -1,3 +1,5 @@
+import { tx } from './i18n';
+
 // Types partagés entre l'application et le backend.
 
 export interface LatLng {
@@ -96,6 +98,8 @@ export interface PlaceDetails {
   types?: string[];
   /** Liens partenaires (réservation, billetterie, VTC), ajoutés par /api/place. */
   partnerLinks?: PartnerLink[];
+  /** Bons plans du jour chez ce lieu, ajoutés par /api/place. */
+  offers?: Offer[];
 }
 
 export type PartnerKind = 'booking' | 'tickets' | 'ride' | 'delivery';
@@ -154,13 +158,13 @@ export type Ambiance =
   | 'accessible';
 
 export const AMBIANCE_LABELS: Record<Ambiance, string> = {
-  terrace: 'Terrasse',
-  liveMusic: 'Musique live',
-  groups: 'En groupe',
-  kids: 'Avec enfants',
-  cocktails: 'Cocktails',
-  vegetarian: 'Végétarien',
-  accessible: 'Accès fauteuil',
+  terrace: tx('Terrasse'),
+  liveMusic: tx('Musique live'),
+  groups: tx('En groupe'),
+  kids: tx('Avec enfants'),
+  cocktails: tx('Cocktails'),
+  vegetarian: tx('Végétarien'),
+  accessible: tx('Accès fauteuil'),
 };
 
 // --- V'Lille (vélos en libre-service, temps réel GBFS) ---
@@ -192,16 +196,10 @@ export interface TransitDeparture {
   minutes: number[];
 }
 
-export interface TransitStop {
-  name: string;
-  location: LatLng;
-  distanceMeters: number;
-  walkMinutes: number;
+/** Prochains passages en temps réel à un arrêt (par son nom). */
+export interface StopDeparturesResponse {
+  stop: string;
   departures: TransitDeparture[];
-}
-
-export interface TransitResponse {
-  stops: TransitStop[];
 }
 
 // --- Météo (Open-Meteo) et suggestions ---
@@ -231,4 +229,155 @@ export interface SurpriseResponse {
   place: PlaceSummary;
   /** Pourquoi ce lieu, ex. « Ouvert · 4,6 ★ · 6 min à pied ». */
   reason: string;
+}
+
+// --- Bons plans (offres des établissements partenaires) ---
+
+export interface Offer {
+  id: string;
+  placeId: string;
+  placeName: string;
+  location: LatLng;
+  title: string;
+  description?: string;
+  conditions?: string;
+  /** « Aujourd'hui de 18:00 à 20:00 », « Toute la journée »… */
+  schedule: string;
+  /** Vrai si l'offre est valable en ce moment. */
+  live: boolean;
+  distanceMeters?: number;
+  walkMinutes?: number;
+}
+
+export interface OffersResponse {
+  offers: Offer[];
+}
+
+// --- Agenda « Ce soir à Lille » ---
+
+export type EventCategory = 'concert' | 'soiree' | 'expo' | 'spectacle' | 'marche' | 'sport' | 'autre';
+
+export interface AgendaEvent {
+  id: string;
+  title: string;
+  description?: string;
+  category: EventCategory;
+  venueName: string;
+  placeId?: string;
+  location: LatLng;
+  address?: string;
+  /** ISO 8601. */
+  start: string;
+  end?: string;
+  /** Horaire lisible (heure de Lille), ex. « 21:00 – 23:30 » ou « sam. 21:00 ». */
+  timeLabel: string;
+  price?: string;
+  url?: string;
+  imageUrl?: string;
+  /** Événement mis en avant (sponsorisé). */
+  featured: boolean;
+  source: 'partner' | 'openagenda';
+  distanceMeters: number;
+  /** Déjà commencé à l'heure de la demande. */
+  ongoing: boolean;
+  /** Date complète, ex. « samedi 3 octobre · 21:00 – 23:30 ». */
+  dateLabel: string;
+  /** Styles de musique détectés (concerts, soirées). */
+  genres?: MusicGenre[];
+  /** Entrée gratuite ou libre. */
+  free?: boolean;
+  /** Description complète, en texte simple. */
+  longDescription?: string;
+  /** Billetterie ou inscription. */
+  ticketUrl?: string;
+}
+
+export type MusicGenre =
+  | 'jazz'
+  | 'rock'
+  | 'electro'
+  | 'rap'
+  | 'classique'
+  | 'chanson'
+  | 'monde'
+  | 'folk';
+
+export const GENRE_LABELS: Record<MusicGenre, string> = {
+  jazz: tx('Jazz & blues'),
+  rock: tx('Rock & métal'),
+  electro: tx('Électro'),
+  rap: tx('Rap & hip-hop'),
+  classique: tx('Classique'),
+  chanson: tx('Chanson & pop'),
+  monde: tx('Musiques du monde'),
+  folk: tx('Folk & acoustique'),
+};
+
+export type AgendaWhen = 'today' | 'tomorrow' | 'weekend';
+
+export interface AgendaResponse {
+  events: AgendaEvent[];
+}
+
+// --- Trajets détaillés en transports en commun (style Citymapper) ---
+
+export interface TransitLineInfo {
+  /** « M1 », « R », « L1 »… */
+  short: string;
+  name: string;
+  /** Couleurs officielles de la ligne (#RRGGBB). */
+  color: string;
+  textColor: string;
+  /** « Métro », « Tram », « Bus »… */
+  vehicle: string;
+}
+
+export interface TransitStopInfo {
+  name: string;
+  location: LatLng;
+}
+
+export type TripSegment =
+  | {
+      kind: 'walk';
+      durationSeconds: number;
+      distanceMeters: number;
+      /** Tracé encodé. */
+      polyline: string;
+      from: LatLng;
+      to: LatLng;
+      /** Nom de l'arrêt ou du lieu d'arrivée de ce tronçon à pied. */
+      toName: string;
+    }
+  | {
+      kind: 'ride';
+      line: TransitLineInfo;
+      /** Direction affichée sur le véhicule. */
+      headsign: string;
+      departureStop: TransitStopInfo;
+      arrivalStop: TransitStopInfo;
+      /** ISO 8601. */
+      departureTime: string;
+      arrivalTime: string;
+      stopCount: number;
+      durationSeconds: number;
+      polyline: string;
+    };
+
+export interface TransitItinerary {
+  id: string;
+  /** ISO 8601 : départ (à pied) et arrivée à destination. */
+  departureTime: string;
+  arrivalTime: string;
+  durationSeconds: number;
+  walkMeters: number;
+  /** Tarif indiqué par Google, ex. « 1,80 € ». */
+  fare?: string;
+  segments: TripSegment[];
+  /** Même trajet, départs suivants du 1er véhicule (ISO), ex. métro toutes les 2 min. */
+  nextDepartures?: string[];
+}
+
+export interface ItinerariesResponse {
+  itineraries: TransitItinerary[];
 }

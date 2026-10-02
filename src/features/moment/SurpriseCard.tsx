@@ -6,6 +6,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/src/components/PressableScale';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
+import { useT } from '@/src/i18n';
 import { ApiRequestError, getSurprise } from '@/src/lib/api';
 import { colors, font, fonts, gradients, radius, shadows, spacing } from '@/src/theme';
 
@@ -15,6 +16,7 @@ export function SurpriseCard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
+  const t = useT();
 
   const onPress = async () => {
     if (busy.current) return;
@@ -26,7 +28,7 @@ export function SurpriseCard() {
       const { place, reason } = await getSurprise(location);
       router.push({ pathname: '/place/[id]', params: { id: place.id, surprise: reason } });
     } catch (e) {
-      setError(e instanceof ApiRequestError ? e.message : 'Surprise impossible. Réessayez.');
+      setError(e instanceof ApiRequestError ? e.message : t('Surprise impossible. Réessayez.'));
     } finally {
       busy.current = false;
       setLoading(false);
@@ -40,7 +42,7 @@ export function SurpriseCard() {
         disabled={loading}
         style={styles.wrap}
         accessibilityRole="button"
-        accessibilityLabel="Surprends-moi : un lieu ouvert, bien noté et proche"
+        accessibilityLabel={t('Surprends-moi : un lieu ouvert, bien noté et proche')}
         accessibilityState={{ busy: loading }}
       >
         <LinearGradient
@@ -57,8 +59,8 @@ export function SurpriseCard() {
             )}
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.title}>{loading ? 'On cherche…' : 'Surprends-moi'}</Text>
-            <Text style={styles.subtitle}>Un lieu ouvert, bien noté et tout près</Text>
+            <Text style={styles.title}>{loading ? t('On cherche…') : t('Surprends-moi')}</Text>
+            <Text style={styles.subtitle}>{t('Un lieu ouvert, bien noté et tout près')}</Text>
           </View>
           <Ionicons name="arrow-forward" size={22} color={colors.accentText} />
         </LinearGradient>

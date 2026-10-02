@@ -6,6 +6,7 @@ import type { LatLng, VlilleResponse, VlilleStation } from '@/shared/types';
 
 import { TtlCache } from './cache';
 import { PlacesError } from './places';
+import { tx } from '@/shared/i18n';
 
 export const VLILLE_GBFS_URL =
   process.env.VLILLE_GBFS_URL ?? 'https://media.ilevia.fr/opendata/gbfs.json';
@@ -94,7 +95,7 @@ async function getJson(url: string): Promise<unknown> {
   const res = await fetch(url, { headers: { Accept: 'application/json' } });
   if (!res.ok) {
     console.error('[vlille] requête GBFS échouée', res.status, url);
-    throw new PlacesError('Données V’Lille indisponibles', 502);
+    throw new PlacesError(tx('Données V’Lille indisponibles'), 502);
   }
   return res.json();
 }
@@ -116,7 +117,7 @@ async function loadStations() {
   }
   const infoUrl = feeds.station_information;
   const statusUrl = feeds.station_status;
-  if (!infoUrl || !statusUrl) throw new PlacesError('Données V’Lille indisponibles', 502);
+  if (!infoUrl || !statusUrl) throw new PlacesError(tx('Données V’Lille indisponibles'), 502);
 
   let info = infoCache.get('info');
   if (!info) {

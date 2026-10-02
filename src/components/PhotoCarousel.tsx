@@ -4,6 +4,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
+import { useT } from '@/src/i18n';
 import { photoUrl } from '@/src/lib/api';
 import { colors, font, radius, spacing } from '@/src/theme';
 import type { PhotoRef } from '@/shared/types';
@@ -13,6 +14,7 @@ const HEIGHT = 280;
 export function PhotoCarousel({ photos }: { photos: PhotoRef[] }) {
   const { width } = useWindowDimensions();
   const [index, setIndex] = useState(0);
+  const t = useT();
 
   if (photos.length === 0) {
     return (
@@ -29,6 +31,11 @@ export function PhotoCarousel({ photos }: { photos: PhotoRef[] }) {
         keyExtractor={(p) => p.name}
         horizontal
         pagingEnabled
+        // Chaque photo affichée est facturée par Google : on ne charge que la photo
+        // visible et ses voisines, pas les 6 d'un coup.
+        initialNumToRender={1}
+        maxToRenderPerBatch={1}
+        windowSize={3}
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={(e) =>
           setIndex(Math.round(e.nativeEvent.contentOffset.x / width))
@@ -53,7 +60,7 @@ export function PhotoCarousel({ photos }: { photos: PhotoRef[] }) {
                   hitSlop={8}
                 >
                   <Text style={styles.creditText} numberOfLines={1}>
-                    Photo : {author.displayName}
+                    {t('Photo : {author}', { author: author.displayName })}
                   </Text>
                 </Pressable>
               )}

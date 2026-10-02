@@ -1,0 +1,16 @@
+[
+  {
+    "id": "illustration-happy-hour",
+    "placeId": "ChIJU5O4oHgqw0cRWNWgIyAf91A",
+    "placeName": "L'Illustration",
+    "location": { "lat": 50.6394789, "lng": 3.0584516 },
+    "title": "2 bières pour le prix d'1",
+    "conditions": "Sur présentation de l'app",
+    "startDate": "2026-10-01",
+    "endDate": "2026-12-31",
+    "days": [4, 5, 6],
+    "startTime": "18:00",
+    "endTime": "20:00",
+    "active": true
+  }
+]

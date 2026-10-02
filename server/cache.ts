@@ -34,4 +34,12 @@ export class TtlCache<T> {
     }
     this.entries.set(key, { value, expiresAt: this.now() + this.ttlMs });
   }
+
+  delete(key: string): void {
+    this.entries.delete(key);
+  }
+
+  clear(): void {
+    this.entries.clear();
+  }
 }

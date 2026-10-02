@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  bboxAround,
-  groupPassages,
+  departuresAt,
+  directionScore,
   parseDepartureTime,
   prettyName,
+  recordsOf,
+  sameStation,
+  toPassage,
 } from '@/server/ilevia';
 import { ambianceOf, textSearchFieldMask } from '@/server/places';
 import { hasAmbiance, withAmbianceHints } from '@/server/search';
@@ -64,34 +67,54 @@ describe('Ilévia (prochains passages)', () => {
     expect(prettyName("PORTE D'ARRAS")).toBe("Porte D'Arras");
   });
 
-  it('calcule un rectangle autour du point', () => {
-    const [minLng, minLat, maxLng, maxLat] = bboxAround(GRAND_PLACE, 600);
-    expect(maxLat - minLat).toBeCloseTo(0.0108, 3);
-    expect(minLng).toBeLessThan(GRAND_PLACE.lng);
-    expect(maxLng).toBeGreaterThan(GRAND_PLACE.lng);
+  // Format réel de la MEL (GeoServer, geometry nulle), relevé le 28/09/2026.
+  const f = (station: string, line: string, dir: string, time: string) => ({
+    type: 'Feature',
+    geometry: null,
+    properties: {
+      identifiant_station: 'ILEVIA:StopPoint:BP:X:LOC',
+      nom_station: station,
+      code_ligne: line,
+      sens_ligne: dir,
+      heure_estimee_depart: time,
+      commune: 'Lille',
+    },
   });
 
-  const f = (station: string, line: string, dir: string, time: string, lng: number, lat: number) => ({
-    geometry: { type: 'Point', coordinates: [lng, lat] as [number, number] },
-    properties: { nom_station: station, code_ligne: line, sens_ligne: dir, heure_estimee_depart: time },
+  it('lit le format de la MEL et d’autres formats', () => {
+    const expected = { station: 'RIHOUR', line: 'M1', direction: 'CHU EURASANTE', time: '2026-09-27T19:03:00Z' };
+    expect(toPassage(f('RIHOUR', 'M1', 'CHU EURASANTE', '2026-09-27T19:03:00Z'))).toEqual(expected);
+    expect(
+      toPassage({ fields: { nomstation: 'RIHOUR', codeligne: 'M1', sensligne: 'CHU EURASANTE', heureestimeedepart: '2026-09-27T19:03:00Z' } }),
+    ).toEqual(expected);
+    expect(toPassage({ properties: { nom_station: 'X' } })).toBeNull();
+    expect(recordsOf({ type: 'FeatureCollection', features: [1, 2] })).toHaveLength(2);
+    expect(recordsOf({ records: [1] })).toHaveLength(1);
   });
 
-  it('regroupe par arrêt et ligne, métro d’abord, arrêts les plus proches', () => {
-    const stops = groupPassages(
+  it('reconnaît un arrêt Google dans les noms Ilévia', () => {
+    expect(sameStation('RIHOUR', 'Rihour')).toBe(true);
+    expect(sameStation('REPUBLIQUE BEAUX ARTS', 'République - Beaux-Arts')).toBe(true);
+    expect(sameStation('GARE LILLE FLANDRES', 'Gare Lille-Flandres Métro')).toBe(true);
+    expect(sameStation('GARE LILLE EUROPE', 'Gare Lille Flandres')).toBe(false);
+    expect(directionScore('CHU EURASANTE', 'Lille Chu - Eurasanté')).toBeCloseTo(2 / 3);
+    expect(directionScore('QUATRE CANTONS', 'Lille Chu - Eurasanté')).toBe(0);
+  });
+
+  it('donne les prochains départs d’un arrêt, métro d’abord', () => {
+    const deps = departuresAt(
       [
-        f('RIHOUR', 'M1', 'CHU EURASANTE', '2026-09-27T21:07:00', 3.0619, 50.6362),
-        f('RIHOUR', 'M1', 'CHU EURASANTE', '2026-09-27T21:03:00', 3.0619, 50.6362),
-        f('RIHOUR', 'M1', 'QUATRE CANTONS', '2026-09-27T21:04:00', 3.0619, 50.6362),
-        f('RIHOUR', 'L1', 'LOMME', '2026-09-27T21:01:00', 3.0619, 50.6362),
-        f('GARE LILLE FLANDRES', 'M2', 'TOURCOING', '2026-09-27T21:02:00', 3.0707, 50.6365),
-        f('RIHOUR', 'M1', 'CHU EURASANTE', '2026-09-27T20:55:00', 3.0619, 50.6362), // passé
-        f('LOIN', 'M2', 'X', '2026-09-27T21:02:00', 3.2, 50.7), // hors rayon
+        f('RIHOUR', 'M1', 'CHU EURASANTE', '2026-09-27T21:07:00'),
+        f('RIHOUR', 'M1', 'CHU EURASANTE', '2026-09-27T21:03:00'),
+        f('RIHOUR', 'M1', 'QUATRE CANTONS', '2026-09-27T21:04:00'),
+        f('RIHOUR', 'L1', 'LOMME', '2026-09-27T21:01:00'),
+        f('RIHOUR', 'M1', 'CHU EURASANTE', '2026-09-27T20:55:00'), // passé
+        f('GARE LILLE FLANDRES', 'M2', 'TOURCOING', '2026-09-27T21:02:00'), // autre arrêt
       ],
-      GRAND_PLACE,
+      'Rihour',
       now,
     );
-    expect(stops.map((s) => s.name)).toEqual(['Rihour', 'Gare Lille Flandres']);
-    expect(stops[0]!.departures).toEqual([
+    expect(deps).toEqual([
       { line: 'M1', direction: 'Chu Eurasante', minutes: [3, 7] },
       { line: 'M1', direction: 'Quatre Cantons', minutes: [4] },
       { line: 'L1', direction: 'Lomme', minutes: [1] },
@@ -186,13 +209,30 @@ describe('recherche avec filtre d’ambiance', () => {
 });
 
 describe('routes API V’Lille et Ilévia', () => {
-  it('refusent une position invalide et ignorent hors métropole', async () => {
+  it('refusent une position invalide ou un arrêt manquant', async () => {
     const { GET: vlille } = await import('@/app/api/vlille+api');
     const { GET: transit } = await import('@/app/api/transit+api');
     expect((await vlille(new Request('http://x/api/vlille?near=abc'))).status).toBe(400);
-    expect(await (await transit(new Request('http://x/api/transit?near=48.85,2.35'))).json()).toEqual({
-      stops: [],
+    expect((await transit(new Request('http://x/api/transit'))).status).toBe(400);
+  });
+
+  it('interroge la MEL sans bbox (refusé par l’API) et partage la réponse', async () => {
+    vi.resetModules();
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ type: 'FeatureCollection', features: [] })),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { GET } = await import('@/app/api/transit+api');
+    expect(await (await GET(new Request('http://x/api/transit?stop=Rihour'))).json()).toEqual({
+      stop: 'Rihour',
+      departures: [],
     });
+    await GET(new Request('http://x/api/transit?stop=Gambetta'));
+    expect(fetchMock).toHaveBeenCalledTimes(1); // cache partagé
+    const url = String((fetchMock.mock.calls[0] as unknown as [URL])[0]);
+    expect(url).not.toContain('bbox');
+    expect(url).toContain('f=application%2Fgeo%2Bjson');
+    vi.unstubAllGlobals();
   });
 });
 

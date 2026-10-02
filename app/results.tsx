@@ -22,6 +22,7 @@ import { useAds } from '@/src/features/ads/AdsProvider';
 import { NativeAdCard } from '@/src/features/ads/NativeAdCard';
 import { withAdSlots } from '@/src/features/ads/policy';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
+import { useT } from '@/src/i18n';
 import { ApiRequestError, searchPlaces } from '@/src/lib/api';
 import { colors, font, fonts, motion, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { AMBIANCE_LABELS, type Ambiance, type PlaceSummary, type SearchFilters } from '@/shared/types';
@@ -40,6 +41,7 @@ export default function ResultsScreen() {
   const query = (q ?? '').trim();
   const { refresh } = useUserLocation();
   const { canRequestAds } = useAds();
+  const t = useT();
 
   // Filtres initiaux passés par l'accueil (ex. suggestion météo « en terrasse »).
   const [filters, setFilters] = useState<SearchFilters>(() => {
@@ -68,10 +70,10 @@ export default function ResultsScreen() {
       setState({
         kind: 'error',
         message:
-          error instanceof ApiRequestError ? error.message : 'Une erreur est survenue. Réessayez.',
+          error instanceof ApiRequestError ? error.message : t('Une erreur est survenue. Réessayez.'),
       });
     }
-  }, [query, filters, refresh]);
+  }, [query, filters, refresh, t]);
 
   useEffect(() => {
     setState({ kind: 'loading' });
@@ -89,16 +91,16 @@ export default function ResultsScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: query || 'Résultats' }} />
+      <Stack.Screen options={{ title: query ? t(query) : t('Résultats') }} />
 
       <View style={styles.toolbar}>
         <Chip
-          label="Ouvert maintenant"
+          label={t('Ouvert maintenant')}
           selected={filters.openNow ?? false}
           onPress={() => setFilters({ ...filters, openNow: filters.openNow ? undefined : true })}
         />
         <Chip
-          label={activeCount ? `Filtres (${activeCount})` : 'Filtres'}
+          label={activeCount ? t('Filtres ({n})', { n: activeCount }) : t('Filtres')}
           selected={activeCount > 0}
           onPress={() => setFiltersVisible(true)}
         />
@@ -107,19 +109,19 @@ export default function ResultsScreen() {
           onPress={() => setView(view === 'list' ? 'map' : 'list')}
           style={({ pressed }) => [styles.toggle, pressed && { opacity: 0.75 }]}
           accessibilityRole="button"
-          accessibilityLabel={view === 'list' ? 'Afficher la carte' : 'Afficher la liste'}
+          accessibilityLabel={view === 'list' ? t('Afficher la carte') : t('Afficher la liste')}
         >
           <Ionicons
             name={view === 'list' ? 'map-outline' : 'list-outline'}
             size={20}
             color={colors.gold}
           />
-          <Text style={styles.toggleText}>{view === 'list' ? 'Carte' : 'Liste'}</Text>
+          <Text style={styles.toggleText}>{view === 'list' ? t('Carte') : t('Liste')}</Text>
         </Pressable>
       </View>
 
       {state.kind === 'loading' && (
-        <View style={styles.list} accessibilityLabel="Recherche des meilleurs lieux">
+        <View style={styles.list} accessibilityLabel={t('Recherche des meilleurs lieux')}>
           <SkeletonCard />
           <View style={{ height: spacing.lg }} />
           <SkeletonCard />
@@ -138,7 +140,7 @@ export default function ResultsScreen() {
             }}
             accessibilityRole="button"
           >
-            <Text style={styles.retryText}>Réessayer</Text>
+            <Text style={styles.retryText}>{t('Réessayer')}</Text>
           </Pressable>
         </View>
       )}
@@ -152,6 +154,10 @@ export default function ResultsScreen() {
           data={withAdSlots(state.places, canRequestAds)}
           keyExtractor={(item) => (item.type === 'ad' ? item.key : item.place.id)}
           contentContainerStyle={styles.list}
+          // Photos facturées à l'affichage : seules les cartes proches de l'écran sont rendues.
+          initialNumToRender={4}
+          maxToRenderPerBatch={3}
+          windowSize={5}
           ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
           renderItem={({ item, index }) => (
             // Apparition en cascade des premières cartes, puis instantanée au défilement.
@@ -174,8 +180,9 @@ export default function ResultsScreen() {
               <LocationBanner />
               {state.places.length > 0 && (
                 <Text style={styles.count}>
-                  {state.places.length} {state.places.length > 1 ? 'adresses' : 'adresse'} autour
-                  de vous
+                  {state.places.length > 1
+                    ? t('{n} adresses autour de vous', { n: state.places.length })
+                    : t('1 adresse autour de vous')}
                 </Text>
               )}
             </View>
@@ -184,7 +191,8 @@ export default function ResultsScreen() {
             <View style={styles.center}>
               <Ionicons name="search-outline" size={48} color={colors.textFaint} />
               <Text style={styles.message}>
-                Aucun lieu trouvé.{activeCount ? ' Essayez d’assouplir les filtres.' : ''}
+                {t('Aucun lieu trouvé.')}
+                {activeCount ? ` ${t('Essayez d’assouplir les filtres.')}` : ''}
               </Text>
             </View>
           }

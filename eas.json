@@ -17,7 +17,10 @@
       "env": {
         "APP_ENV": "preview"
       },
-      "environment": "preview"
+      "environment": "preview",
+      "android": {
+        "buildType": "apk"
+      }
     },
     "production": {
       "autoIncrement": true,

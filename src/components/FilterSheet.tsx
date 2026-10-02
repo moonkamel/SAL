@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useI18n } from '@/src/i18n';
 import { colors, font, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { decimal } from '@/shared/i18n';
 import { formatDistance } from '@/shared/format';
 import { AMBIANCE_LABELS, type Ambiance, type PriceLevel, type SearchFilters } from '@/shared/types';
 
@@ -33,6 +35,7 @@ interface Props {
 export function FilterSheet({ visible, filters, onApply, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<SearchFilters>(filters);
+  const { t, lang } = useI18n();
 
   useEffect(() => {
     if (visible) setDraft(filters);
@@ -52,27 +55,27 @@ export function FilterSheet({ visible, filters, onApply, onClose }: Props) {
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Fermer les filtres" />
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('Fermer les filtres')} />
       <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
-        <Text style={styles.title}>Filtres</Text>
+        <Text style={styles.title}>{t('Filtres')}</Text>
         <ScrollView contentContainerStyle={{ gap: spacing.xl }}>
           <View style={styles.switchRow}>
-            <Text style={styles.label}>Ouvert maintenant</Text>
+            <Text style={styles.label}>{t('Ouvert maintenant')}</Text>
             <Switch
               value={draft.openNow ?? false}
               onValueChange={(v) => setDraft({ ...draft, openNow: v || undefined })}
               trackColor={{ true: colors.accent, false: colors.border }}
-              accessibilityLabel="Ouvert maintenant"
+              accessibilityLabel={t('Ouvert maintenant')}
             />
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.label}>Ambiance</Text>
+            <Text style={styles.label}>{t('Ambiance')}</Text>
             <View style={styles.chips}>
               {AMBIANCE_OPTIONS.map((a) => (
                 <Chip
                   key={a}
-                  label={AMBIANCE_LABELS[a]}
+                  label={t(AMBIANCE_LABELS[a])}
                   selected={draft.ambiance?.includes(a) ?? false}
                   onPress={() => toggleAmbiance(a)}
                 />
@@ -81,12 +84,12 @@ export function FilterSheet({ visible, filters, onApply, onClose }: Props) {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.label}>Distance maximale</Text>
+            <Text style={styles.label}>{t('Distance maximale')}</Text>
             <View style={styles.chips}>
               {DISTANCE_OPTIONS.map((d) => (
                 <Chip
                   key={d}
-                  label={formatDistance(d)}
+                  label={formatDistance(d, lang)}
                   selected={draft.maxDistanceMeters === d}
                   onPress={() =>
                     setDraft({
@@ -100,7 +103,7 @@ export function FilterSheet({ visible, filters, onApply, onClose }: Props) {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.label}>Prix</Text>
+            <Text style={styles.label}>{t('Prix')}</Text>
             <View style={styles.chips}>
               {PRICE_OPTIONS.map((p) => (
                 <Chip
@@ -114,12 +117,12 @@ export function FilterSheet({ visible, filters, onApply, onClose }: Props) {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.label}>Note minimum</Text>
+            <Text style={styles.label}>{t('Note minimum')}</Text>
             <View style={styles.chips}>
               {RATING_OPTIONS.map((r) => (
                 <Chip
                   key={r}
-                  label={`${String(r).replace('.', ',')} ★ et +`}
+                  label={t('{rating} ★ et +', { rating: decimal(lang, String(r)) })}
                   selected={draft.minRating === r}
                   onPress={() =>
                     setDraft({ ...draft, minRating: draft.minRating === r ? undefined : r })
@@ -136,14 +139,14 @@ export function FilterSheet({ visible, filters, onApply, onClose }: Props) {
             onPress={() => setDraft({})}
             accessibilityRole="button"
           >
-            <Text style={styles.secondaryText}>Réinitialiser</Text>
+            <Text style={styles.secondaryText}>{t('Réinitialiser')}</Text>
           </Pressable>
           <Pressable
             style={[styles.button, styles.primary]}
             onPress={() => onApply(draft)}
             accessibilityRole="button"
           >
-            <Text style={styles.primaryText}>Appliquer</Text>
+            <Text style={styles.primaryText}>{t('Appliquer')}</Text>
           </Pressable>
         </View>
       </View>

@@ -1,6 +1,7 @@
 // « Surprends-moi » : un lieu ouvert, bien noté et proche, adapté à l'heure et à la météo.
 
 import { formatRating, formatWalk } from '@/shared/format';
+import { type Lang, translate } from '@/shared/i18n';
 import { parisHour, pickAmongTop, surpriseQueries } from '@/shared/suggest';
 import type { LatLng, PlaceSummary, SurpriseResponse, Weather } from '@/shared/types';
 
@@ -21,16 +22,16 @@ export function surpriseCandidates(places: PlaceSummary[]): PlaceSummary[] {
   );
 }
 
-export function surpriseReason(place: PlaceSummary): string {
-  const parts = ['Ouvert'];
-  if (place.rating !== undefined) parts.push(`${formatRating(place.rating)} ★`);
-  parts.push(formatWalk(place.walkMinutes));
+export function surpriseReason(place: PlaceSummary, lang: Lang = 'fr'): string {
+  const parts = [translate(lang, 'Ouvert')];
+  if (place.rating !== undefined) parts.push(`${formatRating(place.rating, lang)} ★`);
+  parts.push(formatWalk(place.walkMinutes, lang));
   return parts.join(' · ');
 }
 
 export async function surprise(
   location: LatLng,
-  opts: { date?: Date; random?: () => number } = {},
+  opts: { date?: Date; random?: () => number; lang?: Lang } = {},
 ): Promise<SurpriseResponse | null> {
   const random = opts.random ?? Math.random;
   const weather: Weather | undefined = await currentWeather(location).catch(() => undefined);
@@ -53,9 +54,9 @@ export async function surprise(
           maxDistanceMeters: attempt.maxDistanceMeters,
           ambiance: attempt.ambiance,
         },
-      });
+      }, opts.lang);
       const place = pickAmongTop(surpriseCandidates(places), 5, random);
-      if (place) return { place, reason: surpriseReason(place) };
+      if (place) return { place, reason: surpriseReason(place, opts.lang) };
     }
   }
   return null;
