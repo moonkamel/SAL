@@ -77,11 +77,11 @@ dependencies {
     const keys = ['android.enableJetifier', 'org.gradle.jvmargs'];
     const props = cfg.modResults.filter((p) => !(p.type === 'property' && keys.includes(p.key)));
     props.push({ type: 'property', key: 'android.enableJetifier', value: 'true' });
-    // Build de production (R8 + Jetifier sur le SDK Google) : 2 Go par défaut ne suffisent pas.
+    // Build de production (R8 + Jetifier sur le SDK Google) : on laisse de la marge (2 Go par défaut).
     props.push({
       type: 'property',
       key: 'org.gradle.jvmargs',
-      value: '-Xmx6g -XX:MaxMetaspaceSize=1536m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8',
+      value: '-Xmx4g -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8',
     });
     cfg.modResults = props;
     return cfg;
