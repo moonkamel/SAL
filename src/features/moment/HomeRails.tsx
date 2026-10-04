@@ -1,14 +1,16 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { PressableScale } from '@/src/components/PressableScale';
 import { EventCard } from '@/src/features/agenda/EventCard';
 import { openEvent } from '@/src/features/agenda/openEvent';
 import { useLiveData } from '@/src/features/lille/useLiveData';
 import { OfferCard } from '@/src/features/offers/OfferCard';
 import { useI18n, useT } from '@/src/i18n';
 import { getAgenda, getOffers } from '@/src/lib/api';
-import { colors, font, fonts, spacing } from '@/src/theme';
+import { colors, font, fonts, radius, spacing } from '@/src/theme';
 import { useTone } from '@/src/theme/tone';
 import type { AgendaResponse, LatLng, OffersResponse } from '@/shared/types';
 
@@ -35,15 +37,16 @@ function Rail({ title, onSeeAll, children }: { title: string; onSeeAll: () => vo
   );
 }
 
-/** « Ce soir à Lille » (agenda), masqué s'il n'y a rien. */
+/** « Ce soir à Lille » (agenda) ; s'il n'y a rien ce soir, un accès à l'agenda complet. */
 export function TonightRail({ near }: { near: LatLng }) {
   const { t, lang } = useI18n();
-  const { data } = useLiveData<AgendaResponse>(
+  const { data, error } = useLiveData<AgendaResponse>(
     (signal) => getAgenda(near, 'today', signal),
     10 * 60_000,
     [...refreshKey(near), lang],
   );
-  if (!data?.events.length) return null;
+  if (!data && !error) return null; // chargement discret
+  if (!data?.events.length) return <AgendaLink />;
   return (
     <Rail title={t('Ce soir à Lille')} onSeeAll={() => router.push('/agenda')}>
       {data.events.slice(0, 8).map((e) => (
@@ -77,7 +80,47 @@ export function OffersRail({ near }: { near: LatLng }) {
   );
 }
 
+/** Accès à l'agenda quand rien n'est prévu ce soir (demain, week-end…). */
+function AgendaLink() {
+  const { c } = useTone();
+  const t = useT();
+  return (
+    <View style={styles.linkWrap}>
+      <PressableScale
+        onPress={() => router.push('/agenda')}
+        style={[styles.link, { backgroundColor: c.surface, borderColor: c.border }]}
+        accessibilityRole="button"
+        accessibilityLabel={t('Agenda des sorties')}
+      >
+        <View style={[styles.linkIcon, { backgroundColor: c.goldTint }]}>
+          <Ionicons name="calendar" size={22} color={c.gold} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={[styles.linkTitle, { color: c.text }]}>{t('Agenda des sorties')}</Text>
+          <Text style={[styles.linkText, { color: c.textMuted }]}>
+            {t('Concerts, expos, spectacles : demain et ce week-end')}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={c.textFaint} />
+      </PressableScale>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  linkWrap: { marginTop: spacing.xl, paddingHorizontal: spacing.lg },
+  link: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  linkIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  linkTitle: { fontFamily: fonts.displayMedium, fontSize: font.body + 1 },
+  linkText: { fontSize: font.small },
   section: { marginTop: spacing.xl, gap: spacing.md },
   header: {
     flexDirection: 'row',
