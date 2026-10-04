@@ -374,11 +374,29 @@ const dedupKey = (e: AgendaEvent) =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 
+/** Diagnostic (?debug=1) : ce que chaque source a renvoyé, sans jamais la clé. */
+export interface AgendaDebug {
+  window: { start: string; end: string };
+  partnerEvents: number;
+  openAgendaKey: boolean;
+  agendas: {
+    uid: string;
+    fetched?: number;
+    cultural?: number;
+    mapped?: number;
+    sample?: string[];
+    error?: string;
+  }[];
+  merged?: number;
+  withinRadius?: number;
+}
+
 export async function agenda(
   near: LatLng,
   when: AgendaWhen,
   now: Date = new Date(),
   lang: Lang = 'fr',
+  debug?: AgendaDebug,
 ): Promise<AgendaEvent[]> {
   const w = windowFor(when, now);
   const partner = (await getContent('events'))
@@ -386,6 +404,11 @@ export async function agenda(
     .filter((e): e is AgendaEvent => e !== null);
 
   const oa = openAgendaConfig();
+  if (debug) {
+    debug.window = { start: w.start.toISOString(), end: w.end.toISOString() };
+    debug.partnerEvents = partner.length;
+    debug.openAgendaKey = Boolean(oa);
+  }
   const external = oa
     ? (
         await Promise.all(
@@ -395,11 +418,20 @@ export async function agenda(
                 fetchOpenAgenda(uid, oa.key, w),
                 agendaSlug(uid, oa.key),
               ]);
-              return events
-                .filter(isCulturalHighlight)
-                .map((ev) => fromOpenAgenda(ev, uid, near, w, now, slug, lang));
+              const cultural = events.filter(isCulturalHighlight);
+              const mapped = cultural.map((ev) => fromOpenAgenda(ev, uid, near, w, now, slug, lang));
+              debug?.agendas.push({
+                uid,
+                fetched: events.length,
+                cultural: cultural.length,
+                mapped: mapped.filter(Boolean).length,
+                sample: events.slice(0, 5).map((ev) => text(ev.title) ?? '?'),
+              });
+              return mapped;
             } catch (error) {
               console.error('[agenda] OpenAgenda indisponible', uid, error);
+              const message = error instanceof Error ? error.message : String(error);
+              debug?.agendas.push({ uid, error: oa.key ? message.replaceAll(oa.key, '***') : message });
               return [];
             }
           }),
@@ -417,6 +449,10 @@ export async function agenda(
     return true;
   });
   const events = sortEvents(merged.filter((e) => e.distanceMeters <= RADIUS_METERS)).slice(0, MAX_EVENTS);
+  if (debug) {
+    debug.merged = merged.length;
+    debug.withinRadius = merged.filter((e) => e.distanceMeters <= RADIUS_METERS).length;
+  }
   return lang === 'fr' ? events : localizeEvents(events, lang);
 }
 

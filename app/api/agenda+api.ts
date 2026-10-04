@@ -1,4 +1,4 @@
-import { agenda } from '@/server/agenda';
+import { agenda, type AgendaDebug } from '@/server/agenda';
 import { parseLatLng } from '@/server/params';
 import type { AgendaResponse, AgendaWhen } from '@/shared/types';
 import { langFromHeader, tx } from '@/shared/i18n';
@@ -15,8 +15,12 @@ export async function GET(request: Request): Promise<Response> {
   }
   try {
     const lang = langFromHeader(request.headers.get('accept-language'));
-    const body: AgendaResponse = { events: await agenda(near, when, new Date(), lang) };
-    return Response.json(body);
+    const debug: AgendaDebug | undefined =
+      q.get('debug') === '1'
+        ? { window: { start: '', end: '' }, partnerEvents: 0, openAgendaKey: false, agendas: [] }
+        : undefined;
+    const body: AgendaResponse = { events: await agenda(near, when, new Date(), lang, debug) };
+    return Response.json(debug ? { ...body, debug } : body);
   } catch (error) {
     console.error('[api/agenda]', error);
     return Response.json({ error: tx('Agenda momentanément indisponible') }, { status: 500 });
