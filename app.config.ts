@@ -68,6 +68,15 @@ const config: ExpoConfig = {
     blockedPermissions: [
       'android.permission.READ_EXTERNAL_STORAGE',
       'android.permission.WRITE_EXTERNAL_STORAGE',
+      // Déclarées par le SDK de navigation Google (guidage), qu'on n'utilise plus :
+      // Google Play exigerait de justifier un service de localisation en arrière-plan.
+      'android.permission.ACCESS_BACKGROUND_LOCATION',
+      'android.permission.FOREGROUND_SERVICE',
+      'android.permission.FOREGROUND_SERVICE_LOCATION',
+      'android.permission.FOREGROUND_SERVICE_DATA_SYNC',
+      'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
+      'android.permission.SCHEDULE_EXACT_ALARM',
+      'android.permission.USE_EXACT_ALARM',
     ],
     predictiveBackGestureEnabled: false,
   },
@@ -85,6 +94,7 @@ const config: ExpoConfig = {
         // Pas de guidage dans l'app (il se fait dans Google Maps) : pas d'arrière-plan.
         isIosBackgroundLocationEnabled: false,
         isAndroidBackgroundLocationEnabled: false,
+        isAndroidForegroundServiceEnabled: false,
       },
     ],
     'expo-system-ui',
