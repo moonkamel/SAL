@@ -13,7 +13,7 @@ export interface RankingWeights {
 }
 
 export const RANKING = {
-  weights: { rating: 0.4, popularity: 0.1, distance: 0.3, relevance: 0.2 } as RankingWeights,
+  weights: { rating: 0.4, popularity: 0.1, distance: 0.35, relevance: 0.15 } as RankingWeights,
   /** Note « a priori » d'un lieu sans avis, et poids de cet a priori (en nombre d'avis). */
   priorRating: 3.8,
   priorWeight: 30,

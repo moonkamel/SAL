@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import {
   FlatList,
@@ -22,9 +22,10 @@ import { useAds } from '@/src/features/ads/AdsProvider';
 import { NativeAdCard } from '@/src/features/ads/NativeAdCard';
 import { withAdSlots } from '@/src/features/ads/policy';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
-import { useT } from '@/src/i18n';
+import { tx, useT } from '@/src/i18n';
 import { ApiRequestError, searchPlaces } from '@/src/lib/api';
 import { font, fonts, motion, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { type PlaceSort, sortPlaces } from '@/shared/sortPlaces';
 import { AMBIANCE_LABELS, type Ambiance, type PlaceSummary, type SearchFilters } from '@/shared/types';
 import { themedStyles, useColors } from '@/src/theme/tone';
 
@@ -36,6 +37,12 @@ type State =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
   | { kind: 'done'; places: PlaceSummary[] };
+
+const SORTS: { key: PlaceSort; label: string }[] = [
+  { key: 'recommended', label: tx('Recommandés') },
+  { key: 'nearest', label: tx('Plus proches') },
+  { key: 'topRated', label: tx('Mieux notés') },
+];
 
 export default function ResultsScreen() {
   const colors = useColors();
@@ -55,6 +62,7 @@ export default function ResultsScreen() {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
   const [view, setView] = useState<'list' | 'map'>('list');
+  const [sort, setSort] = useState<PlaceSort>('recommended');
 
   const openPlace = (id: string) => router.push({ pathname: '/place/[id]', params: { id } });
   const abortRef = useRef<AbortController | null>(null);
@@ -91,6 +99,10 @@ export default function ResultsScreen() {
   };
 
   const activeCount = countActiveFilters(filters);
+  const places = useMemo(
+    () => (state.kind === 'done' ? sortPlaces(state.places, sort) : []),
+    [state, sort],
+  );
 
   return (
     <View style={styles.screen}>
@@ -149,7 +161,7 @@ export default function ResultsScreen() {
 
       {state.kind === 'done' && view === 'list' && (
         <FlatList
-          data={withAdSlots(state.places, canRequestAds)}
+          data={withAdSlots(places, canRequestAds)}
           keyExtractor={(item) => (item.type === 'ad' ? item.key : item.place.id)}
           contentContainerStyle={styles.list}
           // Photos facturées à l'affichage : seules les cartes proches de l'écran sont rendues.
@@ -182,6 +194,23 @@ export default function ResultsScreen() {
                     ? t('{n} adresses autour de vous', { n: state.places.length })
                     : t('1 adresse autour de vous')}
                 </Text>
+              )}
+              {state.places.length > 1 && (
+                <View style={styles.sorts} accessibilityRole="radiogroup" accessibilityLabel={t('Trier')}>
+                  {SORTS.map((o) => (
+                    <Pressable
+                      key={o.key}
+                      onPress={() => setSort(o.key)}
+                      style={[styles.sort, sort === o.key && styles.sortActive]}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: sort === o.key }}
+                    >
+                      <Text style={[styles.sortText, sort === o.key && styles.sortTextActive]} numberOfLines={1}>
+                        {t(o.label)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
               )}
             </View>
           }
@@ -223,6 +252,19 @@ const useStyles = themedStyles((colors) => ({
   list: { padding: spacing.lg, paddingTop: 0 },
   count: { color: colors.text, fontFamily: fonts.displayMedium, fontSize: font.title - 2 },
   spacer: { flex: 1, minWidth: spacing.xs },
+  // Sélecteur à trois segments, sur une seule ligne même sur un petit écran.
+  sorts: {
+    flexDirection: 'row',
+    padding: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sort: { flex: 1, minHeight: TOUCH_TARGET - 8, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, paddingHorizontal: spacing.xs },
+  sortActive: { backgroundColor: colors.accent },
+  sortText: { color: colors.textMuted, fontSize: font.small, fontWeight: '700' },
+  sortTextActive: { color: colors.accentText },
   toggle: {
     alignItems: 'center',
     justifyContent: 'center',
