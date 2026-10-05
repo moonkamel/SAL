@@ -11,6 +11,7 @@ import type {
   Review,
 } from '@/shared/types';
 import { type Lang, LANG_INFO, tx } from '@/shared/i18n';
+import { TtlCache } from './cache';
 
 const PLACES_BASE = 'https://places.googleapis.com/v1';
 
@@ -403,6 +404,29 @@ export async function placeDetails(
   const details = mapDetails((await res.json()) as GooglePlace, new Date(), lang);
   if (!details) throw new PlacesError(tx('Lieu introuvable'), 404);
   return details;
+}
+
+// Photo principale d'une fiche Google : la référence change rarement, une journée de cache.
+const mainPhotoCache = new TtlCache<string | null>(24 * 3_600_000, 500);
+
+/** Référence de la 1re photo de la fiche Google (« places/…/photos/… »), ou null. */
+export async function mainPhotoName(id: string): Promise<string | null> {
+  if (!PLACE_ID_PATTERN.test(id)) return null;
+  const hit = mainPhotoCache.get(id);
+  if (hit !== undefined) return hit;
+  try {
+    const res = await fetch(`${PLACES_BASE}/places/${id}`, {
+      headers: { 'X-Goog-Api-Key': apiKey(), 'X-Goog-FieldMask': 'photos' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null; // pas mis en cache : nouvel essai plus tard
+    const body = (await res.json()) as { photos?: { name?: string }[] };
+    const name = body.photos?.[0]?.name ?? null;
+    mainPhotoCache.set(id, name);
+    return name;
+  } catch {
+    return null;
+  }
 }
 
 /**

@@ -19,7 +19,7 @@ export async function GET(request: Request): Promise<Response> {
       q.get('debug') === '1'
         ? { window: { start: '', end: '' }, partnerEvents: 0, openAgendaKey: false, agendas: [] }
         : undefined;
-    const body: AgendaResponse = { events: await agenda(near, when, new Date(), lang, debug) };
+    const body: AgendaResponse = { events: await agenda(near, when, new Date(), lang, debug, new URL(request.url).origin) };
     return Response.json(debug ? { ...body, debug } : body);
   } catch (error) {
     console.error('[api/agenda]', error);

@@ -11,6 +11,7 @@ import { isAutoTranslateEnabled, lastTranslateError, translateFields } from './a
 import { TtlCache } from './cache';
 import { getContent } from './content';
 import { categorize, detectGenres, isFree, plainText } from './eventText';
+import { mainPhotoName } from './places';
 import { addDays, formatParisDayTime, formatParisTime, parisParts, parisTime } from './paris';
 import type { EventItem } from './schemas';
 
@@ -411,6 +412,21 @@ const dedupKey = (e: AgendaEvent) =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 
+/**
+ * Événement partenaire sans image mais rattaché à une fiche Google : on montre la
+ * photo principale de la fiche (via /api/photo, la clé Google reste sur le serveur).
+ */
+async function withPlacePhotos(events: AgendaEvent[], origin?: string): Promise<AgendaEvent[]> {
+  if (!origin) return events;
+  return Promise.all(
+    events.map(async (e) => {
+      if (e.imageUrl || !e.placeId) return e;
+      const name = await mainPhotoName(e.placeId);
+      return name ? { ...e, imageUrl: `${origin}/api/photo?name=${encodeURIComponent(name)}&w=800` } : e;
+    }),
+  );
+}
+
 /** Diagnostic (?debug=1) : ce que chaque source a renvoyé, sans jamais la clé. */
 export interface AgendaDebug {
   window: { start: string; end: string };
@@ -435,11 +451,16 @@ export async function agenda(
   now: Date = new Date(),
   lang: Lang = 'fr',
   debug?: AgendaDebug,
+  /** Adresse du serveur (https://…), pour les photos Google des événements partenaires. */
+  origin?: string,
 ): Promise<AgendaEvent[]> {
   const w = windowFor(when, now);
-  const partner = (await getContent('events'))
-    .map((item) => fromPartnerEvent(item, near, w, now, lang))
-    .filter((e): e is AgendaEvent => e !== null);
+  const partner = await withPlacePhotos(
+    (await getContent('events'))
+      .map((item) => fromPartnerEvent(item, near, w, now, lang))
+      .filter((e): e is AgendaEvent => e !== null),
+    origin,
+  );
 
   const oa = openAgendaConfig();
   if (debug) {
