@@ -5,11 +5,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { type ComponentProps, useState } from 'react';
-import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GradientButton } from '@/src/components/GradientButton';
 import { CATEGORY_INFO } from '@/src/features/agenda/EventCard';
+import { useNotifications } from '@/src/features/notifications/NotificationsProvider';
 import { tx, useI18n } from '@/src/i18n';
 import { getKnownEvent } from '@/src/lib/api';
 import { font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
@@ -198,6 +199,7 @@ function About({ event }: { event: AgendaEvent }) {
             }} />
         )}
         <LinkButton icon="share-social-outline" label={t('Partager')} onPress={share} />
+        <ReminderButton event={event} />
         {event.url && event.source === 'openagenda' && (
           <LinkButton icon="open-outline" label={t('Voir sur OpenAgenda')} onPress={() => open(event.url!)} />
         )}
@@ -207,6 +209,24 @@ function About({ event }: { event: AgendaEvent }) {
       )}
       {event.source === 'ticketmaster' && <Text style={styles.source}>{t('Source : Ticketmaster.')}</Text>}
     </View>
+  );
+}
+
+/** « Me le rappeler » : notification 2 h avant le début (si l'événement n'a pas commencé). */
+function ReminderButton({ event }: { event: AgendaEvent }) {
+  const { t } = useI18n();
+  const { isReminded, toggleReminder } = useNotifications();
+  const on = isReminded(event.id);
+  if (Platform.OS === 'web' || (!on && new Date(event.start).getTime() - Date.now() < 15 * 60_000)) return null;
+  return (
+    <LinkButton
+      icon={on ? 'notifications' : 'notifications-outline'}
+      label={on ? t('Rappel activé') : t('Me le rappeler')}
+      onPress={() => {
+        void Haptics.selectionAsync();
+        void toggleReminder(event);
+      }}
+    />
   );
 }
 

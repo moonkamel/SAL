@@ -10,7 +10,7 @@ import { currentLang } from '@/src/i18n';
 import { apiOrigin } from './api';
 
 type Props = Record<string, string | number | boolean>;
-type Name = 'app_open' | 'screen' | 'search' | 'sort' | 'open_now' | 'directions' | 'ticket' | 'share';
+type Name = 'app_open' | 'screen' | 'search' | 'sort' | 'open_now' | 'directions' | 'ticket' | 'share' | 'reminder' | 'notifications';
 
 const session = Array.from({ length: 16 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
 let queue: { name: Name; props?: Props; t: number }[] = [];

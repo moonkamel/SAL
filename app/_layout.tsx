@@ -11,6 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AdsProvider } from '@/src/features/ads/AdsProvider';
 import { useDaytime } from '@/src/features/moment/useDaytime';
+import { NotificationsProvider } from '@/src/features/notifications/NotificationsProvider';
 import { FavoritesProvider } from '@/src/features/favorites/FavoritesProvider';
 import { LocationProvider } from '@/src/features/location/LocationProvider';
 import { AppNavigationProvider } from '@/src/features/navigation/AppNavigationProvider';
@@ -100,6 +101,7 @@ function AppWithLanguage() {
     <AppNavigationProvider>
       <LocationProvider>
         <FavoritesProvider>
+          <NotificationsProvider>
           <AdsProvider>
             <StatusBar style={statusBar} />
             <Stack
@@ -124,12 +126,14 @@ function AppWithLanguage() {
               <Stack.Screen name="event/[id]" options={{ title: '' }} />
               <Stack.Screen name="admin" options={{ title: 'Espace partenaires' }} />
               <Stack.Screen name="privacy" options={{ title: 'Confidentialité' }} />
+              <Stack.Screen name="notifications" options={{ title: t('Notifications') }} />
               <Stack.Screen
                 name="language"
                 options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
               />
             </Stack>
           </AdsProvider>
+          </NotificationsProvider>
         </FavoritesProvider>
       </LocationProvider>
     </AppNavigationProvider>

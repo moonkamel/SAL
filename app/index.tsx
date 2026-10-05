@@ -27,6 +27,7 @@ import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { OffersRail, TonightRail } from '@/src/features/moment/HomeRails';
 import { SurpriseCard } from '@/src/features/moment/SurpriseCard';
 import { WeatherCard } from '@/src/features/moment/WeatherCard';
+import { NotificationInvite } from '@/src/features/notifications/NotificationInvite';
 import { weatherIcon } from '@/src/features/moment/weatherIcons';
 import { tx, useI18n } from '@/src/i18n';
 import { LANG_INFO } from '@/shared/i18n';
@@ -177,6 +178,7 @@ export default function HomeScreen() {
             </Animated.View>
 
             <TonightRail near={coords} />
+            <NotificationInvite />
             <OffersRail near={coords} />
 
             <View style={styles.section}>
@@ -250,6 +252,15 @@ export default function HomeScreen() {
                 </View>
               </Animated.View>
             )}
+            <Pressable
+              onPress={() => router.push('/notifications')}
+              style={styles.footerLink}
+              hitSlop={8}
+              accessibilityRole="button"
+            >
+              <Ionicons name="notifications-outline" size={14} color={tone.textFaint} />
+              <Text style={[styles.privacyText, { color: tone.textFaint }]}>{tr('Notifications et rappels')}</Text>
+            </Pressable>
           </ScrollView>
 
           {privacyOptionsRequired && (
@@ -383,5 +394,13 @@ const useStyles = themedStyles((colors) => ({
   historySeparator: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   historyText: { flex: 1, color: colors.text, fontSize: font.body },
   privacy: { alignItems: 'center', paddingVertical: spacing.sm },
+  footerLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.sm,
+  },
   privacyText: { color: colors.textFaint, fontSize: font.tiny, textDecorationLine: 'underline' },
 }));

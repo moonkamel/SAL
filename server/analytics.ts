@@ -16,6 +16,8 @@ export const EVENT_NAMES = [
   'directions',
   'ticket',
   'share',
+  'reminder',
+  'notifications',
 ] as const;
 
 const PropValue = z.union([z.string().max(80), z.number().finite(), z.boolean()]);

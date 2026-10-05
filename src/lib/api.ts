@@ -163,6 +163,11 @@ export async function getAgenda(
   return res;
 }
 
+/** Garde un événement en mémoire (ex. rappel programmé, retrouvé après un redémarrage). */
+export function rememberEvent(event: AgendaEvent): void {
+  knownEvents.set(event.id, event);
+}
+
 export function getKnownEvent(id: string): AgendaEvent | undefined {
   return knownEvents.get(id);
 }

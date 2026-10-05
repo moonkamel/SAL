@@ -99,6 +99,8 @@ const config: ExpoConfig = {
     ],
     'expo-system-ui',
     'expo-web-browser',
+    // Notifications locales (programme du week-end, rappels d'événements) : pas de serveur push.
+    ['expo-notifications', { icon: './assets/notification-icon.png', color: '#D9502F' }],
     [
       'react-native-google-mobile-ads',
       {
