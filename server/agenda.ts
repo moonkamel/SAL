@@ -416,17 +416,26 @@ const normalize = (s: string) =>
 const dedupKey = (e: AgendaEvent) => normalize(`${e.title}|${e.venueName}`);
 
 /**
- * Même événement venu de deux sources (« concert : Youngblood Brass band » au FLOW
- * sur OpenAgenda, « YOUNGBLOOD BRASS BAND » au LE FLOW sur Ticketmaster) : même
- * endroit (< 300 m), même heure (± 90 min) et un titre contenu dans l'autre.
+ * Même événement publié deux fois (« concert : Youngblood Brass band » au FLOW sur
+ * OpenAgenda, « YOUNGBLOOD BRASS BAND » au LE FLOW sur Ticketmaster) : même endroit
+ * (< 300 m), même heure (± 90 min) et un titre contenu dans l'autre.
  */
 export function sameEvent(a: AgendaEvent, b: AgendaEvent): boolean {
   if (haversineMeters(a.location, b.location) > 300) return false;
   if (Math.abs(new Date(a.start).getTime() - new Date(b.start).getTime()) > 90 * 60_000) return false;
   const ta = normalize(a.title);
   const tb = normalize(b.title);
-  if (ta.length < 3 || tb.length < 3) return false;
-  return ta.includes(tb) || tb.includes(ta);
+  if (ta.length >= 3 && tb.length >= 3 && (ta.includes(tb) || tb.includes(ta))) return true;
+  // Même soirée publiée deux fois sous deux titres (« Shii Foo Miix » dont la
+  // description est « DJ Vadim + Selecta Cab ») : à la même heure exactement,
+  // un titre repris dans la description de l'autre, ou le même texte de présentation.
+  if (Math.abs(new Date(a.start).getTime() - new Date(b.start).getTime()) > 15 * 60_000) return false;
+  const da = normalize(a.description ?? '');
+  const db = normalize(b.description ?? '');
+  if ((ta.length >= 5 && db.includes(ta)) || (tb.length >= 5 && da.includes(tb))) return true;
+  const la = normalize(a.longDescription ?? '').slice(0, 200);
+  const lb = normalize(b.longDescription ?? '').slice(0, 200);
+  return la.length >= 80 && la === lb;
 }
 
 /**

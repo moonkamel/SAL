@@ -512,4 +512,15 @@ describe('agenda : doublons entre sources', () => {
     expect(sameEvent(ev({}), { ...tm, start: '2026-10-07T18:00:00.000Z' })).toBe(false);
     expect(sameEvent(ev({}), { ...tm, title: 'Autre groupe' })).toBe(false);
   });
+
+  it('reconnaît une même soirée publiée sous deux titres', async () => {
+    const { sameEvent } = await import('@/server/agenda');
+    const long = 'Tous les jeudis au Bistrot de St So ! Du bon goût pour tes oreilles, du bon son pour ton bidon. DJ Vadim en tête d’affiche.';
+    const a = ev({ title: 'DJ Vadim + Selecta Cab', longDescription: long });
+    const b = ev({ id: 'y', title: 'Shii Foo Miix', description: 'DJ Vadim + Selecta Cab' });
+    expect(sameEvent(a, b)).toBe(true);
+    expect(sameEvent(ev({ title: 'Soirée A', longDescription: long }), ev({ title: 'Soirée B', longDescription: long }))).toBe(true);
+    // Deux concerts différents au même endroit, même heure : gardés tous les deux.
+    expect(sameEvent(ev({ title: 'Groupe A', description: 'Rock' }), ev({ title: 'Groupe B', description: 'Jazz' }))).toBe(false);
+  });
 });
