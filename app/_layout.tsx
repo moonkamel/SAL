@@ -2,10 +2,11 @@ import { Fraunces_600SemiBold } from '@expo-google-fonts/fraunces/600SemiBold';
 import { Fraunces_600SemiBold_Italic } from '@expo-google-fonts/fraunces/600SemiBold_Italic';
 import { Fraunces_700Bold } from '@expo-google-fonts/fraunces/700Bold';
 import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AdsProvider } from '@/src/features/ads/AdsProvider';
@@ -14,6 +15,7 @@ import { FavoritesProvider } from '@/src/features/favorites/FavoritesProvider';
 import { LocationProvider } from '@/src/features/location/LocationProvider';
 import { AppNavigationProvider } from '@/src/features/navigation/AppNavigationProvider';
 import { LanguageProvider, useI18n } from '@/src/i18n';
+import { track } from '@/src/lib/analytics';
 import { LanguagePicker } from '@/src/i18n/LanguagePicker';
 import { fonts } from '@/src/theme';
 import { type Tone, TONES, ToneProvider, useColors, useTone } from '@/src/theme/tone';
@@ -73,6 +75,15 @@ function AppWithLanguage() {
   const colors = useColors();
   const { ready, chosen, t } = useI18n();
   const statusBar = useTone().tone === 'day' ? 'dark' : 'light';
+  // Statistiques anonymes : ouverture de l'app et écrans vus (« /place/[id] », jamais l'identifiant).
+  const segments = useSegments();
+  const screen = `/${segments.join('/')}`;
+  useEffect(() => {
+    if (ready) track('app_open');
+  }, [ready]);
+  useEffect(() => {
+    if (ready && chosen) track('screen', { screen });
+  }, [ready, chosen, screen]);
   const pathname = usePathname();
   if (!ready) return null;
   // La politique de confidentialité s'ouvre directement (lien depuis Google Play).

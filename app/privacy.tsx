@@ -6,7 +6,7 @@ import { themedStyles } from '@/src/theme/tone';
 
 // Adresse de contact publiée (EAS : EXPO_PUBLIC_CONTACT_EMAIL).
 const CONTACT = process.env.EXPO_PUBLIC_CONTACT_EMAIL;
-const UPDATED = '1er octobre 2026';
+const UPDATED = '6 octobre 2026';
 
 const SECTIONS: { title: string; body: string[] }[] = [
   {
@@ -40,6 +40,13 @@ const SECTIONS: { title: string; body: string[] }[] = [
     ],
   },
   {
+    title: 'Statistiques d’utilisation',
+    body: [
+      'Pour améliorer l’application, nous mesurons de façon anonyme son utilisation : écrans consultés, recherches tapées (texte seul), tri choisi, itinéraires et billetteries ouverts.',
+      'Ces mesures sont rattachées à un numéro tiré au hasard à chaque ouverture de l’application, jamais à votre identité, à votre appareil ni à votre position. Elles sont conservées au plus 13 mois et ne sont ni vendues ni partagées.',
+    ],
+  },
+  {
     title: 'Liens partenaires',
     body: [
       'Certains liens (réservation, billetterie, VTC) sont des liens partenaires : nous comptons le nombre de clics par lieu, sans aucune donnée personnelle, et pouvons recevoir une commission.',
@@ -54,7 +61,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'Vos droits',
     body: [
-      'Comme aucune donnée personnelle n’est conservée sur nos serveurs, il n’y a rien à supprimer de notre côté : désinstaller l’application efface tout ce qu’elle a enregistré sur votre téléphone.',
+      'Aucune donnée permettant de vous identifier n’est conservée sur nos serveurs (les statistiques sont anonymes) : désinstaller l’application efface tout ce qu’elle a enregistré sur votre téléphone.',
       'Pour toute question sur vos données (RGPD), contactez-nous' +
         (CONTACT ? ` : ${CONTACT}.` : ' via l’adresse indiquée sur la fiche Google Play.') +
         ' Vous pouvez aussi saisir la CNIL (cnil.fr).',

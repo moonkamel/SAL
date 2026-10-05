@@ -16,6 +16,7 @@ import { adminRequest, ApiRequestError, searchPlaces } from '@/src/lib/api';
 import { colors, font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { GRAND_PLACE } from '@/shared/geo';
 import type { PlaceSummary } from '@/shared/types';
+import type { UsageStats } from '@/server/analytics';
 
 import {
   type ContentKind,
@@ -42,6 +43,8 @@ interface Status {
   openAgenda: boolean;
   clicks: { partner: string; placeId: string; clicks: number }[];
   clicksError?: string;
+  usage?: UsageStats;
+  usageError?: string;
 }
 
 const STORAGE_KEY = 'sal-admin-password';
@@ -157,30 +160,157 @@ export function AdminPanel() {
   );
 }
 
+// Libellés lisibles des écrans de l'app (statistiques).
+const SCREEN_NAMES: Record<string, string> = {
+  '/': 'Accueil',
+  '/results': 'Résultats de recherche',
+  '/place/[id]': 'Fiche d’un lieu',
+  '/route/[id]': 'Itinéraire',
+  '/transit/[id]': 'Transports (horaires)',
+  '/agenda': 'Agenda',
+  '/event/[id]': 'Fiche d’un événement',
+  '/offers': 'Bons plans',
+  '/favorites': 'Favoris',
+  '/language': 'Choix de la langue',
+  '/privacy': 'Confidentialité',
+};
+const screenName = (s: string) => SCREEN_NAMES[s] ?? s;
+const MODE_NAMES: Record<string, string> = { walking: 'À pied', bicycle: 'Vélo', driving: 'Voiture', transit: 'Transports' };
+
+function Bar({ label, value, max, suffix }: { label: string; value: number; max: number; suffix?: string }) {
+  return (
+    <View style={{ gap: 4 }}>
+      <View style={styles.row}>
+        <Text style={[styles.text, { flex: 1 }]} numberOfLines={1}>
+          {label}
+        </Text>
+        <Text style={styles.count}>
+          {value}
+          {suffix ? <Text style={styles.muted}> {suffix}</Text> : null}
+        </Text>
+      </View>
+      <View style={styles.barTrack}>
+        <View style={[styles.barFill, { width: `${max ? Math.max(2, (value / max) * 100) : 0}%` }]} />
+      </View>
+    </View>
+  );
+}
+
+function Usage({ usage }: { usage: UsageStats }) {
+  const maxDay = Math.max(1, ...usage.perDay.map((d) => d.sessions));
+  const opened = usage.funnel[0]?.sessions ?? 0;
+  return (
+    <>
+      <View style={styles.card}>
+        <Text style={styles.h2}>Utilisation ({usage.days} derniers jours)</Text>
+        <Text style={styles.text}>
+          <Text style={styles.count}>{usage.sessions}</Text> ouvertures de l’app
+        </Text>
+        <View style={styles.chart}>
+          {usage.perDay.map((d) => (
+            <View key={d.day} style={styles.chartCol} accessibilityLabel={`${d.day} : ${d.sessions}`}>
+              <View style={[styles.chartBar, { height: `${(d.sessions / maxDay) * 100}%` }]} />
+            </View>
+          ))}
+        </View>
+        <Text style={styles.help}>Une barre par jour (ouvertures de l’app).</Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.h2}>Parcours</Text>
+        <Text style={styles.help}>Sur 100 ouvertures, combien vont jusqu’à chaque étape (une même ouverture compte une fois).</Text>
+        {usage.funnel.map((f) => (
+          <Bar
+            key={f.step}
+            label={f.step}
+            value={f.sessions}
+            max={opened}
+            suffix={opened ? `(${Math.round((f.sessions / opened) * 100)} %)` : undefined}
+          />
+        ))}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.h2}>Recherches les plus fréquentes</Text>
+        {usage.searches.length === 0 ? (
+          <Text style={styles.muted}>Aucune recherche pour le moment.</Text>
+        ) : (
+          usage.searches.map((q) => (
+            <Bar key={q.query} label={`${q.query}  ·  ${q.avgResults} résultats en moyenne`} value={q.count} max={usage.searches[0]!.count} />
+          ))
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.h2}>Recherches sans résultat</Text>
+        <Text style={styles.help}>Ce que les gens cherchent sans rien trouver : idées de contenus ou de partenaires.</Text>
+        {usage.emptySearches.length === 0 ? (
+          <Text style={styles.muted}>Aucune.</Text>
+        ) : (
+          usage.emptySearches.map((q) => <Bar key={q.query} label={q.query} value={q.count} max={usage.emptySearches[0]!.count} />)
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.h2}>Écrans les plus vus</Text>
+        {usage.screens.map((s) => (
+          <Bar key={s.screen} label={screenName(s.screen)} value={s.views} max={usage.screens[0]?.views ?? 1} />
+        ))}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.h2}>Où les gens quittent l’app</Text>
+        <Text style={styles.help}>Dernier écran vu avant de fermer l’app ou de partir vers Google Maps.</Text>
+        {usage.exits.map((s) => (
+          <Bar key={s.screen} label={screenName(s.screen)} value={s.sessions} max={usage.exits[0]?.sessions ?? 1} />
+        ))}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.h2}>Itinéraires lancés et langues</Text>
+        {usage.directions.map((d) => (
+          <Bar key={d.mode} label={MODE_NAMES[d.mode] ?? d.mode} value={d.count} max={usage.directions[0]?.count ?? 1} />
+        ))}
+        <Text style={styles.muted}>
+          {usage.languages.map((l) => `${l.lang.toUpperCase()} ${l.sessions}`).join(' · ')}
+        </Text>
+      </View>
+    </>
+  );
+}
+
 function Stats({ status }: { status: Status }) {
   if (!status.database) {
-    return <Text style={styles.muted}>Les clics sont comptés dans la base de données (non configurée).</Text>;
+    return <Text style={styles.muted}>Les statistiques sont enregistrées dans la base de données (non configurée).</Text>;
   }
-  if (status.clicksError) return <Text style={styles.error}>{status.clicksError}</Text>;
   return (
-    <View style={styles.card}>
-      <Text style={styles.h2}>Clics sur les liens partenaires (30 derniers jours)</Text>
-      {status.clicks.length === 0 ? (
-        <Text style={styles.muted}>Aucun clic pour le moment.</Text>
-      ) : (
-        status.clicks.map((c) => (
-          <View key={`${c.partner}|${c.placeId}`} style={styles.row}>
-            <Text style={[styles.text, { flex: 1 }]}>
-              {c.partner} · <Text style={styles.muted}>{c.placeId}</Text>
-            </Text>
-            <Text style={styles.count}>{c.clicks}</Text>
-          </View>
-        ))
-      )}
-      <Text style={styles.muted}>
-        Agenda OpenAgenda : {status.openAgenda ? 'activé' : 'non configuré'}.
-      </Text>
-    </View>
+    <>
+      {status.usageError ? (
+        <Text style={styles.error}>
+          {status.usageError} — avez-vous créé la table « events » (supabase/schema.sql) ?
+        </Text>
+      ) : status.usage ? (
+        <Usage usage={status.usage} />
+      ) : null}
+      <View style={styles.card}>
+        <Text style={styles.h2}>Clics sur les liens partenaires (30 derniers jours)</Text>
+        {status.clicksError ? (
+          <Text style={styles.error}>{status.clicksError}</Text>
+        ) : status.clicks.length === 0 ? (
+          <Text style={styles.muted}>Aucun clic pour le moment.</Text>
+        ) : (
+          status.clicks.map((c) => (
+            <View key={`${c.partner}|${c.placeId}`} style={styles.row}>
+              <Text style={[styles.text, { flex: 1 }]}>
+                {c.partner} · <Text style={styles.muted}>{c.placeId}</Text>
+              </Text>
+              <Text style={styles.count}>{c.clicks}</Text>
+            </View>
+          ))
+        )}
+        <Text style={styles.muted}>Agenda OpenAgenda : {status.openAgenda ? 'activé' : 'non configuré'}.</Text>
+      </View>
+    </>
   );
 }
 
@@ -517,6 +647,11 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   count: { color: colors.gold, fontSize: font.body, fontWeight: '800' },
+  barTrack: { height: 6, borderRadius: 3, backgroundColor: colors.surfaceRaised, overflow: 'hidden' },
+  barFill: { height: 6, borderRadius: 3, backgroundColor: colors.accent },
+  chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 90, marginTop: spacing.sm },
+  chartCol: { flex: 1, height: '100%', justifyContent: 'flex-end' },
+  chartBar: { backgroundColor: colors.gold, borderTopLeftRadius: 3, borderTopRightRadius: 3, minHeight: 2 },
   input: {
     minHeight: TOUCH_TARGET,
     borderRadius: radius.sm,

@@ -17,6 +17,7 @@ import { font, fonts, radius, spacing } from '@/src/theme';
 import { segmentPoints } from '@/shared/trip';
 import type { LatLng, TransitItinerary } from '@/shared/types';
 import { themedStyles, useColors } from '@/src/theme/tone';
+import { track } from '@/src/lib/analytics';
 
 type State =
   | { kind: 'loading' }
@@ -111,6 +112,7 @@ export default function TransitTripScreen() {
 
   const openGoogleMaps = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    track('directions', { mode: 'transit' });
     void Linking.openURL(googleMapsDirections(destination, 'transit', { id: params.id, name }));
   };
 

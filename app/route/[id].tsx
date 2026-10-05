@@ -17,6 +17,7 @@ import { formatArrival, formatDistance, formatDuration } from '@/shared/format';
 import { decodePolyline } from '@/shared/polyline';
 import type { LatLng, RouteOption, TravelMode } from '@/shared/types';
 import { themedStyles, useColors } from '@/src/theme/tone';
+import { track } from '@/src/lib/analytics';
 
 const MODES: {
   mode: TravelMode;
@@ -93,6 +94,7 @@ export default function RoutePreviewScreen() {
   // Le guidage (voix, virages) se fait dans Google Maps.
   const onStart = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    track('directions', { mode });
     void Linking.openURL(googleMapsDirections(destination, mode, { id: params.id, name: params.name }));
   };
 

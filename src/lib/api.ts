@@ -27,7 +27,7 @@ import { currentLang } from '@/src/i18n';
  * - EXPO_PUBLIC_API_URL si défini (production, EAS Hosting) ;
  * - sinon le serveur de développement Metro, qui sert aussi les routes API.
  */
-function apiOrigin(): string {
+export function apiOrigin(): string {
   const configured = process.env.EXPO_PUBLIC_API_URL;
   if (configured) return configured.replace(/\/$/, '');
   // Sur le web, l'app et les routes API sont servies par la même origine.

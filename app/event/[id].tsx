@@ -14,6 +14,7 @@ import { tx, useI18n } from '@/src/i18n';
 import { getKnownEvent } from '@/src/lib/api';
 import { font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { themedStyles, useColors } from '@/src/theme/tone';
+import { track } from '@/src/lib/analytics';
 import { formatDistance } from '@/shared/format';
 import {
   type AgendaEvent,
@@ -164,12 +165,14 @@ export default function EventScreen() {
 function About({ event }: { event: AgendaEvent }) {
   const styles = useStyles();
   const { t } = useI18n();
-  const share = () =>
+  const share = () => {
+    track('share', { source: event.source });
     void Share.share({
       message: [event.title, event.dateLabel, event.venueName, event.url, '', t('Trouvé avec Sortir à Lille')]
         .filter((l) => l !== undefined)
         .join('\n'),
     }).catch(() => {});
+  };
   const text = event.longDescription ?? event.description;
   return (
     <View style={styles.section}>
@@ -189,7 +192,10 @@ function About({ event }: { event: AgendaEvent }) {
 
       <View style={styles.links}>
         {event.ticketUrl && (
-          <LinkButton icon="ticket-outline" label={t('Billets / réservation')} onPress={() => open(event.ticketUrl!)} />
+          <LinkButton icon="ticket-outline" label={t('Billets / réservation')} onPress={() => {
+              track('ticket', { source: event.source });
+              open(event.ticketUrl!);
+            }} />
         )}
         <LinkButton icon="share-social-outline" label={t('Partager')} onPress={share} />
         {event.url && event.source === 'openagenda' && (

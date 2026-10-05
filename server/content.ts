@@ -44,7 +44,7 @@ export function hasDatabase(): boolean {
   return supabaseConfig() !== null;
 }
 
-async function supabase(
+export async function supabaseRequest(
   path: string,
   init: RequestInit & { prefer?: string } = {},
 ): Promise<Response> {
@@ -89,7 +89,7 @@ export async function listRaw(kind: ContentKind): Promise<unknown[]> {
   if (hit) return hit;
   let items: unknown[];
   if (hasDatabase()) {
-    const res = await supabase(`content?kind=eq.${kind}&select=data&order=id.asc`);
+    const res = await supabaseRequest(`content?kind=eq.${kind}&select=data&order=id.asc`);
     items = ((await res.json()) as { data: unknown }[]).map((row) => row.data);
   } else {
     items = Array.isArray(FILES[kind]) ? (FILES[kind] as unknown[]) : [];
@@ -109,7 +109,7 @@ export async function getContent<K extends ContentKind>(kind: K): Promise<Conten
 }
 
 export async function putContent(kind: ContentKind, id: string, data: unknown): Promise<void> {
-  await supabase('content?on_conflict=kind,id', {
+  await supabaseRequest('content?on_conflict=kind,id', {
     method: 'POST',
     prefer: 'resolution=merge-duplicates,return=minimal',
     body: JSON.stringify([{ kind, id, data, updated_at: new Date().toISOString() }]),
@@ -118,7 +118,7 @@ export async function putContent(kind: ContentKind, id: string, data: unknown): 
 }
 
 export async function deleteContent(kind: ContentKind, id: string): Promise<void> {
-  await supabase(`content?kind=eq.${kind}&id=eq.${encodeURIComponent(id)}`, {
+  await supabaseRequest(`content?kind=eq.${kind}&id=eq.${encodeURIComponent(id)}`, {
     method: 'DELETE',
     prefer: 'return=minimal',
   });
@@ -135,7 +135,7 @@ export function invalidate(kind?: ContentKind): void {
 export async function recordClick(click: { partner: string; placeId: string }): Promise<void> {
   if (!hasDatabase()) return;
   try {
-    await supabase('clicks', {
+    await supabaseRequest('clicks', {
       method: 'POST',
       prefer: 'return=minimal',
       body: JSON.stringify([{ partner: click.partner, place_id: click.placeId }]),
@@ -155,7 +155,7 @@ export interface ClickStat {
 /** Clics des `days` derniers jours, par partenaire et par lieu. */
 export async function clickStats(days = 30, now: Date = new Date()): Promise<ClickStat[]> {
   const since = new Date(now.getTime() - days * 86_400_000).toISOString();
-  const res = await supabase(
+  const res = await supabaseRequest(
     `clicks?select=partner,place_id&created_at=gte.${encodeURIComponent(since)}&limit=50000`,
   );
   const rows = (await res.json()) as { partner: string; place_id: string }[];

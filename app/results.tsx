@@ -28,6 +28,7 @@ import { font, fonts, motion, radius, spacing, TOUCH_TARGET } from '@/src/theme'
 import { type PlaceSort, sortPlaces } from '@/shared/sortPlaces';
 import { AMBIANCE_LABELS, type Ambiance, type PlaceSummary, type SearchFilters } from '@/shared/types';
 import { themedStyles, useColors } from '@/src/theme/tone';
+import { cleanQuery, track } from '@/src/lib/analytics';
 
 function parseAmbianceParam(value?: string): Ambiance[] {
   return (value ?? '').split(',').filter((a): a is Ambiance => a in AMBIANCE_LABELS);
@@ -66,6 +67,7 @@ export default function ResultsScreen() {
 
   const openPlace = (id: string) => router.push({ pathname: '/place/[id]', params: { id } });
   const abortRef = useRef<AbortController | null>(null);
+  const trackedRef = useRef<string | null>(null);
 
   const run = useCallback(async () => {
     if (!query) return;
@@ -75,7 +77,15 @@ export default function ResultsScreen() {
     try {
       const location = await refresh();
       const res = await searchPlaces({ query, location, filters }, controller.signal);
-      if (!controller.signal.aborted) setState({ kind: 'done', places: res.places });
+      if (!controller.signal.aborted) {
+        setState({ kind: 'done', places: res.places });
+        // Une fois par recherche (pas à chaque actualisation) : ce que les gens cherchent.
+        const key = `${query}|${JSON.stringify(filters)}`;
+        if (trackedRef.current !== key) {
+          trackedRef.current = key;
+          track('search', { q: cleanQuery(query), n: res.places.length, ...(filters.openNow ? { openNow: true } : {}) });
+        }
+      }
     } catch (error) {
       if (controller.signal.aborted) return;
       setState({
@@ -126,7 +136,10 @@ export default function ResultsScreen() {
         {/* Élément à part, à droite : le filtre le plus utilisé, activable d'un geste. */}
         <OpenNowToggle
           value={filters.openNow ?? false}
-          onChange={(on) => setFilters({ ...filters, openNow: on ? true : undefined })}
+          onChange={(on) => {
+            track('open_now', { on });
+            setFilters({ ...filters, openNow: on ? true : undefined });
+          }}
         />
       </View>
 
@@ -200,7 +213,10 @@ export default function ResultsScreen() {
                   {SORTS.map((o) => (
                     <Pressable
                       key={o.key}
-                      onPress={() => setSort(o.key)}
+                      onPress={() => {
+                        track('sort', { sort: o.key });
+                        setSort(o.key);
+                      }}
                       style={[styles.sort, sort === o.key && styles.sortActive]}
                       accessibilityRole="radio"
                       accessibilityState={{ checked: sort === o.key }}
