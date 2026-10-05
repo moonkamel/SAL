@@ -1,7 +1,7 @@
 // Stockage des contenus partenaires.
 // - Par défaut : fichiers JSON versionnés dans server/ (lecture seule, redéploiement
 //   nécessaire pour les modifier).
-// - Si SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont définies : base Supabase
+// - Si SUPABASE_URL et SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_ROLE_KEY) sont définies : base Supabase
 //   (tables « content » et « clicks », voir supabase/schema.sql), modifiable depuis
 //   l'espace partenaires /admin sans redéployer.
 
@@ -35,7 +35,8 @@ interface SupabaseConfig {
 
 export function supabaseConfig(): SupabaseConfig | null {
   const url = process.env.SUPABASE_URL?.replace(/\/$/, '');
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Nouvelle clé secrète (sb_secret_…) ou ancienne clé « service_role ».
+  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   return url && key ? { url, key } : null;
 }
 
@@ -49,11 +50,9 @@ async function supabase(
 ): Promise<Response> {
   const cfg = supabaseConfig();
   if (!cfg) throw new StoreError('Base de données non configurée (voir README)', 503);
-  const headers: Record<string, string> = {
-    apikey: cfg.key,
-    Authorization: `Bearer ${cfg.key}`,
-    'Content-Type': 'application/json',
-  };
+  const headers: Record<string, string> = { apikey: cfg.key, 'Content-Type': 'application/json' };
+  // Les nouvelles clés (sb_secret_…) ne sont pas des JWT : en-tête apikey seul.
+  if (!cfg.key.startsWith('sb_')) headers.Authorization = `Bearer ${cfg.key}`;
   if (init.prefer) headers.Prefer = init.prefer;
   let res: Response;
   try {

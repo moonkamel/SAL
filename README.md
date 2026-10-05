@@ -350,7 +350,7 @@ serveur en ligne). Sans ce réglage, l'espace reste fermé.
 
 ```
 SUPABASE_URL=https://xxxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
+SUPABASE_SECRET_KEY=sb_secret_...   # ou SUPABASE_SERVICE_ROLE_KEY=eyJ... (ancienne clé)
 ```
 
 Relancez `npm start` : l'espace partenaires indique « Base de données connectée » et les
@@ -446,7 +446,7 @@ doit rester allumé).
    eas env:set --name OPENAGENDA_KEY --value "…" --visibility sensitive --environment production
    ```
 
-   (idem pour `MEL_API_KEY`, `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+   (idem pour `MEL_API_KEY`, `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`,
    `ANTHROPIC_API_KEY` si vous les utilisez.)
 
 2. Mise en ligne du backend (EAS Hosting) :
