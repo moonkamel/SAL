@@ -6,6 +6,7 @@ import {
   guessCategory,
   isCulturalHighlight,
   openAgendaConfig,
+  outingDays,
   sortEvents,
   windowFor,
 } from '@/server/agenda';
@@ -117,6 +118,21 @@ describe('K : agenda', () => {
     // Un samedi soir : le week-end en cours, à partir de maintenant.
     const sat = new Date('2026-09-26T19:00:00Z');
     expect(windowFor('weekend', sat).start).toEqual(sat);
+  });
+
+  it('découpe la fenêtre en journées entières (6 h → 6 h)', () => {
+    // Lundi 15 h : « aujourd'hui » redemande toute la journée depuis 6 h.
+    const mon15 = new Date('2026-09-28T13:00:00Z');
+    const today = outingDays(windowFor('today', mon15));
+    expect(today).toHaveLength(1);
+    expect(today[0]!.start.toISOString()).toBe('2026-09-28T04:00:00.000Z');
+    // La semaine : du lundi au dimanche, 7 journées.
+    const week = outingDays(windowFor('week', mon15));
+    expect(week).toHaveLength(7);
+    expect(week[6]!.end.toISOString()).toBe('2026-10-05T04:00:00.000Z');
+    // À 1 h du matin, on est encore dans la journée de la veille.
+    const oneAm = new Date('2026-09-28T23:00:00Z');
+    expect(outingDays(windowFor('today', oneAm))[0]!.start.toISOString()).toBe('2026-09-28T04:00:00.000Z');
   });
 
   it('calcule « cette semaine » et « la semaine prochaine » (lundi 6 h → lundi 6 h)', () => {

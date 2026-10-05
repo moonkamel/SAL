@@ -12,7 +12,7 @@ import { useI18n, useT } from '@/src/i18n';
 import { getAgenda, getOffers } from '@/src/lib/api';
 import { font, fonts, radius, spacing } from '@/src/theme';
 import { useTone, themedStyles } from '@/src/theme/tone';
-import type { AgendaResponse, LatLng, OffersResponse } from '@/shared/types';
+import type { AgendaEvent, AgendaResponse, AgendaWhen, LatLng, OffersResponse } from '@/shared/types';
 
 /** On ne recharge qu'après un déplacement de ~200 m ; les distances restent exactes. */
 export function refreshKey(p: LatLng): number[] {
@@ -38,19 +38,43 @@ function Rail({ title, onSeeAll, children }: { title: string; onSeeAll: () => vo
   );
 }
 
-/** « Aujourd'hui à Lille » (agenda) ; s'il n'y a rien aujourd'hui, un accès à l'agenda complet. */
+/** Aperçu de l'agenda : « à la une » d'abord, puis les sorties les plus proches. */
+function nearestFirst(events: AgendaEvent[]): AgendaEvent[] {
+  return [...events]
+    .sort((a, b) => Number(b.featured) - Number(a.featured) || a.distanceMeters - b.distanceMeters)
+    .slice(0, 8);
+}
+
+/**
+ * « Aujourd'hui à Lille » : aperçu des sorties les plus proches. S'il n'y a plus rien
+ * aujourd'hui, celles de la semaine ; sinon, un simple accès à l'agenda.
+ */
 export function TonightRail({ near }: { near: LatLng }) {
   const { t, lang } = useI18n();
-  const { data, error } = useLiveData<AgendaResponse>(
+  const today = useLiveData<AgendaResponse>(
     (signal) => getAgenda(near, 'today', signal),
     10 * 60_000,
     [...refreshKey(near), lang],
   );
-  if (!data && !error) return null; // chargement discret
-  if (!data?.events.length) return <AgendaLink />;
+  // Plus rien aujourd'hui (ou agenda du jour indisponible) : la semaine.
+  const useWeek = (!!today.data && today.data.events.length === 0) || today.error;
+  const week = useLiveData<AgendaResponse>(
+    useWeek ? (signal) => getAgenda(near, 'week', signal) : null,
+    10 * 60_000,
+    [...refreshKey(near), lang, useWeek],
+  );
+
+  if (!today.data && !today.error) return null; // chargement discret
+  if (useWeek && !week.data && !week.error) return null;
+  const events = useWeek ? (week.data?.events ?? []) : today.data!.events;
+  if (!events.length) return <AgendaLink />;
+  const when: AgendaWhen = useWeek ? 'week' : 'today';
   return (
-    <Rail title={t('Aujourd’hui à Lille')} onSeeAll={() => router.push('/agenda')}>
-      {data.events.slice(0, 8).map((e) => (
+    <Rail
+      title={useWeek ? t('Cette semaine à Lille') : t('Aujourd’hui à Lille')}
+      onSeeAll={() => router.push({ pathname: '/agenda', params: { when } })}
+    >
+      {nearestFirst(events).map((e) => (
         <EventCard key={e.id} event={e} compact onPress={() => openEvent(e)} />
       ))}
     </Rail>

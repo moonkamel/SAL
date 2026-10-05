@@ -294,24 +294,40 @@ export function fromOpenAgenda(
 
 const openAgendaCache = new TtlCache<OpenAgendaEvent[]>(15 * 60_000, 50);
 
-async function fetchOpenAgenda(uid: string, key: string, w: TimeWindow): Promise<OpenAgendaEvent[]> {
-  // Clé de cache à l'heure près : tous les utilisateurs partagent la même réponse.
-  const hour = (d: Date) => d.toISOString().slice(0, 13);
-  const cacheKey = `${uid}|${hour(w.start)}|${hour(w.end)}`;
+/**
+ * Journées de sortie (6 h → 6 h, heure de Lille) qui couvrent la fenêtre. Chaque
+ * journée est demandée en entier, même « aujourd'hui » : un événement commencé ce
+ * matin (expo 14 h – 19 h) reste ainsi dans la réponse ; overlaps() trie ensuite.
+ */
+export function outingDays(w: TimeWindow): TimeWindow[] {
+  const p = parisParts(w.start);
+  let day = p.minutes < 6 * 60 ? addDays(p.date, -1) : p.date;
+  const days: TimeWindow[] = [];
+  for (let i = 0; i < 9; i++) {
+    const start = parisTime(day, 6);
+    if (start >= w.end) break;
+    const next = addDays(day, 1);
+    days.push({ start, end: parisTime(next, 6) });
+    day = next;
+  }
+  return days;
+}
+
+/** Une journée de l'agenda (jusqu'à 3 pages de 100), en cache 15 min. */
+async function fetchOpenAgendaDay(uid: string, key: string, day: TimeWindow): Promise<OpenAgendaEvent[]> {
+  const cacheKey = `${uid}|${day.start.toISOString()}`;
   const hit = openAgendaCache.get(cacheKey);
   if (hit) return hit;
 
-  // Pages de 100 : 3 pour un jour ou un week-end, 6 pour une semaine entière.
-  const pages = w.end.getTime() - w.start.getTime() > 4 * 24 * 3_600_000 ? 6 : 3;
   const events: OpenAgendaEvent[] = [];
   let after: unknown[] | undefined;
-  for (let page = 0; page < pages; page++) {
+  for (let page = 0; page < 3; page++) {
     const q = new URLSearchParams({
       key,
       size: '100',
       detailed: '1',
-      'timings[gte]': w.start.toISOString(),
-      'timings[lte]': w.end.toISOString(),
+      'timings[gte]': day.start.toISOString(),
+      'timings[lte]': day.end.toISOString(),
     });
     for (const a of after ?? []) q.append('after[]', String(a));
     const res = await fetch(`${OPENAGENDA_URL}/agendas/${encodeURIComponent(uid)}/events?${q}`, {
@@ -325,6 +341,22 @@ async function fetchOpenAgenda(uid: string, key: string, w: TimeWindow): Promise
   }
   openAgendaCache.set(cacheKey, events);
   return events;
+}
+
+/**
+ * Événements de la fenêtre, journée par journée et en parallèle : une semaine
+ * entière ne dépasse plus le nombre de pages (des événements disparaissaient),
+ * et « aujourd'hui », « demain » et « la semaine » partagent le même cache.
+ */
+async function fetchOpenAgenda(uid: string, key: string, w: TimeWindow): Promise<OpenAgendaEvent[]> {
+  const days = await Promise.all(outingDays(w).map((day) => fetchOpenAgendaDay(uid, key, day)));
+  const seen = new Set<string>();
+  return days.flat().filter((ev) => {
+    const id = String(ev.uid ?? ev.slug ?? text(ev.title));
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
 }
 
 // Adresse publique des agendas (« ville-de-lille »), pour les liens vers openagenda.com.
