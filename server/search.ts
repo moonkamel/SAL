@@ -18,6 +18,7 @@ import type { Lang } from '@/shared/i18n';
 
 import { TtlCache } from './cache';
 import { placeDetails, type RawPlace, textSearch } from './places';
+import { isInLille } from '@/shared/lille';
 import { scorePlace } from './ranking';
 import { rewriteQuery } from './rewrite';
 import { activeCampaigns, type SponsoredCampaign } from './sponsored';
@@ -119,7 +120,13 @@ async function fetchPlaces(req: SearchRequest, lang: Lang): Promise<CachedSearch
     lang,
   });
 
-  const result: CachedSearch = { places, effectiveQuery, rewritten: rewrite !== null, ambiance };
+  const result: CachedSearch = {
+    // Lille intramuros seulement (pas La Madeleine, Lambersart, Lomme…).
+    places: places.filter((p) => isInLille({ location: p.location, address: p.address })),
+    effectiveQuery,
+    rewritten: rewrite !== null,
+    ambiance,
+  };
   cache.set(key, result);
   return result;
 }

@@ -12,6 +12,7 @@ import type {
 } from '@/shared/types';
 import { type Lang, LANG_INFO, tx } from '@/shared/i18n';
 import { TtlCache } from './cache';
+import { LILLE_RECTANGLE } from '@/shared/lille';
 
 const PLACES_BASE = 'https://places.googleapis.com/v1';
 
@@ -340,10 +341,12 @@ export async function textSearch(params: TextSearchParams): Promise<RawPlace[]> 
     languageCode: params.lang ?? 'fr',
     regionCode: 'FR',
     pageSize: 20,
-    locationBias: {
-      circle: {
-        center: { latitude: params.center.lat, longitude: params.center.lng },
-        radius: params.radiusMeters,
+    // Uniquement Lille intramuros : la recherche est limitée au rectangle de Lille,
+    // puis le contour exact de la commune trie les résultats (server/search.ts).
+    locationRestriction: {
+      rectangle: {
+        low: { latitude: LILLE_RECTANGLE.low.lat, longitude: LILLE_RECTANGLE.low.lng },
+        high: { latitude: LILLE_RECTANGLE.high.lat, longitude: LILLE_RECTANGLE.high.lng },
       },
     },
     ...(params.includedType ? { includedType: params.includedType } : {}),

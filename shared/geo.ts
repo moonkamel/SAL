@@ -3,7 +3,7 @@ import type { LatLng } from './types';
 /** Grand-Place de Lille : position par défaut si la localisation est refusée. */
 export const GRAND_PLACE: LatLng = { lat: 50.6366, lng: 3.0635 };
 
-/** Rayon du biais de localisation envoyé à Google Places (métropole lilloise). */
+/** Rayon de recherche historique (la recherche est désormais limitée à Lille : shared/lille.ts). */
 export const SEARCH_RADIUS_METERS = 5000;
 
 const EARTH_RADIUS_METERS = 6_371_000;

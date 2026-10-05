@@ -2,6 +2,7 @@
 // (clé gratuite : TICKETMASTER_API_KEY, la « Consumer Key » ; le secret est inutile).
 
 import { haversineMeters } from '@/shared/geo';
+import { isInLille } from '@/shared/lille';
 import { type Lang, translate } from '@/shared/i18n';
 import type { AgendaEvent, EventCategory, EventPractical, LatLng } from '@/shared/types';
 
@@ -11,7 +12,8 @@ import { detectGenres, plainText } from './eventText';
 export const TICKETMASTER_URL = process.env.TICKETMASTER_URL ?? 'https://app.ticketmaster.com/discovery/v2';
 // Grande place de Lille : une seule requête partagée par tous les utilisateurs.
 const LILLE = { lat: 50.6366, lng: 3.0635 };
-const RADIUS_KM = 20;
+// Large autour de la Grand-Place ; seuls les lieux dans Lille sont gardés (fromTicketmaster).
+const RADIUS_KM = 8;
 
 type TmImage = { url?: string; width?: number; height?: number; ratio?: string; fallback?: boolean };
 type TmLinks = Partial<Record<'homepage' | 'spotify' | 'youtube' | 'instagram' | 'facebook' | 'deezer', { url?: string }[]>>;
@@ -41,6 +43,7 @@ export interface TmEvent {
       url?: string;
       address?: { line1?: string };
       city?: { name?: string };
+      postalCode?: string;
       location?: { latitude?: string; longitude?: string };
       parkingDetail?: string;
       accessibleSeatingDetail?: string;
@@ -176,6 +179,8 @@ export function fromTicketmaster(
   const lng = Number(venue?.location?.longitude);
   const startIso = ev.dates?.start?.dateTime;
   if (!venue || !Number.isFinite(lat) || !Number.isFinite(lng) || !startIso) return null;
+  // Lille intramuros seulement (pas le stade Pierre-Mauroy à Villeneuve-d'Ascq, par ex.).
+  if (!isInLille({ location: { lat, lng }, postalCode: venue.postalCode, city: venue.city?.name })) return null;
   const start = new Date(startIso);
   if (Number.isNaN(start.getTime())) return null;
   const end = ev.dates?.end?.dateTime ? new Date(ev.dates.end.dateTime) : undefined;

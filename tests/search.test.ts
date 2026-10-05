@@ -53,7 +53,7 @@ describe('pipeline de recherche', () => {
     vi.unstubAllEnvs();
   });
 
-  it('appelle Text Search avec le biais de localisation et un FieldMask minimal', async () => {
+  it('appelle Text Search limité à Lille et un FieldMask minimal', async () => {
     const { search } = await import('@/server/search');
     await search({ query: 'manger japonais', location: LOCATION, filters: { openNow: true } });
 
@@ -69,9 +69,10 @@ describe('pipeline de recherche', () => {
     expect(body.textQuery).toBe('manger japonais'); // pas de clé Anthropic → requête brute
     expect(body.languageCode).toBe('fr');
     expect(body.openNow).toBe(true);
-    expect(body.locationBias.circle).toEqual({
-      center: { latitude: LOCATION.lat, longitude: LOCATION.lng },
-      radius: 5000,
+    expect(body.locationBias).toBeUndefined();
+    expect(body.locationRestriction.rectangle).toEqual({
+      low: { latitude: 50.6, longitude: 3.02 },
+      high: { latitude: 50.658, longitude: 3.108 },
     });
   });
 

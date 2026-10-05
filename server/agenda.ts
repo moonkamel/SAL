@@ -3,6 +3,7 @@
 // - événements publics d'OpenAgenda, si OPENAGENDA_KEY et OPENAGENDA_AGENDAS sont définies.
 
 import { haversineMeters } from '@/shared/geo';
+import { isInLille } from '@/shared/lille';
 import { type Lang, LANG_INFO, translate } from '@/shared/i18n';
 import type { AgendaEvent, AgendaWhen, EventPractical, LatLng } from '@/shared/types';
 
@@ -175,6 +176,8 @@ interface OpenAgendaEvent {
     address?: string;
     latitude?: number;
     longitude?: number;
+    postalCode?: string;
+    city?: string;
     /** Accès : transports en commun, parking (multilingue). */
     access?: Multilingual;
     website?: string;
@@ -305,6 +308,17 @@ export function fromOpenAgenda(
     else delete event.longDescription;
   }
   return event;
+}
+
+function inLille(ev: OpenAgendaEvent): boolean {
+  const loc = ev.location;
+  if (!loc || typeof loc.latitude !== 'number' || typeof loc.longitude !== 'number') return false;
+  return isInLille({
+    location: { lat: loc.latitude, lng: loc.longitude },
+    address: loc.address,
+    postalCode: loc.postalCode,
+    city: loc.city,
+  });
 }
 
 const OA_STATUS: Record<number, EventPractical['status']> = { 2: 'reprogramme', 3: 'en-ligne', 4: 'reporte', 5: 'complet' };
@@ -563,7 +577,8 @@ export async function agenda(
                 fetchOpenAgenda(uid, oa.key, w),
                 agendaSlug(uid, oa.key),
               ]);
-              const cultural = events.filter(isCulturalHighlight);
+              // Lille intramuros seulement (l'agenda de la Ville annonce aussi Lomme, Hellemmes…).
+              const cultural = events.filter(isCulturalHighlight).filter(inLille);
               const mapped = cultural.map((ev) => fromOpenAgenda(ev, uid, near, w, now, slug, lang));
               debug?.agendas.push({
                 uid,
