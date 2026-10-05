@@ -4,35 +4,30 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { type ComponentProps, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { type ComponentProps, useState } from 'react';
+import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { GoogleAttribution } from '@/src/components/GoogleAttribution';
 import { GradientButton } from '@/src/components/GradientButton';
-import { ReviewItem } from '@/src/components/ReviewItem';
-import { Stars } from '@/src/components/Stars';
 import { CATEGORY_INFO } from '@/src/features/agenda/EventCard';
 import { tx, useI18n } from '@/src/i18n';
-import { findVenue, getKnownEvent, getPlace } from '@/src/lib/api';
+import { getKnownEvent } from '@/src/lib/api';
 import { font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { themedStyles, useColors } from '@/src/theme/tone';
-import { formatDistance, formatRating, formatRatingCount } from '@/shared/format';
+import { formatDistance } from '@/shared/format';
 import {
   type AgendaEvent,
   type EventAccessibility,
   type EventPractical,
   GENRE_LABELS,
-  type PlaceDetails,
 } from '@/shared/types';
 
-type Tab = 'about' | 'practical' | 'reviews';
+type Tab = 'about' | 'practical';
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'about', label: tx('Présentation') },
   { key: 'practical', label: tx('Infos pratiques') },
-  { key: 'reviews', label: tx('Avis') },
 ];
 
 const ACCESSIBILITY: Record<EventAccessibility, { label: string; icon: IconName }> = {
@@ -61,7 +56,7 @@ const LINKS: Record<NonNullable<EventPractical['links']>[number]['kind'], { labe
 
 const open = (url: string) => void WebBrowser.openBrowserAsync(url);
 
-/** Fiche d'un événement : présentation, infos pratiques et avis sur la salle. */
+/** Fiche d'un événement : présentation et infos pratiques. */
 export default function EventScreen() {
   const colors = useColors();
   const styles = useStyles();
@@ -70,8 +65,6 @@ export default function EventScreen() {
   const event = getKnownEvent(id);
   const { t } = useI18n();
   const [tab, setTab] = useState<Tab>('about');
-  // Fiche Google de la salle, trouvée pour l'onglet « Avis » (sert aussi à « Y aller »).
-  const [venueId, setVenueId] = useState<string | null | undefined>(event?.placeId);
 
   if (!event) {
     return (
@@ -91,7 +84,7 @@ export default function EventScreen() {
     router.push({
       pathname: '/route/[id]',
       params: {
-        id: venueId ?? `event-${event.id}`,
+        id: event.placeId ?? `event-${event.id}`,
         name: event.venueName,
         lat: String(event.location.lat),
         lng: String(event.location.lng),
@@ -157,8 +150,7 @@ export default function EventScreen() {
           </View>
 
           {tab === 'about' && <About event={event} />}
-          {tab === 'practical' && <Practical event={event} venueId={venueId} />}
-          {tab === 'reviews' && <VenueReviews event={event} venueId={venueId} onVenue={setVenueId} />}
+          {tab === 'practical' && <Practical event={event} />}
         </View>
       </ScrollView>
 
@@ -212,7 +204,7 @@ function About({ event }: { event: AgendaEvent }) {
   );
 }
 
-function Practical({ event, venueId }: { event: AgendaEvent; venueId: string | null | undefined }) {
+function Practical({ event }: { event: AgendaEvent }) {
   const styles = useStyles();
   const { t, lang, locale } = useI18n();
   const p = event.practical ?? {};
@@ -288,88 +280,14 @@ function Practical({ event, venueId }: { event: AgendaEvent; venueId: string | n
         {p.email && <LinkButton icon="mail-outline" label={p.email} onPress={() => void Linking.openURL(`mailto:${p.email}`)} />}
         {p.website && <LinkButton icon="globe-outline" label={t('Site du lieu')} onPress={() => open(p.website!)} />}
         {p.seatmapUrl && <LinkButton icon="grid-outline" label={t('Plan de la salle')} onPress={() => open(p.seatmapUrl!)} />}
-        {venueId && (
+        {event.placeId && (
           <LinkButton
             icon="storefront-outline"
             label={t('Fiche du lieu')}
-            onPress={() => router.push({ pathname: '/place/[id]', params: { id: venueId } })}
+            onPress={() => router.push({ pathname: '/place/[id]', params: { id: event.placeId! } })}
           />
         )}
       </View>
-    </View>
-  );
-}
-
-/** Avis Google sur la salle : Ticketmaster et OpenAgenda n'en fournissent pas. */
-function VenueReviews({
-  event,
-  venueId,
-  onVenue,
-}: {
-  event: AgendaEvent;
-  venueId: string | null | undefined;
-  onVenue: (id: string | null) => void;
-}) {
-  const colors = useColors();
-  const styles = useStyles();
-  const { t, lang } = useI18n();
-  const [place, setPlace] = useState<PlaceDetails | null | undefined>(undefined);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void (async () => {
-      try {
-        const id = venueId ?? (await findVenue(event, controller.signal));
-        if (venueId === undefined) onVenue(id);
-        const details = id ? await getPlace(id, 'full', controller.signal) : null;
-        if (!controller.signal.aborted) setPlace(details);
-      } catch {
-        if (!controller.signal.aborted) setPlace(null);
-      }
-    })();
-    return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event.id, lang]);
-
-  if (place === undefined) {
-    return (
-      <View style={[styles.section, styles.centered]}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
-    );
-  }
-  if (!place) {
-    return (
-      <View style={styles.section}>
-        <Text style={styles.muted}>{t('Pas d’avis disponibles pour ce lieu.')}</Text>
-      </View>
-    );
-  }
-  return (
-    <View style={styles.section}>
-      <Text style={styles.muted}>{t('Avis Google sur le lieu : {name}', { name: place.name })}</Text>
-      {place.rating !== undefined && (
-        <View style={styles.ratingRow}>
-          <Text style={styles.ratingValue}>{formatRating(place.rating, lang)}</Text>
-          <Stars rating={place.rating} size={18} />
-          {place.userRatingCount !== undefined && (
-            <Text style={styles.muted}>{formatRatingCount(place.userRatingCount, lang)}</Text>
-          )}
-        </View>
-      )}
-      {place.reviews.length > 0 ? (
-        place.reviews.map((r) => <ReviewItem key={`${r.authorName}-${r.publishTime}`} review={r} />)
-      ) : (
-        <Text style={styles.muted}>{t('Pas encore d’avis écrits pour ce lieu.')}</Text>
-      )}
-      <View style={styles.links}>
-        <LinkButton
-          icon="storefront-outline"
-          label={t('Fiche du lieu')}
-          onPress={() => router.push({ pathname: '/place/[id]', params: { id: place.id } })}
-        />
-      </View>
-      <GoogleAttribution />
     </View>
   );
 }
@@ -418,7 +336,6 @@ function LinkButton({ icon, label, onPress }: { icon: IconName; label: string; o
 const useStyles = themedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.background },
   center: { alignItems: 'center', justifyContent: 'center', gap: spacing.lg, padding: spacing.xl },
-  centered: { alignItems: 'center', paddingVertical: spacing.xl },
   hero: { height: 300, backgroundColor: colors.surfaceRaised },
   placeholder: { alignItems: 'center', justifyContent: 'center' },
   credit: {
@@ -491,8 +408,6 @@ const useStyles = themedStyles((colors) => ({
     backgroundColor: colors.surfaceRaised,
   },
   linkText: { flexShrink: 1, color: colors.text, fontSize: font.small, fontWeight: '700' },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  ratingValue: { color: colors.text, fontFamily: fonts.display, fontSize: font.title },
   source: { color: colors.textFaint, fontSize: font.tiny },
   muted: { color: colors.textMuted, fontSize: font.small },
   secondary: { backgroundColor: colors.surfaceRaised, borderRadius: radius.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md },

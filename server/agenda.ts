@@ -11,7 +11,7 @@ import { isAutoTranslateEnabled, lastTranslateError, translateFields } from './a
 import { TtlCache } from './cache';
 import { getContent } from './content';
 import { categorize, detectGenres, isFree, plainText } from './eventText';
-import { mainPhotoName } from './places';
+import { findVenuePlaceId, mainPhotoName } from './places';
 import { fetchTicketmaster, fromTicketmaster, ticketmasterKey } from './ticketmaster';
 import { addDays, formatParisDayTime, formatParisTime, parisParts, parisTime } from './paris';
 import type { EventItem } from './schemas';
@@ -501,16 +501,35 @@ export function sameEvent(a: AgendaEvent, b: AgendaEvent): boolean {
 }
 
 /**
- * Événement partenaire sans image mais rattaché à une fiche Google : on montre la
- * photo principale de la fiche (via /api/photo, la clé Google reste sur le serveur).
+ * Événement sans image : on montre la photo principale de la fiche Google du lieu
+ * (via /api/photo, la clé Google reste sur le serveur). Pour Ticketmaster et
+ * OpenAgenda, la fiche de la salle est d'abord retrouvée par son nom (recherche
+ * « identifiant seulement », mise en cache) ; elle sert aussi au lien « Fiche du lieu ».
  */
 async function withPlacePhotos(events: AgendaEvent[], origin?: string): Promise<AgendaEvent[]> {
   if (!origin) return events;
+  const venues = new Map<string, Promise<string | null>>();
+  const venueId = (e: AgendaEvent): Promise<string | null> => {
+    const key = `${e.venueName}|${e.location.lat.toFixed(4)},${e.location.lng.toFixed(4)}`;
+    let p = venues.get(key);
+    if (!p) {
+      // Au plus 20 salles par demande : le reste attendra la prochaine ouverture (cache).
+      p = venues.size < 20 ? findVenuePlaceId(e.venueName, e.location, e.address).catch(() => null) : Promise.resolve(null);
+      venues.set(key, p);
+    }
+    return p;
+  };
   return Promise.all(
     events.map(async (e) => {
-      if (e.imageUrl || !e.placeId) return e;
-      const name = await mainPhotoName(e.placeId);
-      return name ? { ...e, imageUrl: `${origin}/api/photo?name=${encodeURIComponent(name)}&w=800` } : e;
+      if (e.imageUrl) return e;
+      const placeId = e.placeId ?? (e.source === 'partner' ? undefined : ((await venueId(e)) ?? undefined));
+      if (!placeId) return e;
+      const name = await mainPhotoName(placeId);
+      return {
+        ...e,
+        placeId,
+        ...(name ? { imageUrl: `${origin}/api/photo?name=${encodeURIComponent(name)}&w=800` } : {}),
+      };
     }),
   );
 }
@@ -528,7 +547,7 @@ export interface AgendaDebug {
     sample?: string[];
     error?: string;
   }[];
-  ticketmaster?: { key: boolean; fetched?: number; mapped?: number; error?: string };
+  ticketmaster?: { key: boolean; fetched?: number; mapped?: number; withoutPhoto?: number; error?: string };
   merged?: number;
   withinRadius?: number;
   translate?: { enabled: boolean; lang?: string; probe?: string; lastError?: string };
@@ -544,12 +563,9 @@ export async function agenda(
   origin?: string,
 ): Promise<AgendaEvent[]> {
   const w = windowFor(when, now);
-  const partner = await withPlacePhotos(
-    (await getContent('events'))
-      .map((item) => fromPartnerEvent(item, near, w, now, lang))
-      .filter((e): e is AgendaEvent => e !== null),
-    origin,
-  );
+  const partner = (await getContent('events'))
+    .map((item) => fromPartnerEvent(item, near, w, now, lang))
+    .filter((e): e is AgendaEvent => e !== null);
 
   const oa = openAgendaConfig();
   if (debug) {
@@ -608,7 +624,15 @@ export async function agenda(
           ),
         )
         .filter((e) => e !== null && overlaps(new Date(e.start), e.end ? new Date(e.end) : undefined, w));
-      if (debug) debug.ticketmaster = { key: true, fetched: raw.length, mapped: ticketmaster.length };
+      if (debug) {
+        debug.ticketmaster = {
+          key: true,
+          fetched: raw.length,
+          mapped: ticketmaster.length,
+          // Seulement l'image générique de Ticketmaster : photo de la salle à la place.
+          withoutPhoto: ticketmaster.filter((e) => e && !e.imageUrl).length,
+        };
+      }
     } catch (error) {
       console.error('[agenda] Ticketmaster indisponible', error);
       const message = error instanceof Error ? error.message : String(error);
@@ -627,7 +651,10 @@ export async function agenda(
     kept.push(e);
     return true;
   });
-  const events = sortEvents(merged.filter((e) => e.distanceMeters <= RADIUS_METERS)).slice(0, MAX_EVENTS);
+  const events = await withPlacePhotos(
+    sortEvents(merged.filter((e) => e.distanceMeters <= RADIUS_METERS)).slice(0, MAX_EVENTS),
+    origin,
+  );
   if (debug) {
     debug.merged = merged.length;
     debug.withinRadius = merged.filter((e) => e.distanceMeters <= RADIUS_METERS).length;
