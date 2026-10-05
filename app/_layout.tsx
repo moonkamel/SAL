@@ -127,6 +127,8 @@ function AppWithLanguage() {
               <Stack.Screen name="admin" options={{ title: 'Espace partenaires' }} />
               <Stack.Screen name="privacy" options={{ title: 'Confidentialité' }} />
               <Stack.Screen name="notifications" options={{ title: t('Notifications') }} />
+              <Stack.Screen name="discover" options={{ title: t('Découvrir Lille') }} />
+              <Stack.Screen name="tour/[id]" options={{ title: '' }} />
               <Stack.Screen
                 name="language"
                 options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}

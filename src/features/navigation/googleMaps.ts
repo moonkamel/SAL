@@ -32,3 +32,21 @@ export function googleMapsDirections(
   if (mode !== 'transit') params.set('dir_action', 'navigate');
   return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
+
+/**
+ * Parcours à plusieurs étapes dans Google Maps, depuis la position actuelle :
+ * la dernière étape est la destination, les autres des étapes intermédiaires
+ * (8 au plus, au-delà Google Maps les ignore).
+ */
+export function googleMapsTour(points: LatLng[], mode: TravelMode = 'walk'): string {
+  const steps = points.slice(0, 9);
+  const last = steps[steps.length - 1]!;
+  const params = new URLSearchParams({
+    api: '1',
+    destination: `${last.lat},${last.lng}`,
+    travelmode: TRAVEL[mode],
+  });
+  const waypoints = steps.slice(0, -1).map((p) => `${p.lat},${p.lng}`);
+  if (waypoints.length) params.set('waypoints', waypoints.join('|'));
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
+}

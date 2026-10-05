@@ -25,7 +25,7 @@ import { useSearchHistory } from '@/src/features/history/useSearchHistory';
 import { useLiveData } from '@/src/features/lille/useLiveData';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { OffersRail, TonightRail } from '@/src/features/moment/HomeRails';
-import { SurpriseCard } from '@/src/features/moment/SurpriseCard';
+import { DiscoverCard } from '@/src/features/discover/DiscoverCard';
 import { WeatherCard } from '@/src/features/moment/WeatherCard';
 import { NotificationInvite } from '@/src/features/notifications/NotificationInvite';
 import { weatherIcon } from '@/src/features/moment/weatherIcons';
@@ -171,7 +171,7 @@ export default function HomeScreen() {
               entering={FadeInDown.delay(motion.stagger * 3).duration(motion.slow)}
               style={[styles.padded, styles.moments]}
             >
-              <SurpriseCard />
+              <DiscoverCard />
               {weather && (
                 <WeatherCard data={weather} onPress={(s) => search(s.query, s.ambiance)} />
               )}

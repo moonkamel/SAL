@@ -18,7 +18,7 @@ describe('traductions', () => {
 
   it('trouve les textes à traduire dans le code', () => {
     expect(keys.length).toBeGreaterThan(200);
-    expect(keys).toContain('Surprends-moi');
+    expect(keys).toContain('Découvrir Lille');
     expect(keys).toContain('{n} adresses autour de vous');
   });
 
