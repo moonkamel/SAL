@@ -65,7 +65,8 @@ export function selectOffersNear(
       return status ? [toOffer(item, status, near)] : [];
     })
     .filter((o) => (o.distanceMeters ?? 0) <= radiusMeters)
-    .sort((a, b) => Number(b.live) - Number(a.live) || (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0))
+    // Du plus proche au plus loin (l'étiquette « en cours » reste affichée sur la carte).
+    .sort((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0))
     .slice(0, 30);
 }
 

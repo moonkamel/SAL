@@ -73,7 +73,7 @@ describe('J : bons plans', () => {
     expect(offerToday(offer({ startTime: '22:00', endTime: '02:00' }), SAT_20H)?.live).toBe(false);
   });
 
-  it('trie : en ce moment d’abord, puis au plus près', () => {
+  it('trie du plus proche au plus loin', () => {
     const list = selectOffersNear(
       [
         offer({ id: 'loin', location: { lat: 50.65, lng: 3.07 } }),
@@ -84,7 +84,7 @@ describe('J : bons plans', () => {
       GRAND_PLACE,
       SAT_20H,
     );
-    expect(list.map((o) => o.id)).toEqual(['pres', 'loin', 'plus-tard']);
+    expect(list.map((o) => o.id)).toEqual(['pres', 'plus-tard', 'loin']);
     expect(list[0]?.distanceMeters).toBeLessThan(50);
   });
 });
