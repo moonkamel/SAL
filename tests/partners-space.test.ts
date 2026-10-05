@@ -448,16 +448,3 @@ describe('I : espace partenaires', () => {
     expect(toValues(KINDS.events.fields, ev.item!).start).toBe('2026-10-03 21:00');
   });
 });
-
-describe('espace partenaires : dates lisibles', () => {
-  it('écrit la date en toutes lettres et signale une date passée', async () => {
-    const { datePreview } = await import('@/src/features/admin/fields');
-    const now = new Date(2026, 9, 5, 12, 0);
-    const p = datePreview('datetime', '2026-05-10 17:00', now);
-    expect(p?.text).toContain('10 mai 2026');
-    expect(p?.past).toBe(true);
-    expect(datePreview('datetime', '2026-10-09 21:00', now)?.past).toBe(false);
-    expect(datePreview('date', '2026-10-05', now)?.past).toBe(false);
-    expect(datePreview('text', 'x', now)).toBeNull();
-  });
-});

@@ -75,8 +75,7 @@ export const KINDS: Record<ContentKind, KindConfig> = {
     title: 'Agenda',
     singular: 'événement',
     place: { placeId: 'placeId', name: 'venueName', lat: 'location.lat', lng: 'location.lng' },
-    summary: (i) =>
-      `${i.featured ? '★ ' : ''}${i.title} — ${i.venueName} (${new Date(String(i.end ?? i.start)) < new Date() ? 'PASSÉ · ' : ''}${datePreview('datetime', isoToLocalInput(String(i.start)))?.text ?? String(i.start)})`,
+    summary: (i) => `${i.featured ? '★ ' : ''}${i.title} — ${i.venueName} (${String(i.start).slice(0, 16).replace('T', ' ')})`,
     fields: [
       { key: 'id', label: 'Identifiant', type: 'text', help: ID_HELP },
       { key: 'title', label: 'Titre', type: 'text' },
@@ -191,27 +190,6 @@ export function isoToLocalInput(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-/**
- * Date saisie en toutes lettres, pour éviter les inversions jour / mois :
- * « 2026-05-10 » → « dimanche 10 mai 2026 » (et signale une date passée).
- */
-export function datePreview(type: FieldType, value: string, now: Date = new Date()): { text: string; past: boolean } | null {
-  const v = value.trim();
-  if (!v) return null;
-  let d: Date | null = null;
-  if (type === 'datetime') {
-    const iso = localInputToIso(v);
-    d = iso ? new Date(iso) : null;
-  } else if (type === 'date') {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
-    d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 23, 59) : null;
-  }
-  if (!d || Number.isNaN(d.getTime())) return null;
-  const text = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const time = type === 'datetime' ? ` à ${pad(d.getHours())}:${pad(d.getMinutes())}` : '';
-  return { text: `${text}${time}`, past: d < now };
 }
 
 export function localInputToIso(value: string): string | null {
