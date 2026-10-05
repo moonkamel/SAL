@@ -19,6 +19,7 @@ import type { PlaceSummary } from '@/shared/types';
 
 import {
   type ContentKind,
+  datePreview,
   DAY_LABELS,
   emptyValues,
   type Field,
@@ -339,6 +340,7 @@ function ItemForm({
 }
 
 function FieldInput({ field, value, onChange }: { field: Field; value: string; onChange: (v: string) => void }) {
+  const preview = datePreview(field.type, value);
   let control: React.ReactNode;
   if (field.type === 'bool') {
     control = (
@@ -398,6 +400,11 @@ function FieldInput({ field, value, onChange }: { field: Field; value: string; o
         {field.optional ? <Text style={styles.muted}> (facultatif)</Text> : null}
       </Text>
       {control}
+      {preview && (
+        <Text style={preview.past ? styles.error : styles.help}>
+          {preview.past ? `⚠ Date passée : ${preview.text}. Vérifiez le jour et le mois (AAAA-MM-JJ).` : `→ ${preview.text}`}
+        </Text>
+      )}
       {field.help && <Text style={styles.help}>{field.help}</Text>}
     </View>
   );
