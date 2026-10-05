@@ -448,3 +448,41 @@ describe('I : espace partenaires', () => {
     expect(toValues(KINDS.events.fields, ev.item!).start).toBe('2026-10-03 21:00');
   });
 });
+
+describe('Ticketmaster', () => {
+  const labels = () => ({ timeLabel: '20:00', dateLabel: 'samedi', ongoing: false });
+  const base = {
+    id: 'Z1',
+    name: 'Angèle',
+    url: 'https://www.ticketmaster.fr/x',
+    dates: { start: { dateTime: '2026-10-10T18:00:00Z' }, status: { code: 'onsale' } },
+    images: [
+      { url: 'https://img/a.jpg', width: 305, ratio: '16_9' },
+      { url: 'https://img/b.jpg', width: 640, ratio: '16_9' },
+      { url: 'https://img/c.jpg', width: 1024, ratio: '16_9' },
+    ],
+    classifications: [{ segment: { name: 'Music' }, genre: { name: 'Pop' } }],
+    priceRanges: [{ min: 39, max: 59.5, currency: 'EUR' }],
+    _embedded: {
+      venues: [{ name: 'Zénith de Lille', city: { name: 'Lille' }, location: { latitude: '50.6327', longitude: '3.0784' } }],
+    },
+  };
+
+  it('convertit un concert : salle, image 16:9, prix, billetterie', async () => {
+    const { fromTicketmaster } = await import('@/server/ticketmaster');
+    const e = fromTicketmaster(base, GRAND_PLACE, labels);
+    expect(e?.id).toBe('tm-Z1');
+    expect(e?.category).toBe('concert');
+    expect(e?.venueName).toBe('Zénith de Lille');
+    expect(e?.imageUrl).toBe('https://img/b.jpg');
+    expect(e?.price).toBe('de 39 € à 59,50 €');
+    expect(e?.ticketUrl).toBe('https://www.ticketmaster.fr/x');
+    expect(e?.source).toBe('ticketmaster');
+  });
+
+  it('écarte les événements annulés ou sans salle', async () => {
+    const { fromTicketmaster } = await import('@/server/ticketmaster');
+    expect(fromTicketmaster({ ...base, dates: { ...base.dates, status: { code: 'cancelled' } } }, GRAND_PLACE, labels)).toBeNull();
+    expect(fromTicketmaster({ ...base, _embedded: {} }, GRAND_PLACE, labels)).toBeNull();
+  });
+});

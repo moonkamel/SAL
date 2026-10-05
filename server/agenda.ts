@@ -12,6 +12,7 @@ import { TtlCache } from './cache';
 import { getContent } from './content';
 import { categorize, detectGenres, isFree, plainText } from './eventText';
 import { mainPhotoName } from './places';
+import { fetchTicketmaster, fromTicketmaster, ticketmasterKey } from './ticketmaster';
 import { addDays, formatParisDayTime, formatParisTime, parisParts, parisTime } from './paris';
 import type { EventItem } from './schemas';
 
@@ -440,6 +441,7 @@ export interface AgendaDebug {
     sample?: string[];
     error?: string;
   }[];
+  ticketmaster?: { key: boolean; fetched?: number; mapped?: number; error?: string };
   merged?: number;
   withinRadius?: number;
   translate?: { enabled: boolean; lang?: string; probe?: string; lastError?: string };
@@ -498,9 +500,38 @@ export async function agenda(
       ).flat()
     : [];
 
+  // Ticketmaster : gros concerts et spectacles (Zénith, Aéronef, Splendid…).
+  const tmKey = ticketmasterKey();
+  if (debug) debug.ticketmaster = { key: Boolean(tmKey) };
+  let ticketmaster: (AgendaEvent | null)[] = [];
+  if (tmKey) {
+    try {
+      const raw = await fetchTicketmaster(tmKey, w);
+      ticketmaster = raw
+        .map((ev) =>
+          fromTicketmaster(
+            ev,
+            near,
+            (start, end) => ({
+              timeLabel: timeLabel(start, end, w, now, lang),
+              dateLabel: dateLabel(start, end, lang),
+              ongoing: start <= now,
+            }),
+            lang,
+          ),
+        )
+        .filter((e) => e !== null && overlaps(new Date(e.start), e.end ? new Date(e.end) : undefined, w));
+      if (debug) debug.ticketmaster = { key: true, fetched: raw.length, mapped: ticketmaster.length };
+    } catch (error) {
+      console.error('[agenda] Ticketmaster indisponible', error);
+      const message = error instanceof Error ? error.message : String(error);
+      if (debug) debug.ticketmaster = { key: true, error: message.replaceAll(tmKey, '***') };
+    }
+  }
+
   // Doublons (même titre au même endroit) : le partenaire d'abord, puis la 1re occurrence.
   const seen = new Set<string>();
-  const merged = [...partner, ...external].filter((e): e is AgendaEvent => {
+  const merged = [...partner, ...external, ...ticketmaster].filter((e): e is AgendaEvent => {
     if (!e) return false;
     const key = dedupKey(e);
     if (seen.has(key)) return false;

@@ -276,7 +276,7 @@ export interface AgendaEvent {
   imageUrl?: string;
   /** Événement mis en avant (sponsorisé). */
   featured: boolean;
-  source: 'partner' | 'openagenda';
+  source: 'partner' | 'openagenda' | 'ticketmaster';
   distanceMeters: number;
   /** Déjà commencé à l'heure de la demande. */
   ongoing: boolean;

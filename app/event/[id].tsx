@@ -106,12 +106,15 @@ export default function EventScreen() {
               />
             )}
             <LinkButton icon="share-social-outline" label={t('Partager')} onPress={share} />
-            {event.url && (
+            {event.url && event.source === 'openagenda' && (
               <LinkButton icon="open-outline" label={t('Voir sur OpenAgenda')} onPress={() => void WebBrowser.openBrowserAsync(event.url!)} />
             )}
           </View>
           {event.source === 'openagenda' && (
             <Text style={styles.source}>{t('Source : agenda de la Ville de Lille (OpenAgenda).')}</Text>
+          )}
+          {event.source === 'ticketmaster' && (
+            <Text style={styles.source}>{t('Source : Ticketmaster.')}</Text>
           )}
         </View>
       </ScrollView>
