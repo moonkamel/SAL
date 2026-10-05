@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AgendaEvent } from '@/shared/types';
 
 import {
   fromOpenAgenda,
@@ -484,5 +485,31 @@ describe('Ticketmaster', () => {
     const { fromTicketmaster } = await import('@/server/ticketmaster');
     expect(fromTicketmaster({ ...base, dates: { ...base.dates, status: { code: 'cancelled' } } }, GRAND_PLACE, labels)).toBeNull();
     expect(fromTicketmaster({ ...base, _embedded: {} }, GRAND_PLACE, labels)).toBeNull();
+  });
+});
+
+describe('agenda : doublons entre sources', () => {
+  const ev = (over: Partial<AgendaEvent>): AgendaEvent => ({
+    id: 'x',
+    title: 'concert : Youngblood Brass band',
+    category: 'concert',
+    venueName: 'FLOW',
+    location: { lat: 50.622521, lng: 3.067621 },
+    start: '2026-10-06T18:00:00.000Z',
+    timeLabel: '20:00',
+    dateLabel: 'mardi',
+    ongoing: false,
+    featured: false,
+    source: 'openagenda',
+    distanceMeters: 0,
+    ...over,
+  });
+
+  it('reconnaît le même concert sur OpenAgenda et Ticketmaster', async () => {
+    const { sameEvent } = await import('@/server/agenda');
+    const tm = ev({ id: 'tm', title: 'YOUNGBLOOD BRASS BAND', venueName: 'LE FLOW', location: { lat: 50.622411, lng: 3.067468 }, source: 'ticketmaster' });
+    expect(sameEvent(ev({}), tm)).toBe(true);
+    expect(sameEvent(ev({}), { ...tm, start: '2026-10-07T18:00:00.000Z' })).toBe(false);
+    expect(sameEvent(ev({}), { ...tm, title: 'Autre groupe' })).toBe(false);
   });
 });

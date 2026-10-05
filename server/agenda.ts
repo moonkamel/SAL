@@ -405,13 +405,29 @@ export function sortEvents(events: AgendaEvent[]): AgendaEvent[] {
   );
 }
 
-const dedupKey = (e: AgendaEvent) =>
-  `${e.title}|${e.venueName}`
+const normalize = (s: string) =>
+  s
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+
+const dedupKey = (e: AgendaEvent) => normalize(`${e.title}|${e.venueName}`);
+
+/**
+ * Même événement venu de deux sources (« concert : Youngblood Brass band » au FLOW
+ * sur OpenAgenda, « YOUNGBLOOD BRASS BAND » au LE FLOW sur Ticketmaster) : même
+ * endroit (< 300 m), même heure (± 90 min) et un titre contenu dans l'autre.
+ */
+export function sameEvent(a: AgendaEvent, b: AgendaEvent): boolean {
+  if (haversineMeters(a.location, b.location) > 300) return false;
+  if (Math.abs(new Date(a.start).getTime() - new Date(b.start).getTime()) > 90 * 60_000) return false;
+  const ta = normalize(a.title);
+  const tb = normalize(b.title);
+  if (ta.length < 3 || tb.length < 3) return false;
+  return ta.includes(tb) || tb.includes(ta);
+}
 
 /**
  * Événement partenaire sans image mais rattaché à une fiche Google : on montre la
@@ -529,13 +545,15 @@ export async function agenda(
     }
   }
 
-  // Doublons (même titre au même endroit) : le partenaire d'abord, puis la 1re occurrence.
+  // Doublons (même événement, d'une ou deux sources) : le partenaire, puis OpenAgenda, puis Ticketmaster.
   const seen = new Set<string>();
+  const kept: AgendaEvent[] = [];
   const merged = [...partner, ...external, ...ticketmaster].filter((e): e is AgendaEvent => {
     if (!e) return false;
     const key = dedupKey(e);
-    if (seen.has(key)) return false;
+    if (seen.has(key) || kept.some((k) => sameEvent(k, e))) return false;
     seen.add(key);
+    kept.push(e);
     return true;
   });
   const events = sortEvents(merged.filter((e) => e.distanceMeters <= RADIUS_METERS)).slice(0, MAX_EVENTS);
