@@ -65,8 +65,17 @@ async function supabase(
     throw new StoreError('Base de données injoignable', 502);
   }
   if (!res.ok) {
-    console.error('[content] Supabase', res.status, await res.text().catch(() => ''));
-    throw new StoreError('Erreur de la base de données', 502);
+    const body = await res.text().catch(() => '');
+    console.error('[content] Supabase', res.status, body);
+    // Détail de Supabase (code et message, jamais la clé) pour savoir quoi corriger.
+    let detail = '';
+    try {
+      const e = JSON.parse(body) as { code?: string; message?: string };
+      detail = [e.code, e.message].filter(Boolean).join(' : ');
+    } catch {
+      detail = body.slice(0, 120);
+    }
+    throw new StoreError(`Erreur de la base de données (${res.status}${detail ? ` · ${detail}` : ''})`, 502);
   }
   return res;
 }

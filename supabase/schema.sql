@@ -22,3 +22,9 @@ create index if not exists clicks_created_at_idx on clicks (created_at);
 -- « service_role » (jamais dans l'application), peut lire et écrire.
 alter table content enable row level security;
 alter table clicks enable row level security;
+
+-- Droits du serveur (clé secrète / service_role). Nécessaire sur les projets
+-- où les nouvelles tables ne sont pas exposées automatiquement à l'API.
+grant usage on schema public to service_role;
+grant select, insert, update, delete on table content to service_role;
+grant select, insert, update, delete on table clicks to service_role;
