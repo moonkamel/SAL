@@ -442,7 +442,7 @@ export interface AgendaDebug {
   }[];
   merged?: number;
   withinRadius?: number;
-  translate?: { enabled: boolean; lastError?: string };
+  translate?: { enabled: boolean; lang?: string; probe?: string; lastError?: string };
 }
 
 export async function agenda(
