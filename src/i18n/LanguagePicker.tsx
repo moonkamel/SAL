@@ -1,16 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LilleSkyline } from '@/src/components/LilleSkyline';
 import { PressableScale } from '@/src/components/PressableScale';
-import { colors, font, fonts, gradients, motion, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { font, fonts, motion, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { type Lang, LANG_INFO, LANGS } from '@/shared/i18n';
 
 import { deviceLang, useI18n } from './index';
+import { themedStyles, useColors, useTone } from '@/src/theme/tone';
 
 // Le titre s'affiche dans toutes les langues : on ne sait pas encore laquelle lire.
 const TITLES: Record<Lang, string> = {
@@ -23,8 +24,11 @@ const TITLES: Record<Lang, string> = {
 
 /** Choix de la langue, avec drapeaux : au premier lancement, puis depuis l'accueil. */
 export function LanguagePicker({ onDone }: { onDone?: () => void }) {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { lang, chosen, setLang } = useI18n();
+  const { tone } = useTone();
   // Déjà choisie : on met en avant la langue actuelle ; sinon celle du téléphone.
   const highlighted = chosen ? lang : deviceLang();
 
@@ -36,8 +40,8 @@ export function LanguagePicker({ onDone }: { onDone?: () => void }) {
 
   return (
     <View style={styles.screen}>
-      <LinearGradient colors={gradients.sky} style={[styles.sky, { paddingTop: insets.top + spacing.xl }]}>
-        <LilleSkyline style={styles.skyline} />
+      <LinearGradient colors={colors.sky} style={[styles.sky, { paddingTop: insets.top + spacing.xl }]}>
+        <LilleSkyline style={styles.skyline} tone={tone} />
         <Ionicons name="language" size={34} color={colors.gold} />
         <Text style={styles.title} accessibilityRole="header">
           {TITLES[highlighted]}
@@ -89,7 +93,7 @@ export function LanguagePicker({ onDone }: { onDone?: () => void }) {
 
 const SKYLINE = 96;
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.background },
   sky: {
     paddingHorizontal: spacing.xl,
@@ -122,4 +126,4 @@ const styles = StyleSheet.create({
   names: { flex: 1, gap: 2 },
   name: { color: colors.text, fontSize: font.body + 1, fontWeight: '800' },
   countries: { color: colors.textMuted, fontSize: font.small },
-});
+}));

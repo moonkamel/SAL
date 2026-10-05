@@ -1,14 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useI18n, useT } from '@/src/i18n';
-import { colors, font, fonts, radius, spacing } from '@/src/theme';
+import { font, fonts, radius, spacing } from '@/src/theme';
 import { formatDistance } from '@/shared/format';
 import { formatClock } from '@/shared/trip';
 import type { TransitItinerary, TripSegment } from '@/shared/types';
 
 import { LineBadge } from './LineBadge';
 import { useStopRealtime } from './useStopRealtime';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 interface Props {
   itinerary: TransitItinerary;
@@ -19,6 +20,8 @@ const minutes = (s: number) => `${Math.max(1, Math.round(s / 60))} min`;
 
 /** Étapes du trajet, façon feuille de route. */
 export function TripTimeline({ itinerary, destinationName }: Props) {
+  const colors = useColors();
+  const styles = useStyles();
   const { t, lang } = useI18n();
   return (
     <View style={styles.list}>
@@ -88,6 +91,7 @@ export function TripTimeline({ itinerary, destinationName }: Props) {
 
 /** Temps réel Ilévia à l'arrêt de montée (masqué s'il n'est pas disponible). */
 function Realtime({ ride }: { ride: Extract<TripSegment, { kind: 'ride' }> }) {
+  const styles = useStyles();
   const mins = useStopRealtime(ride.departureStop.name, ride.line.short, ride.headsign);
   const t = useT();
   if (!mins?.length) return null;
@@ -103,7 +107,7 @@ function Realtime({ ride }: { ride: Extract<TripSegment, { kind: 'ride' }> }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   live: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.open },
   liveText: { color: colors.open, fontSize: font.small, fontWeight: '800' },
@@ -116,4 +120,4 @@ const styles = StyleSheet.create({
   title: { flex: 1, color: colors.text, fontSize: font.body, fontWeight: '700' },
   stop: { color: colors.text, fontFamily: fonts.displayMedium, fontSize: font.body },
   muted: { color: colors.textMuted, fontSize: font.small, fontWeight: '400' },
-});
+}));

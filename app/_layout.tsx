@@ -2,34 +2,41 @@ import { Fraunces_600SemiBold } from '@expo-google-fonts/fraunces/600SemiBold';
 import { Fraunces_600SemiBold_Italic } from '@expo-google-fonts/fraunces/600SemiBold_Italic';
 import { Fraunces_700Bold } from '@expo-google-fonts/fraunces/700Bold';
 import { useFonts } from 'expo-font';
-import { DarkTheme, Stack, ThemeProvider, usePathname } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AdsProvider } from '@/src/features/ads/AdsProvider';
+import { useDaytime } from '@/src/features/moment/useDaytime';
 import { FavoritesProvider } from '@/src/features/favorites/FavoritesProvider';
 import { LocationProvider } from '@/src/features/location/LocationProvider';
 import { AppNavigationProvider } from '@/src/features/navigation/AppNavigationProvider';
 import { LanguageProvider, useI18n } from '@/src/i18n';
 import { LanguagePicker } from '@/src/i18n/LanguagePicker';
-import { colors, fonts } from '@/src/theme';
+import { fonts } from '@/src/theme';
+import { type Tone, TONES, ToneProvider, useColors, useTone } from '@/src/theme/tone';
 
 // L'écran de démarrage reste affiché le temps de charger la police de titre.
 void SplashScreen.preventAutoHideAsync();
 
-const theme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    background: colors.background,
-    card: colors.background,
-    text: colors.text,
-    primary: colors.accent,
-    border: colors.border,
-  },
-};
+/** Thème de la navigation (en-têtes, fonds) aux couleurs de la tonalité. */
+function navigationTheme(tone: Tone) {
+  const c = TONES[tone];
+  const base = tone === 'day' ? DefaultTheme : DarkTheme;
+  return {
+    ...base,
+    colors: {
+      ...base.colors,
+      background: c.background,
+      card: c.background,
+      text: c.text,
+      primary: c.accent,
+      border: c.border,
+    },
+  };
+}
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -43,14 +50,19 @@ export default function RootLayout() {
     if (ready) void SplashScreen.hideAsync();
   }, [ready]);
 
+  // Tonalité jour (6 h – 19 h) ou nuit, pour tous les écrans ; suit l'heure qui passe.
+  const tone: Tone = useDaytime() ? 'day' : 'night';
+
   if (!ready) return null;
 
   return (
     <SafeAreaProvider>
       <LanguageProvider>
-        <ThemeProvider value={theme}>
-          <AppWithLanguage />
-        </ThemeProvider>
+        <ToneProvider value={tone}>
+          <ThemeProvider value={navigationTheme(tone)}>
+            <AppWithLanguage />
+          </ThemeProvider>
+        </ToneProvider>
       </LanguageProvider>
     </SafeAreaProvider>
   );
@@ -58,14 +70,16 @@ export default function RootLayout() {
 
 /** Au premier lancement : choix de la langue (mémorisé), puis l'app. */
 function AppWithLanguage() {
+  const colors = useColors();
   const { ready, chosen, t } = useI18n();
+  const statusBar = useTone().tone === 'day' ? 'dark' : 'light';
   const pathname = usePathname();
   if (!ready) return null;
   // La politique de confidentialité s'ouvre directement (lien depuis Google Play).
   if (!chosen && pathname !== '/privacy') {
     return (
       <>
-        <StatusBar style="light" />
+        <StatusBar style={statusBar} />
         <LanguagePicker />
       </>
     );
@@ -76,7 +90,7 @@ function AppWithLanguage() {
       <LocationProvider>
         <FavoritesProvider>
           <AdsProvider>
-            <StatusBar style="light" />
+            <StatusBar style={statusBar} />
             <Stack
               screenOptions={{
                 headerTintColor: colors.text,

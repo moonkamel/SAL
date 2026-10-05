@@ -1,17 +1,19 @@
 import { Image } from 'expo-image';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { useT } from '@/src/i18n';
-import { colors, font, spacing } from '@/src/theme';
+import { font, spacing } from '@/src/theme';
 import type { Review } from '@/shared/types';
 
 import { Stars } from './Stars';
+import { themedStyles } from '@/src/theme/tone';
 
 const COLLAPSED_LINES = 4;
 
 export function ReviewItem({ review }: { review: Review }) {
+  const styles = useStyles();
   const [expanded, setExpanded] = useState(false);
   const [truncated, setTruncated] = useState(false);
   const t = useT();
@@ -62,7 +64,7 @@ export function ReviewItem({ review }: { review: Review }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   review: { gap: spacing.sm, paddingVertical: spacing.md },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   avatar: { width: 40, height: 40, borderRadius: 20 },
@@ -77,4 +79,4 @@ const styles = StyleSheet.create({
   time: { color: colors.textMuted, fontSize: font.tiny },
   text: { color: colors.text, fontSize: font.small + 1, lineHeight: 21 },
   more: { color: colors.accent, fontSize: font.small, fontWeight: '600' },
-});
+}));

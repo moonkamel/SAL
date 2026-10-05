@@ -6,12 +6,12 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
 
 import { Chip } from '@/src/components/Chip';
+import { OpenNowToggle } from '@/src/components/OpenNowToggle';
 import { countActiveFilters, FilterSheet } from '@/src/components/FilterSheet';
 import { GoogleAttribution } from '@/src/components/GoogleAttribution';
 import { LocationBanner } from '@/src/components/LocationBanner';
@@ -24,8 +24,9 @@ import { withAdSlots } from '@/src/features/ads/policy';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { useT } from '@/src/i18n';
 import { ApiRequestError, searchPlaces } from '@/src/lib/api';
-import { colors, font, fonts, motion, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { font, fonts, motion, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { AMBIANCE_LABELS, type Ambiance, type PlaceSummary, type SearchFilters } from '@/shared/types';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 function parseAmbianceParam(value?: string): Ambiance[] {
   return (value ?? '').split(',').filter((a): a is Ambiance => a in AMBIANCE_LABELS);
@@ -37,6 +38,8 @@ type State =
   | { kind: 'done'; places: PlaceSummary[] };
 
 export default function ResultsScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { q, ambiance } = useLocalSearchParams<{ q: string; ambiance?: string }>();
   const query = (q ?? '').trim();
   const { refresh } = useUserLocation();
@@ -95,29 +98,24 @@ export default function ResultsScreen() {
 
       <View style={styles.toolbar}>
         <Chip
-          label={t('Ouvert maintenant')}
-          selected={filters.openNow ?? false}
-          onPress={() => setFilters({ ...filters, openNow: filters.openNow ? undefined : true })}
-        />
-        <Chip
           label={activeCount ? t('Filtres ({n})', { n: activeCount }) : t('Filtres')}
           selected={activeCount > 0}
           onPress={() => setFiltersVisible(true)}
         />
-        <View style={{ flex: 1 }} />
         <Pressable
           onPress={() => setView(view === 'list' ? 'map' : 'list')}
           style={({ pressed }) => [styles.toggle, pressed && { opacity: 0.75 }]}
           accessibilityRole="button"
           accessibilityLabel={view === 'list' ? t('Afficher la carte') : t('Afficher la liste')}
         >
-          <Ionicons
-            name={view === 'list' ? 'map-outline' : 'list-outline'}
-            size={20}
-            color={colors.gold}
-          />
-          <Text style={styles.toggleText}>{view === 'list' ? t('Carte') : t('Liste')}</Text>
+          <Ionicons name={view === 'list' ? 'map-outline' : 'list-outline'} size={20} color={colors.gold} />
         </Pressable>
+        <View style={styles.spacer} />
+        {/* Élément à part, à droite : le filtre le plus utilisé, activable d'un geste. */}
+        <OpenNowToggle
+          value={filters.openNow ?? false}
+          onChange={(on) => setFilters({ ...filters, openNow: on ? true : undefined })}
+        />
       </View>
 
       {state.kind === 'loading' && (
@@ -213,28 +211,28 @@ export default function ResultsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.background },
   toolbar: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
   },
   list: { padding: spacing.lg, paddingTop: 0 },
   count: { color: colors.text, fontFamily: fonts.displayMedium, fontSize: font.title - 2 },
+  spacer: { flex: 1, minWidth: spacing.xs },
   toggle: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    minHeight: TOUCH_TARGET - 4,
-    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+    width: TOUCH_TARGET - 4,
+    height: TOUCH_TARGET - 4,
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceRaised,
     borderWidth: 1,
     borderColor: colors.gold,
   },
-  toggleText: { color: colors.text, fontSize: font.small + 1, fontWeight: '600' },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -251,4 +249,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   retryText: { color: colors.accentText, fontSize: font.body, fontWeight: '700' },
-});
+}));

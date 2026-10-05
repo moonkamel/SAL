@@ -3,8 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/src/components/PressableScale';
 import { useT } from '@/src/i18n';
-import { colors, font, fonts, radius, shadows, spacing } from '@/src/theme';
-import { useTone } from '@/src/theme/tone';
+import { font, fonts, radius, spacing } from '@/src/theme';
+import { useTone, themedStyles } from '@/src/theme/tone';
 import type { Suggestion, WeatherResponse } from '@/shared/types';
 
 import { WEATHER_LABELS, weatherIcon } from './weatherIcons';
@@ -16,6 +16,7 @@ interface Props {
 
 /** Idée de sortie selon le temps qu'il fait (Open-Meteo). */
 export function WeatherCard({ data, onPress }: Props) {
+  const styles = useStyles();
   const { weather, suggestion } = data;
   const { c } = useTone();
   const t = useT();
@@ -44,7 +45,7 @@ export function WeatherCard({ data, onPress }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -55,11 +56,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    boxShadow: shadows.card,
+    boxShadow: colors.cardShadow,
   },
   weather: { alignItems: 'center', minWidth: 52 },
   temp: { color: colors.text, fontFamily: fonts.display, fontSize: font.title },
   title: { color: colors.text, fontFamily: fonts.displayMedium, fontSize: font.body + 1 },
   subtitle: { color: colors.textMuted, fontSize: font.small },
   cta: { color: colors.gold, fontSize: font.small, fontWeight: '700', marginTop: spacing.xs },
-});
+}));

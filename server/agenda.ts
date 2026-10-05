@@ -1,4 +1,4 @@
-// Agenda « Ce soir à Lille » :
+// Agenda des sorties (aujourd'hui, demain, la semaine, le week-end…) :
 // - événements saisis dans l'espace partenaires (dont les événements « À la une », payants) ;
 // - événements publics d'OpenAgenda, si OPENAGENDA_KEY et OPENAGENDA_AGENDAS sont définies.
 
@@ -6,7 +6,7 @@ import { haversineMeters } from '@/shared/geo';
 import { type Lang, LANG_INFO, translate } from '@/shared/i18n';
 import type { AgendaEvent, AgendaWhen, LatLng } from '@/shared/types';
 
-import { translateFields } from './autoTranslate';
+import { isAutoTranslateEnabled, lastTranslateError, translateFields } from './autoTranslate';
 
 import { TtlCache } from './cache';
 import { getContent } from './content';
@@ -16,7 +16,7 @@ import type { EventItem } from './schemas';
 
 export const OPENAGENDA_URL = process.env.OPENAGENDA_URL ?? 'https://api.openagenda.com/v2';
 const RADIUS_METERS = 15_000;
-const MAX_EVENTS = 150;
+const MAX_EVENTS = 250;
 const DEFAULT_DURATION_MS = 3 * 3_600_000;
 
 export interface TimeWindow {
@@ -35,8 +35,12 @@ export function windowFor(when: AgendaWhen, now: Date = new Date()): TimeWindow 
   if (when === 'tomorrow') {
     return { start: parisTime(addDays(outingDay, 1), 6), end: parisTime(addDays(outingDay, 2), 6) };
   }
-  // Week-end : du vendredi 18 h au lundi 6 h (celui en cours, ou le prochain).
   const outingWeekday = p.minutes < 6 * 60 ? (p.day + 6) % 7 : p.day;
+  // Semaine : jusqu'au lundi 6 h qui suit ; semaine prochaine : le lundi suivant, 6 h → 6 h.
+  const nextMonday = addDays(outingDay, (8 - outingWeekday) % 7 || 7);
+  if (when === 'week') return { start: now, end: parisTime(nextMonday, 6) };
+  if (when === 'nextweek') return { start: parisTime(nextMonday, 6), end: parisTime(addDays(nextMonday, 7), 6) };
+  // Week-end : du vendredi 18 h au lundi 6 h (celui en cours, ou le prochain).
   const daysToFriday = outingWeekday === 0 ? -2 : outingWeekday === 6 ? -1 : 5 - outingWeekday;
   const friday = addDays(outingDay, daysToFriday);
   const start = parisTime(friday, 18);
@@ -297,10 +301,11 @@ async function fetchOpenAgenda(uid: string, key: string, w: TimeWindow): Promise
   const hit = openAgendaCache.get(cacheKey);
   if (hit) return hit;
 
-  // Jusqu'à 3 pages de 100 (un week-end chargé dépasse 100 événements).
+  // Pages de 100 : 3 pour un jour ou un week-end, 6 pour une semaine entière.
+  const pages = w.end.getTime() - w.start.getTime() > 4 * 24 * 3_600_000 ? 6 : 3;
   const events: OpenAgendaEvent[] = [];
   let after: unknown[] | undefined;
-  for (let page = 0; page < 3; page++) {
+  for (let page = 0; page < pages; page++) {
     const q = new URLSearchParams({
       key,
       size: '100',
@@ -389,6 +394,7 @@ export interface AgendaDebug {
   }[];
   merged?: number;
   withinRadius?: number;
+  translate?: { enabled: boolean; lastError?: string };
 }
 
 export async function agenda(
@@ -453,7 +459,10 @@ export async function agenda(
     debug.merged = merged.length;
     debug.withinRadius = merged.filter((e) => e.distanceMeters <= RADIUS_METERS).length;
   }
-  return lang === 'fr' ? events : localizeEvents(events, lang);
+  if (lang === 'fr') return events;
+  const localized = await localizeEvents(events, lang);
+  if (debug) debug.translate = { enabled: isAutoTranslateEnabled(), lastError: lastTranslateError };
+  return localized;
 }
 
 /**

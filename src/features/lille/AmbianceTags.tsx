@@ -1,15 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useT } from '@/src/i18n';
-import { colors, font, radius, spacing } from '@/src/theme';
+import { font, radius, spacing } from '@/src/theme';
 import { AMBIANCE_LABELS, type Ambiance } from '@/shared/types';
 
 import { AMBIANCE_ICONS } from './pickers';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 /** Pastilles « Terrasse », « Musique live »… confirmées par Google. */
 export function AmbianceTags({ ambiance }: { ambiance?: Ambiance[] }) {
+  const colors = useColors();
+  const styles = useStyles();
   const t = useT();
   if (!ambiance?.length) return null;
   return (
@@ -28,7 +31,7 @@ export function AmbianceTags({ ambiance }: { ambiance?: Ambiance[] }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs + 2 },
   tag: {
     flexDirection: 'row',
@@ -37,7 +40,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(230, 180, 90, 0.12)',
+    backgroundColor: colors.goldTint,
   },
   text: { color: colors.gold, fontSize: font.tiny, fontWeight: '700' },
-});
+}));

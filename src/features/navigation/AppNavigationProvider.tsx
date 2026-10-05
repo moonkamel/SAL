@@ -3,11 +3,12 @@ import {
   TaskRemovedBehavior,
 } from '@googlemaps/react-native-navigation-sdk';
 import type { ReactNode } from 'react';
+import { useColors } from '@/src/theme/tone';
 
-import { colors } from '@/src/theme';
 
 /** Contexte du Navigation SDK, avec la boîte de dialogue des conditions Google en français. */
 export function AppNavigationProvider({ children }: { children: ReactNode }) {
+  const colors = useColors();
   return (
     <NavigationProvider
       termsAndConditionsDialogOptions={{

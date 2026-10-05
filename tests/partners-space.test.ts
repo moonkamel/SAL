@@ -119,6 +119,21 @@ describe('K : agenda', () => {
     expect(windowFor('weekend', sat).start).toEqual(sat);
   });
 
+  it('calcule « cette semaine » et « la semaine prochaine » (lundi 6 h → lundi 6 h)', () => {
+    const wed = new Date('2026-09-23T10:00:00Z');
+    expect(windowFor('week', wed).start).toEqual(wed);
+    expect(windowFor('week', wed).end.toISOString()).toBe('2026-09-28T04:00:00.000Z');
+    const next = windowFor('nextweek', wed);
+    expect(next.start.toISOString()).toBe('2026-09-28T04:00:00.000Z');
+    expect(next.end.toISOString()).toBe('2026-10-05T04:00:00.000Z');
+    // Dimanche soir : la semaine prochaine commence demain matin.
+    const sun = new Date('2026-09-27T18:00:00Z');
+    expect(windowFor('nextweek', sun).start.toISOString()).toBe('2026-09-28T04:00:00.000Z');
+    // Lundi matin : la semaine en cours va jusqu'au lundi suivant.
+    const mon = new Date('2026-09-28T08:00:00Z');
+    expect(windowFor('week', mon).end.toISOString()).toBe('2026-10-05T04:00:00.000Z');
+  });
+
   it('garde les événements qui chevauchent la fenêtre', () => {
     const w = windowFor('today', SAT_20H);
     const e = fromPartnerEvent(event(), GRAND_PLACE, w, SAT_20H);

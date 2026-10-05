@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 
-import { colors, font, gradients, radius, shadows, spacing, TOUCH_TARGET } from '@/src/theme';
+import { font, gradients, radius, shadows, spacing, TOUCH_TARGET } from '@/src/theme';
 import { useT } from '@/src/i18n';
-import { useTone } from '@/src/theme/tone';
+import { useTone, themedStyles, useColors } from '@/src/theme/tone';
 
 interface Props {
   initialValue?: string;
@@ -14,6 +14,8 @@ interface Props {
 }
 
 export function SearchBar({ initialValue = '', autoFocus, onSubmit }: Props) {
+  const colors = useColors();
+  const styles = useStyles();
   const [value, setValue] = useState(initialValue);
   const [focused, setFocused] = useState(false);
   const { tone, c } = useTone();
@@ -71,7 +73,7 @@ export function SearchBar({ initialValue = '', autoFocus, onSubmit }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -84,7 +86,7 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.lg,
     paddingRight: spacing.xs + 2,
     minHeight: 68,
-    boxShadow: shadows.raised,
+    boxShadow: colors.raisedShadow,
   },
   input: {
     flex: 1,
@@ -101,4 +103,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

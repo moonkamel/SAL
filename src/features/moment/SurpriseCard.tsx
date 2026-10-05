@@ -2,16 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { PressableScale } from '@/src/components/PressableScale';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { useT } from '@/src/i18n';
 import { ApiRequestError, getSurprise } from '@/src/lib/api';
-import { colors, font, fonts, gradients, radius, shadows, spacing } from '@/src/theme';
+import { font, fonts, gradients, radius, shadows, spacing } from '@/src/theme';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 /** « Surprends-moi » : tire au sort un lieu ouvert, bien noté et proche. */
 export function SurpriseCard() {
+  const colors = useColors();
+  const styles = useStyles();
   const { refresh } = useUserLocation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +77,7 @@ export function SurpriseCard() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   wrap: { borderRadius: radius.lg, borderCurve: 'continuous', boxShadow: shadows.glow },
   card: {
     flexDirection: 'row',
@@ -97,4 +100,4 @@ const styles = StyleSheet.create({
   title: { color: colors.accentText, fontFamily: fonts.display, fontSize: font.title - 2 },
   subtitle: { color: 'rgba(255, 255, 255, 0.85)', fontSize: font.small, marginTop: 2 },
   error: { color: colors.closed, fontSize: font.small, textAlign: 'center' },
-});
+}));

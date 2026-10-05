@@ -6,12 +6,15 @@ import { FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from
 
 import { useT } from '@/src/i18n';
 import { photoUrl } from '@/src/lib/api';
-import { colors, font, radius, spacing } from '@/src/theme';
+import { font, radius, spacing } from '@/src/theme';
 import type { PhotoRef } from '@/shared/types';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 const HEIGHT = 280;
 
 export function PhotoCarousel({ photos }: { photos: PhotoRef[] }) {
+  const colors = useColors();
+  const styles = useStyles();
   const { width } = useWindowDimensions();
   const [index, setIndex] = useState(0);
   const t = useT();
@@ -79,7 +82,7 @@ export function PhotoCarousel({ photos }: { photos: PhotoRef[] }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   placeholder: {
     height: HEIGHT / 2,
     backgroundColor: colors.surface,
@@ -108,4 +111,4 @@ const styles = StyleSheet.create({
   },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.5)' },
   dotActive: { backgroundColor: '#FFFFFF' },
-});
+}));

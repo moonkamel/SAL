@@ -13,9 +13,10 @@ import { ItineraryCard } from '@/src/features/transit/ItineraryCard';
 import { TripTimeline } from '@/src/features/transit/TripTimeline';
 import { useT } from '@/src/i18n';
 import { ApiRequestError, getItineraries } from '@/src/lib/api';
-import { colors, font, fonts, radius, spacing } from '@/src/theme';
+import { font, fonts, radius, spacing } from '@/src/theme';
 import { segmentPoints } from '@/shared/trip';
 import type { LatLng, TransitItinerary } from '@/shared/types';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 type State =
   | { kind: 'loading' }
@@ -26,6 +27,8 @@ const WALK_COLOR = '#B9B4C6';
 
 /** Trajets en transports (métro, tram, bus) avec horaires ; le guidage se fait dans Google Maps. */
 export default function TransitTripScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const params = useLocalSearchParams<{ id: string; name: string; lat: string; lng: string }>();
   const name = params.name ?? 'Destination';
   const destination = useMemo<LatLng>(
@@ -151,7 +154,7 @@ export default function TransitTripScreen() {
       {itineraries.length > 0 && (
         <ScrollView
           style={styles.panel}
-          contentContainerStyle={[styles.panelContent, { paddingBottom: insets.bottom + spacing.lg }]}
+          contentContainerStyle={[styles.panelContent, { paddingBottom: spacing.lg }]}
         >
           {itineraries.map((it) => (
             <ItineraryCard
@@ -173,21 +176,27 @@ export default function TransitTripScreen() {
                   })}
                 </Text>
               )}
-              <GradientButton
-                title={t('Y aller avec Google Maps')}
-                icon="navigate"
-                onPress={openGoogleMaps}
-                accessibilityLabel={t('Ouvrir le trajet en transports dans Google Maps')}
-              />
             </>
           )}
         </ScrollView>
+      )}
+
+      {/* Toujours visible : le guidage se fait dans Google Maps, comme pour la marche. */}
+      {state.kind !== 'loading' && (
+        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+          <GradientButton
+            title={t('Y aller avec Google Maps')}
+            icon="navigate"
+            onPress={openGoogleMaps}
+            accessibilityLabel={t('Ouvrir le trajet en transports dans Google Maps')}
+          />
+        </View>
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.background },
   mapWrap: { height: '42%', backgroundColor: colors.surface },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xl },
@@ -195,6 +204,13 @@ const styles = StyleSheet.create({
   message: { color: colors.text, fontSize: font.body, textAlign: 'center' },
   retry: { backgroundColor: colors.accent, borderRadius: radius.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md },
   retryText: { color: colors.accentText, fontWeight: '700', fontSize: font.body },
+  footer: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    backgroundColor: colors.background,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
   panel: {
     flex: 1,
     backgroundColor: colors.background,
@@ -205,4 +221,4 @@ const styles = StyleSheet.create({
   panelContent: { padding: spacing.lg, gap: spacing.md },
   section: { color: colors.text, fontFamily: fonts.displayMedium, fontSize: font.title - 2, marginTop: spacing.sm },
   fare: { color: colors.textMuted, fontSize: font.small },
-});
+}));

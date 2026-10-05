@@ -10,8 +10,8 @@ import { useLiveData } from '@/src/features/lille/useLiveData';
 import { OfferCard } from '@/src/features/offers/OfferCard';
 import { useI18n, useT } from '@/src/i18n';
 import { getAgenda, getOffers } from '@/src/lib/api';
-import { colors, font, fonts, radius, spacing } from '@/src/theme';
-import { useTone } from '@/src/theme/tone';
+import { font, fonts, radius, spacing } from '@/src/theme';
+import { useTone, themedStyles } from '@/src/theme/tone';
 import type { AgendaResponse, LatLng, OffersResponse } from '@/shared/types';
 
 /** On ne recharge qu'après un déplacement de ~200 m ; les distances restent exactes. */
@@ -20,6 +20,7 @@ export function refreshKey(p: LatLng): number[] {
 }
 
 function Rail({ title, onSeeAll, children }: { title: string; onSeeAll: () => void; children: ReactNode }) {
+  const styles = useStyles();
   const { c } = useTone();
   const t = useT();
   return (
@@ -37,7 +38,7 @@ function Rail({ title, onSeeAll, children }: { title: string; onSeeAll: () => vo
   );
 }
 
-/** « Ce soir à Lille » (agenda) ; s'il n'y a rien ce soir, un accès à l'agenda complet. */
+/** « Aujourd'hui à Lille » (agenda) ; s'il n'y a rien aujourd'hui, un accès à l'agenda complet. */
 export function TonightRail({ near }: { near: LatLng }) {
   const { t, lang } = useI18n();
   const { data, error } = useLiveData<AgendaResponse>(
@@ -48,7 +49,7 @@ export function TonightRail({ near }: { near: LatLng }) {
   if (!data && !error) return null; // chargement discret
   if (!data?.events.length) return <AgendaLink />;
   return (
-    <Rail title={t('Ce soir à Lille')} onSeeAll={() => router.push('/agenda')}>
+    <Rail title={t('Aujourd’hui à Lille')} onSeeAll={() => router.push('/agenda')}>
       {data.events.slice(0, 8).map((e) => (
         <EventCard key={e.id} event={e} compact onPress={() => openEvent(e)} />
       ))}
@@ -80,8 +81,9 @@ export function OffersRail({ near }: { near: LatLng }) {
   );
 }
 
-/** Accès à l'agenda quand rien n'est prévu ce soir (demain, week-end…). */
+/** Accès à l'agenda quand rien n'est prévu aujourd'hui (demain, la semaine…). */
 function AgendaLink() {
+  const styles = useStyles();
   const { c } = useTone();
   const t = useT();
   return (
@@ -98,7 +100,7 @@ function AgendaLink() {
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={[styles.linkTitle, { color: c.text }]}>{t('Agenda des sorties')}</Text>
           <Text style={[styles.linkText, { color: c.textMuted }]}>
-            {t('Concerts, expos, spectacles : demain et ce week-end')}
+            {t('Concerts, expos, spectacles : cette semaine et ce week-end')}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={c.textFaint} />
@@ -107,7 +109,7 @@ function AgendaLink() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   linkWrap: { marginTop: spacing.xl, paddingHorizontal: spacing.lg },
   link: {
     flexDirection: 'row',
@@ -131,4 +133,4 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontFamily: fonts.displayMedium, fontSize: font.title - 2 },
   seeAll: { color: colors.accent, fontSize: font.small, fontWeight: '700' },
   row: { paddingHorizontal: spacing.lg, gap: spacing.md },
-});
+}));

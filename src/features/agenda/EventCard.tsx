@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import type { ComponentProps } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { PressableScale } from '@/src/components/PressableScale';
 import { tx, useI18n } from '@/src/i18n';
-import { colors, font, fonts, palette, radius, spacing } from '@/src/theme';
-import { useTone } from '@/src/theme/tone';
+import { font, fonts, palette, radius, spacing } from '@/src/theme';
+import { useTone, themedStyles } from '@/src/theme/tone';
 import { formatDistance } from '@/shared/format';
 import { type AgendaEvent, type EventCategory, GENRE_LABELS } from '@/shared/types';
 
@@ -31,6 +31,7 @@ interface Props {
 }
 
 export function EventCard({ event, onPress, compact }: Props) {
+  const styles = useStyles();
   const cat = CATEGORY_INFO[event.category];
   const { tone, c } = useTone();
   const day = tone === 'day';
@@ -90,7 +91,7 @@ export function EventCard({ event, onPress, compact }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
@@ -111,4 +112,4 @@ const styles = StyleSheet.create({
   venue: { color: colors.text, fontSize: font.small },
   muted: { color: colors.textMuted, fontSize: font.small },
   free: { color: colors.open, fontWeight: '800' },
-});
+}));

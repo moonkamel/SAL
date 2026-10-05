@@ -1,23 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useI18n } from '@/src/i18n';
-import { colors, font, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { font, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { decimal } from '@/shared/i18n';
 import { formatDistance } from '@/shared/format';
 import { AMBIANCE_LABELS, type Ambiance, type PriceLevel, type SearchFilters } from '@/shared/types';
 
 import { Chip } from './Chip';
+import { themedStyles } from '@/src/theme/tone';
 
 export const DISTANCE_OPTIONS = [500, 1000, 2000, 5000];
 export const RATING_OPTIONS = [3.5, 4, 4.5];
 const PRICE_OPTIONS: PriceLevel[] = [1, 2, 3, 4];
 const AMBIANCE_OPTIONS = Object.keys(AMBIANCE_LABELS) as Ambiance[];
 
+/** Filtres de la feuille (« Ouvert maintenant » est un interrupteur à part). */
 export function countActiveFilters(f: SearchFilters): number {
   return (
-    (f.openNow ? 1 : 0) +
     (f.maxDistanceMeters ? 1 : 0) +
     (f.priceLevels?.length ? 1 : 0) +
     (f.minRating ? 1 : 0) +
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export function FilterSheet({ visible, filters, onApply, onClose }: Props) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<SearchFilters>(filters);
   const { t, lang } = useI18n();
@@ -59,16 +61,6 @@ export function FilterSheet({ visible, filters, onApply, onClose }: Props) {
       <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
         <Text style={styles.title}>{t('Filtres')}</Text>
         <ScrollView contentContainerStyle={{ gap: spacing.xl }}>
-          <View style={styles.switchRow}>
-            <Text style={styles.label}>{t('Ouvert maintenant')}</Text>
-            <Switch
-              value={draft.openNow ?? false}
-              onValueChange={(v) => setDraft({ ...draft, openNow: v || undefined })}
-              trackColor={{ true: colors.accent, false: colors.border }}
-              accessibilityLabel={t('Ouvert maintenant')}
-            />
-          </View>
-
           <View style={styles.section}>
             <Text style={styles.label}>{t('Ambiance')}</Text>
             <View style={styles.chips}>
@@ -136,7 +128,7 @@ export function FilterSheet({ visible, filters, onApply, onClose }: Props) {
         <View style={styles.actions}>
           <Pressable
             style={[styles.button, styles.secondary]}
-            onPress={() => setDraft({})}
+            onPress={() => setDraft({ openNow: draft.openNow })}
             accessibilityRole="button"
           >
             <Text style={styles.secondaryText}>{t('Réinitialiser')}</Text>
@@ -154,7 +146,7 @@ export function FilterSheet({ visible, filters, onApply, onClose }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: {
     backgroundColor: colors.surface,
@@ -166,7 +158,6 @@ const styles = StyleSheet.create({
   },
   title: { color: colors.text, fontSize: font.title, fontWeight: '700' },
   section: { gap: spacing.md },
-  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   label: { color: colors.text, fontSize: font.body, fontWeight: '600' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   actions: { flexDirection: 'row', gap: spacing.md },
@@ -181,4 +172,4 @@ const styles = StyleSheet.create({
   primaryText: { color: colors.accentText, fontSize: font.body, fontWeight: '700' },
   secondary: { backgroundColor: colors.surfaceRaised },
   secondaryText: { color: colors.text, fontSize: font.body, fontWeight: '600' },
-});
+}));

@@ -1,7 +1,8 @@
 import { Stack } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
-import { colors, font, fonts, spacing } from '@/src/theme';
+import { font, fonts, spacing } from '@/src/theme';
+import { themedStyles } from '@/src/theme/tone';
 
 // Adresse de contact publiée (EAS : EXPO_PUBLIC_CONTACT_EMAIL).
 const CONTACT = process.env.EXPO_PUBLIC_CONTACT_EMAIL;
@@ -63,6 +64,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
 
 /** Politique de confidentialité, publiée sur le web (lien demandé par Google Play). */
 export default function PrivacyScreen() {
+  const styles = useStyles();
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Stack.Screen options={{ title: 'Confidentialité' }} />
@@ -82,7 +84,7 @@ export default function PrivacyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, gap: spacing.lg, maxWidth: 760, width: '100%', alignSelf: 'center' },
   title: { color: colors.text, fontFamily: fonts.display, fontSize: font.hero - 6 },
@@ -90,4 +92,4 @@ const styles = StyleSheet.create({
   section: { gap: spacing.sm },
   heading: { color: colors.gold, fontFamily: fonts.displayMedium, fontSize: font.title - 2 },
   body: { color: colors.text, fontSize: font.body, lineHeight: 24 },
-});
+}));

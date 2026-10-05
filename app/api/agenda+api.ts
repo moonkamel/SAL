@@ -3,9 +3,9 @@ import { parseLatLng } from '@/server/params';
 import type { AgendaResponse, AgendaWhen } from '@/shared/types';
 import { langFromHeader, tx } from '@/shared/i18n';
 
-const WHEN: AgendaWhen[] = ['today', 'tomorrow', 'weekend'];
+const WHEN: AgendaWhen[] = ['today', 'tomorrow', 'week', 'weekend', 'nextweek'];
 
-/** GET /api/agenda?near=lat,lng&when=today|tomorrow|weekend */
+/** GET /api/agenda?near=lat,lng&when=today|tomorrow|week|weekend|nextweek */
 export async function GET(request: Request): Promise<Response> {
   const q = new URL(request.url).searchParams;
   const near = parseLatLng(q.get('near'));

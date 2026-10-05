@@ -26,25 +26,14 @@ import { useLiveData } from '@/src/features/lille/useLiveData';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { OffersRail, TonightRail } from '@/src/features/moment/HomeRails';
 import { SurpriseCard } from '@/src/features/moment/SurpriseCard';
-import { useDaytime } from '@/src/features/moment/useDaytime';
 import { WeatherCard } from '@/src/features/moment/WeatherCard';
 import { weatherIcon } from '@/src/features/moment/weatherIcons';
 import { tx, useI18n } from '@/src/i18n';
 import { LANG_INFO } from '@/shared/i18n';
 import { getWeather } from '@/src/lib/api';
 import { momentLabel } from '@/src/lib/moment';
-import {
-  colors,
-  font,
-  fonts,
-  motion,
-  palette,
-  radius,
-  shadows,
-  spacing,
-  TOUCH_TARGET,
-} from '@/src/theme';
-import { TONES, ToneProvider } from '@/src/theme/tone';
+import { font, fonts, motion, palette, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { themedStyles, useColors, useTone } from '@/src/theme/tone';
 import type { Suggestion, WeatherResponse } from '@/shared/types';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -62,12 +51,15 @@ const CATEGORIES: { label: string; query: string; icon: IconName; tint: string }
 const SKY_HEIGHT = 280;
 
 export default function HomeScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { history, add, clear } = useSearchHistory();
   const { onSearch, privacyOptionsRequired, showPrivacyOptions } = useAds();
   // Le jour (6 h – 19 h) : « aujourd'hui » et tonalité jour ; le soir : la nuit lilloise.
-  const day = useDaytime();
-  const tone = TONES[day ? 'day' : 'night'];
+  // Tonalité choisie à la racine (app/_layout.tsx), commune à tous les écrans.
+  const { tone: toneName, c: tone } = useTone();
+  const day = toneName === 'day';
   const { t: tr, lang } = useI18n();
 
   // Barre d'état sombre sur le ciel clair ; les autres écrans restent en tonalité nuit.
@@ -99,7 +91,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <ToneProvider value={day ? 'day' : 'night'}>
+    <>
       <View style={[styles.screen, { backgroundColor: tone.background }]}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -275,11 +267,11 @@ export default function HomeScreen() {
           </View>
         </KeyboardAvoidingView>
       </View>
-    </ToneProvider>
+    </>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.background },
   sky: {
     minHeight: SKY_HEIGHT,
@@ -318,7 +310,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.glass,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(245, 238, 226, 0.18)',
+    borderColor: colors.glassBorder,
   },
   topActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   langButton: {
@@ -363,7 +355,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    boxShadow: shadows.card,
+    boxShadow: colors.cardShadow,
   },
   categoryIcon: {
     width: 44,
@@ -392,4 +384,4 @@ const styles = StyleSheet.create({
   historyText: { flex: 1, color: colors.text, fontSize: font.body },
   privacy: { alignItems: 'center', paddingVertical: spacing.sm },
   privacyText: { color: colors.textFaint, fontSize: font.tiny, textDecorationLine: 'underline' },
-});
+}));

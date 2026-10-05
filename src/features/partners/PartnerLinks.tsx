@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { Linking, Text, View } from 'react-native';
 
 import { PressableScale } from '@/src/components/PressableScale';
 import { useT } from '@/src/i18n';
 import { partnerLinkUrl } from '@/src/lib/api';
-import { colors, font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import type { PartnerKind, PartnerLink } from '@/shared/types';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 const ICONS: Record<PartnerKind, ComponentProps<typeof Ionicons>['name']> = {
   booking: 'calendar',
@@ -17,6 +18,8 @@ const ICONS: Record<PartnerKind, ComponentProps<typeof Ionicons>['name']> = {
 
 /** Réserver, prendre des billets, commander un VTC : liens d'affiliation signalés. */
 export function PartnerLinks({ links }: { links?: PartnerLink[] }) {
+  const colors = useColors();
+  const styles = useStyles();
   const t = useT();
   if (!links?.length) return null;
   return (
@@ -47,7 +50,7 @@ export function PartnerLinks({ links }: { links?: PartnerLink[] }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   card: {
     backgroundColor: colors.surfaceRaised,
     borderRadius: radius.md,
@@ -66,11 +69,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(230, 180, 90, 0.12)',
+    backgroundColor: colors.goldTint,
     alignItems: 'center',
     justifyContent: 'center',
   },
   label: { color: colors.text, fontSize: font.body, fontWeight: '700' },
   partner: { color: colors.textMuted, fontSize: font.small },
   disclosure: { color: colors.textFaint, fontSize: font.tiny, marginTop: spacing.xs },
-});
+}));

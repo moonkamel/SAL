@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { Chip } from '@/src/components/Chip';
@@ -13,7 +13,8 @@ import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { refreshKey } from '@/src/features/moment/HomeRails';
 import { tx, useI18n } from '@/src/i18n';
 import { getAgenda } from '@/src/lib/api';
-import { colors, font, motion, spacing } from '@/src/theme';
+import { agendaPeriods } from '@/src/lib/moment';
+import { font, motion, spacing } from '@/src/theme';
 import {
   type AgendaEvent,
   type AgendaResponse,
@@ -22,12 +23,15 @@ import {
   GENRE_LABELS,
   type MusicGenre,
 } from '@/shared/types';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
-const WHEN: { key: AgendaWhen; label: string }[] = [
-  { key: 'today', label: tx('Ce soir') },
-  { key: 'tomorrow', label: tx('Demain') },
-  { key: 'weekend', label: tx('Ce week-end') },
-];
+const WHEN_LABELS: Record<AgendaWhen, string> = {
+  today: tx('Aujourd’hui'),
+  tomorrow: tx('Demain'),
+  week: tx('Cette semaine'),
+  weekend: tx('Ce week-end'),
+  nextweek: tx('Semaine prochaine'),
+};
 
 const CATEGORY_ORDER: EventCategory[] = ['concert', 'expo', 'spectacle', 'soiree', 'marche', 'sport', 'autre'];
 const CATEGORY_PLURAL: Record<EventCategory, string> = {
@@ -63,8 +67,16 @@ function apply(events: AgendaEvent[], f: Filters): AgendaEvent[] {
 
 /** Agenda des sorties : concerts, expos, spectacles… avec filtres. */
 export default function AgendaScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const params = useLocalSearchParams<{ when?: AgendaWhen }>();
   const [when, setWhen] = useState<AgendaWhen>(params.when ?? 'today');
+  // Calculées à l'ouverture ; la période demandée reste proposée même hors liste.
+  const periods = useMemo(() => {
+    const list = agendaPeriods();
+    return list.includes(when) ? list : [...list, when];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [filters, setFilters] = useState<Filters>(NO_FILTER);
   const { coords } = useUserLocation();
   const { t, lang } = useI18n();
@@ -103,11 +115,11 @@ export default function AgendaScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.filters}>
-        <View style={styles.row}>
-          {WHEN.map((w) => (
-            <Chip key={w.key} label={t(w.label)} selected={when === w.key} onPress={() => setWhen(w.key)} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
+          {periods.map((w) => (
+            <Chip key={w} label={t(WHEN_LABELS[w])} selected={when === w} onPress={() => setWhen(w)} />
           ))}
-        </View>
+        </ScrollView>
 
         {events.length > 0 && (
           <>
@@ -201,7 +213,7 @@ export default function AgendaScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.background },
   filters: { gap: spacing.sm, paddingTop: spacing.md, paddingBottom: spacing.sm },
   row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg },
@@ -212,4 +224,4 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
   count: { color: colors.textMuted, fontSize: font.small, marginBottom: spacing.sm },
   muted: { color: colors.textMuted, fontSize: font.body, textAlign: 'center', marginTop: spacing.xl },
-});
+}));

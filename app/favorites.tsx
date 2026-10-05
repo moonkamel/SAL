@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 
 import { GoogleAttribution } from '@/src/components/GoogleAttribution';
 import { PlaceCard } from '@/src/components/PlaceCard';
@@ -9,11 +9,14 @@ import { useFavorites } from '@/src/features/favorites/FavoritesProvider';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { useI18n } from '@/src/i18n';
 import { getPlace } from '@/src/lib/api';
-import { colors, font, spacing } from '@/src/theme';
+import { font, spacing } from '@/src/theme';
 import { detailsToSummary } from '@/shared/summary';
 import type { PlaceDetails } from '@/shared/types';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 export default function FavoritesScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { ids } = useFavorites();
   const { coords } = useUserLocation();
   const [details, setDetails] = useState<Record<string, PlaceDetails>>({});
@@ -92,7 +95,7 @@ export default function FavoritesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   list: { padding: spacing.lg },
   center: {
     flex: 1,
@@ -104,4 +107,4 @@ const styles = StyleSheet.create({
   },
   message: { color: colors.text, fontSize: font.body + 2, fontWeight: '600' },
   hint: { color: colors.textMuted, fontSize: font.small, textAlign: 'center' },
-});
+}));

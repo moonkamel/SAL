@@ -10,7 +10,6 @@ import {
   Pressable,
   ScrollView,
   Share,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -28,7 +27,7 @@ import { useFavorites } from '@/src/features/favorites/FavoritesProvider';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { type T, useI18n } from '@/src/i18n';
 import { ApiRequestError, getPlace, placeWebUrl } from '@/src/lib/api';
-import { colors, font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import {
   formatDistance,
   formatOpening,
@@ -41,6 +40,7 @@ import { estimateWalkMinutes, haversineMeters } from '@/shared/geo';
 import { shareMessage } from '@/shared/share';
 import type { Lang } from '@/shared/i18n';
 import type { PlaceDetails } from '@/shared/types';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 /** Feuille de partage native (WhatsApp, SMS, Messenger…). */
 async function sharePlace(place: PlaceDetails, lang: Lang, t: T) {
@@ -64,6 +64,8 @@ type State =
   | { kind: 'done'; place: PlaceDetails };
 
 export default function PlaceScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { id, surprise } = useLocalSearchParams<{ id: string; surprise?: string }>();
   const insets = useSafeAreaInsets();
   const { coords, status } = useUserLocation();
@@ -113,6 +115,8 @@ export default function PlaceScreen() {
       options={{
         title: '',
         headerTransparent: true,
+        // Posé sur la photo : flèche de retour toujours claire.
+        headerTintColor: state.kind === 'done' && state.place.photos.length > 0 ? colors.onPhoto : colors.text,
         headerRight: () => (
           <View style={styles.headerActions}>
             {state.kind === 'done' && (
@@ -126,7 +130,7 @@ export default function PlaceScreen() {
                 <Ionicons
                   name={Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'}
                   size={24}
-                  color={colors.text}
+                  color={colors.onPhoto}
                 />
               </Pressable>
             )}
@@ -140,7 +144,7 @@ export default function PlaceScreen() {
             <Ionicons
               name={favorite ? 'heart' : 'heart-outline'}
               size={26}
-              color={favorite ? colors.accent : colors.text}
+              color={favorite ? colors.accent : colors.onPhoto}
             />
           </Pressable>
           </View>
@@ -311,6 +315,8 @@ function InfoRow({
   text: string;
   onPress?: () => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Pressable
       onPress={onPress}
@@ -327,7 +333,7 @@ function InfoRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.background },
   center: { alignItems: 'center', justifyContent: 'center', gap: spacing.lg, padding: spacing.xl },
   message: { color: colors.text, fontSize: font.body, textAlign: 'center' },
@@ -340,7 +346,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(230, 180, 90, 0.12)',
+    backgroundColor: colors.goldTint,
   },
   surpriseText: { color: colors.gold, fontSize: font.small, fontWeight: '800' },
   surpriseReason: { color: colors.text, fontWeight: '600' },
@@ -399,4 +405,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   secondaryText: { color: colors.text, fontSize: font.body, fontWeight: '600' },
-});
+}));

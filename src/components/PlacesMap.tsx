@@ -6,10 +6,10 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 
-import { colors } from '@/src/theme';
 import { lilleNightMapStyle } from '@/src/theme/mapStyle';
 import { haversineMeters } from '@/shared/geo';
 import type { LatLng } from '@/shared/types';
+import { useColors, useTone } from '@/src/theme/tone';
 
 export interface MapPin {
   id: string;
@@ -97,6 +97,8 @@ export function PlacesMap({
   interactive = true,
   style,
 }: PlacesMapProps) {
+  const colors = useColors();
+  const day = useTone().tone === 'day';
   const [controller, setController] = useState<MapViewController | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -168,8 +170,9 @@ export function PlacesMap({
     <MapView
       style={style}
       initialCameraPosition={camera(center, pins, route)}
-      mapColorScheme={MapColorScheme.DARK}
-      mapStyle={lilleNightMapStyle}
+      // Le jour, la carte Google claire habituelle ; la nuit, le style « Lille la nuit ».
+      mapColorScheme={day ? MapColorScheme.LIGHT : MapColorScheme.DARK}
+      mapStyle={day ? undefined : lilleNightMapStyle}
       myLocationEnabled={showUserLocation}
       myLocationButtonEnabled={showUserLocation && interactive}
       mapToolbarEnabled={false}

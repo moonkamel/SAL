@@ -11,12 +11,15 @@ import { GradientButton } from '@/src/components/GradientButton';
 import { CATEGORY_INFO } from '@/src/features/agenda/EventCard';
 import { useI18n } from '@/src/i18n';
 import { getKnownEvent } from '@/src/lib/api';
-import { colors, font, fonts, gradients, palette, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { formatDistance } from '@/shared/format';
 import { GENRE_LABELS } from '@/shared/types';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 /** Fiche d'un événement de l'agenda, sans quitter l'app. */
 export default function EventScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const event = getKnownEvent(id);
@@ -64,12 +67,12 @@ export default function EventScreen() {
               <Ionicons name={cat.icon} size={64} color={colors.gold} />
             </View>
           )}
-          <LinearGradient colors={gradients.photo} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={colors.heroFade} style={StyleSheet.absoluteFill} />
         </View>
 
         <View style={styles.body}>
           <View style={styles.tags}>
-            {event.featured && <Tag label={t('À la une')} color={palette.brick} strong />}
+            {event.featured && <Tag label={t('À la une')} color={colors.accent} strong />}
             <Tag label={t(cat.label)} icon={cat.icon} />
             {event.genres?.map((g) => <Tag key={g} label={t(GENRE_LABELS[g])} />)}
             {event.free && <Tag label={t('Gratuit')} color={colors.open} />}
@@ -123,6 +126,8 @@ export default function EventScreen() {
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
 function Tag({ label, icon, color, strong }: { label: string; icon?: IconName; color?: string; strong?: boolean }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={[styles.tag, strong && { backgroundColor: color }]}>
       {icon && <Ionicons name={icon} size={13} color={colors.gold} />}
@@ -134,6 +139,8 @@ function Tag({ label, icon, color, strong }: { label: string; icon?: IconName; c
 }
 
 function Info({ icon, text, extra, strong }: { icon: IconName; text: string; extra?: string; strong?: boolean }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.info}>
       <Ionicons name={icon} size={20} color={colors.gold} />
@@ -144,6 +151,8 @@ function Info({ icon, text, extra, strong }: { icon: IconName; text: string; ext
 }
 
 function LinkButton({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.link, pressed && { opacity: 0.7 }]} accessibilityRole="button">
       <Ionicons name={icon} size={18} color={colors.text} />
@@ -152,7 +161,7 @@ function LinkButton({ icon, label, onPress }: { icon: IconName; label: string; o
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.background },
   center: { alignItems: 'center', justifyContent: 'center', gap: spacing.lg, padding: spacing.xl },
   hero: { height: 300, backgroundColor: colors.surfaceRaised },
@@ -166,7 +175,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 4,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(230, 180, 90, 0.14)',
+    backgroundColor: colors.goldTint,
   },
   tagText: { color: colors.gold, fontSize: font.tiny + 1, fontWeight: '800' },
   title: { color: colors.text, fontFamily: fonts.display, fontSize: font.hero - 6, lineHeight: (font.hero - 6) * 1.15 },
@@ -200,4 +209,4 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
-});
+}));

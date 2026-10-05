@@ -253,7 +253,7 @@ export interface OffersResponse {
   offers: Offer[];
 }
 
-// --- Agenda « Ce soir à Lille » ---
+// --- Agenda des sorties ---
 
 export type EventCategory = 'concert' | 'soiree' | 'expo' | 'spectacle' | 'marche' | 'sport' | 'autre';
 
@@ -313,7 +313,8 @@ export const GENRE_LABELS: Record<MusicGenre, string> = {
   folk: tx('Folk & acoustique'),
 };
 
-export type AgendaWhen = 'today' | 'tomorrow' | 'weekend';
+/** Aujourd'hui · demain · le reste de la semaine · le week-end · la semaine prochaine. */
+export type AgendaWhen = 'today' | 'tomorrow' | 'week' | 'weekend' | 'nextweek';
 
 export interface AgendaResponse {
   events: AgendaEvent[];

@@ -12,10 +12,11 @@ import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { googleMapsDirections } from '@/src/features/navigation/googleMaps';
 import { tx, useI18n } from '@/src/i18n';
 import { ApiRequestError, getRoutes } from '@/src/lib/api';
-import { colors, font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import { formatArrival, formatDistance, formatDuration } from '@/shared/format';
 import { decodePolyline } from '@/shared/polyline';
 import type { LatLng, RouteOption, TravelMode } from '@/shared/types';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 const MODES: {
   mode: TravelMode;
@@ -34,6 +35,8 @@ type State =
   | { kind: 'done'; options: RouteOption[]; from: LatLng };
 
 export default function RoutePreviewScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const params = useLocalSearchParams<{ id: string; name: string; lat: string; lng: string }>();
   const destination = useMemo<LatLng>(
     () => ({ lat: Number(params.lat), lng: Number(params.lng) }),
@@ -196,27 +199,32 @@ export default function RoutePreviewScreen() {
             <VlilleCard from={state.from} to={destination} />
           )}
 
-          {mode === 'transit' ? (
-            <GradientButton
-              title={t('Horaires et trajet détaillé')}
-              icon="subway"
+          <GradientButton
+            title={t('Y aller avec Google Maps')}
+            icon="navigate"
+            onPress={onStart}
+            disabled={!selected?.available}
+            accessibilityLabel={
+              mode === 'transit'
+                ? t('Ouvrir le trajet en transports dans Google Maps')
+                : t('Ouvrir l’itinéraire dans Google Maps')
+            }
+          />
+          {mode === 'transit' && selected?.available && (
+            <Pressable
               onPress={() =>
                 router.push({
                   pathname: '/transit/[id]',
                   params: { id: params.id, name: params.name, lat: params.lat, lng: params.lng },
                 })
               }
-              disabled={!selected?.available}
+              style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.75 }]}
+              accessibilityRole="button"
               accessibilityLabel={t('Voir les horaires et le trajet détaillé en transports')}
-            />
-          ) : (
-            <GradientButton
-              title={t('Y aller avec Google Maps')}
-              icon="navigate"
-              onPress={onStart}
-              disabled={!selected?.available}
-              accessibilityLabel={t('Ouvrir l’itinéraire dans Google Maps')}
-            />
+            >
+              <Ionicons name="time-outline" size={20} color={colors.gold} />
+              <Text style={styles.secondaryText}>{t('Horaires et trajet détaillé')}</Text>
+            </Pressable>
           )}
         </View>
       )}
@@ -224,7 +232,7 @@ export default function RoutePreviewScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.background },
   mapWrap: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg, padding: spacing.xl },
@@ -238,6 +246,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   retryText: { color: colors.accentText, fontSize: font.body, fontWeight: '700' },
+  secondary: {
+    minHeight: TOUCH_TARGET,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: -spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  secondaryText: { color: colors.text, fontSize: font.body, fontWeight: '700' },
   panel: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.lg,
@@ -271,4 +291,4 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   lineText: { color: colors.text, fontSize: font.small, fontWeight: '700' },
-});
+}));

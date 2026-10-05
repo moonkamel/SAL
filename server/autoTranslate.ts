@@ -13,9 +13,16 @@ import { TtlCache } from './cache';
 
 // Un texte traduit ne change pas : on le garde une journée (en mémoire uniquement).
 const cache = new TtlCache<string>(24 * 60 * 60 * 1000, 5000);
-const BATCH = 40;
-const PARALLEL = 4;
+// Petits lots, nombreux en parallèle : chaque appel reste court (une semaine
+// d'agenda, c'est plusieurs centaines de titres et descriptions).
+const BATCH = 25;
+const PARALLEL = 8;
 const MAX_CHARS = 1500;
+// Au-delà, on répond avec ce qui est traduit ; le reste le sera à la prochaine ouverture.
+const BUDGET_MS = 20_000;
+
+/** Dernière erreur de traduction (diagnostic ?debug=1, sans la clé). */
+export let lastTranslateError: string | undefined;
 
 let client: Anthropic | null = null;
 
@@ -25,7 +32,7 @@ export function isAutoTranslateEnabled(): boolean {
 
 function getClient(): Anthropic {
   // Confort : mieux vaut le français tout de suite qu'une longue attente.
-  client ??= new Anthropic({ timeout: 8_000, maxRetries: 0 });
+  client ??= new Anthropic({ timeout: 18_000, maxRetries: 1 });
   return client;
 }
 
@@ -46,10 +53,14 @@ async function translateBatch(texts: string[], lang: Lang): Promise<string[] | n
       output_config: { format: zodOutputFormat(OutputSchema) },
     });
     const out = response.parsed_output?.translations;
-    if (response.stop_reason === 'refusal' || !out || out.length !== texts.length) return null;
+    if (response.stop_reason === 'refusal' || !out || out.length !== texts.length) {
+      lastTranslateError = `réponse inattendue (${response.stop_reason}, ${out?.length ?? 0}/${texts.length})`;
+      return null;
+    }
     return out.map((t, i) => t.trim() || texts[i]!);
   } catch (error) {
-    console.warn(`[translate] échec (${lang}), textes laissés en français`, error instanceof Error ? error.message : error);
+    lastTranslateError = error instanceof Error ? error.message : String(error);
+    console.warn(`[translate] échec (${lang}), textes laissés en français`, lastTranslateError);
     return null;
   }
 }
@@ -63,15 +74,17 @@ export async function autoTranslate(texts: string[], lang: Lang): Promise<string
   ];
   const batches: string[][] = [];
   for (let i = 0; i < missing.length; i += BATCH) batches.push(missing.slice(i, i + BATCH));
-  // Quelques lots en parallèle : la première ouverture de l'agenda reste rapide.
-  for (let i = 0; i < batches.length; i += PARALLEL) {
+  // Plusieurs lots en parallèle ; un lot en échec n'empêche pas les autres.
+  const started = Date.now();
+  for (let i = 0; i < batches.length && Date.now() - started < BUDGET_MS; i += PARALLEL) {
     const group = batches.slice(i, i + PARALLEL);
     const results = await Promise.all(group.map((batch) => translateBatch(batch, lang)));
     group.forEach((batch, g) => {
       const done = results[g];
       if (done) batch.forEach((t, j) => cache.set(`${lang}|${t}`, done[j]!));
     });
-    if (results.some((r) => r === null)) break;
+    // Tout un groupe en échec (clé refusée, service indisponible) : inutile d'insister.
+    if (results.every((r) => r === null)) break;
   }
   return texts.map((t) => cache.get(`${lang}|${t}`) ?? t);
 }

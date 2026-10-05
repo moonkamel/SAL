@@ -2,9 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { View } from 'react-native';
 
 import { useT } from '@/src/i18n';
-import { colors } from '@/src/theme';
+import { useColors } from '@/src/theme/tone';
 
 export function Stars({ rating, size = 14 }: { rating: number; size?: number }) {
+  const colors = useColors();
   const t = useT();
   return (
     <View

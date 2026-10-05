@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 
 import { useLiveData } from '@/src/features/lille/useLiveData';
 import { refreshKey } from '@/src/features/moment/HomeRails';
@@ -7,11 +7,14 @@ import { useUserLocation } from '@/src/features/location/LocationProvider';
 import { OfferCard } from '@/src/features/offers/OfferCard';
 import { useI18n } from '@/src/i18n';
 import { getOffers } from '@/src/lib/api';
-import { colors, font, spacing } from '@/src/theme';
+import { font, spacing } from '@/src/theme';
 import type { OffersResponse } from '@/shared/types';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 /** Tous les bons plans du jour autour de soi. */
 export default function OffersScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { coords } = useUserLocation();
   const { t, lang } = useI18n();
   const { data, error } = useLiveData<OffersResponse>(
@@ -56,10 +59,10 @@ export default function OffersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.background },
   center: { alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   list: { padding: spacing.lg, paddingBottom: spacing.xxl },
   intro: { color: colors.textMuted, fontSize: font.small, marginBottom: spacing.md },
   muted: { color: colors.textMuted, fontSize: font.body, textAlign: 'center' },
-});
+}));

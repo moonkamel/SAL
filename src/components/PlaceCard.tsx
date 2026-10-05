@@ -6,7 +6,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { AmbianceTags } from '@/src/features/lille/AmbianceTags';
 import { useI18n } from '@/src/i18n';
 import { photoUrl } from '@/src/lib/api';
-import { colors, font, fonts, gradients, radius, shadows, spacing } from '@/src/theme';
+import { font, fonts, radius, spacing } from '@/src/theme';
 import {
   formatDistance,
   formatOpening,
@@ -18,6 +18,7 @@ import {
 import type { PlaceSummary } from '@/shared/types';
 
 import { PressableScale } from './PressableScale';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 interface Props {
   place: PlaceSummary;
@@ -27,6 +28,8 @@ interface Props {
 }
 
 export function PlaceCard({ place, onPress, compact }: Props) {
+  const colors = useColors();
+  const styles = useStyles();
   const photoAuthor = place.photo?.attributions[0]?.displayName;
   const photoHeight = compact ? 110 : 190;
   const { t, lang } = useI18n();
@@ -54,7 +57,7 @@ export function PlaceCard({ place, onPress, compact }: Props) {
             <Ionicons name="image-outline" size={32} color={colors.textFaint} />
           </View>
         )}
-        <LinearGradient colors={gradients.photo} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={colors.photoFade} style={StyleSheet.absoluteFill} />
 
         <View style={styles.topRow}>
           {place.sponsored ? (
@@ -127,13 +130,13 @@ export function PlaceCard({ place, onPress, compact }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderCurve: 'continuous',
     overflow: 'hidden',
-    boxShadow: shadows.card,
+    boxShadow: colors.cardShadow,
   },
   photoPlaceholder: {
     backgroundColor: colors.surfaceRaised,
@@ -170,8 +173,8 @@ const styles = StyleSheet.create({
   ratingText: { color: colors.text, fontSize: font.small - 1, fontWeight: '800' },
   ratingCount: { color: colors.textMuted, fontSize: font.tiny },
   titleBlock: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.md },
-  name: { color: colors.text, fontFamily: fonts.display, fontSize: font.title, lineHeight: 28 },
-  photoCredit: { color: colors.textMuted, fontSize: font.tiny - 1, marginTop: 2 },
+  name: { color: colors.onPhoto, fontFamily: fonts.display, fontSize: font.title, lineHeight: 28 },
+  photoCredit: { color: colors.onPhotoMuted, fontSize: font.tiny - 1, marginTop: 2 },
   body: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: 6 },
   address: { color: colors.textMuted, fontSize: font.small },
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -180,4 +183,4 @@ const styles = StyleSheet.create({
   price: { color: colors.gold, fontSize: font.small, fontWeight: '800', letterSpacing: 1 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   opening: { fontSize: font.small, fontWeight: '700' },
-});
+}));

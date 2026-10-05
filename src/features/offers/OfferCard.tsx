@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { PressableScale } from '@/src/components/PressableScale';
 import { useI18n } from '@/src/i18n';
-import { colors, font, fonts, radius, spacing } from '@/src/theme';
-import { useTone } from '@/src/theme/tone';
+import { font, fonts, radius, spacing } from '@/src/theme';
+import { useTone, themedStyles, useColors } from '@/src/theme/tone';
 import { formatDistance } from '@/shared/format';
 import type { Offer } from '@/shared/types';
 
@@ -18,6 +18,8 @@ interface Props {
 
 /** Bon plan d'un établissement partenaire (« 1 verre offert avant 20 h »). */
 export function OfferCard({ offer, showPlace, onPress, compact }: Props) {
+  const colors = useColors();
+  const styles = useStyles();
   const { tone, c } = useTone();
   const { t, lang } = useI18n();
   const dayStyle = tone === 'day' && { backgroundColor: c.surface, boxShadow: c.cardShadow, borderColor: c.gold };
@@ -66,7 +68,7 @@ export function OfferCard({ offer, showPlace, onPress, compact }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
@@ -92,4 +94,4 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontFamily: fonts.displayMedium, fontSize: font.body + 1 },
   place: { color: colors.text, fontSize: font.small, fontWeight: '700' },
   muted: { color: colors.textMuted, fontSize: font.small, fontWeight: '400' },
-});
+}));

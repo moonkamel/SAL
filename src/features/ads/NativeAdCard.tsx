@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import {
   NativeAd,
   NativeAdView,
@@ -10,13 +10,15 @@ import {
 
 import { useGuidanceActive } from '@/src/features/navigation/guidanceState';
 import { useT } from '@/src/i18n';
-import { colors, font, radius, spacing } from '@/src/theme';
+import { font, radius, spacing } from '@/src/theme';
 
 import { adUnit } from './adUnits';
 import { useAds } from './AdsProvider';
+import { themedStyles } from '@/src/theme/tone';
 
 /** Pub native insérée dans la liste des résultats, clairement marquée « Annonce ». */
 export function NativeAdCard() {
+  const styles = useStyles();
   const { canRequestAds } = useAds();
   const guiding = useGuidanceActive();
   const t = useT();
@@ -84,7 +86,7 @@ export function NativeAdCard() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -122,4 +124,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: font.small + 1,
   },
-});
+}));

@@ -1,13 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, Text } from 'react-native';
 
 import { useUserLocation } from '@/src/features/location/LocationProvider';
-import { colors, font, radius, spacing } from '@/src/theme';
+import { font, radius, spacing } from '@/src/theme';
 import { useT } from '@/src/i18n';
-import { useTone } from '@/src/theme/tone';
+import { useTone, themedStyles, useColors } from '@/src/theme/tone';
 
 /** Affiché quand on n'a pas la position : les résultats sont centrés sur la Grand-Place. */
 export function LocationBanner() {
+  const colors = useColors();
+  const styles = useStyles();
   const { status, isFallback, requestPermission } = useUserLocation();
   const { c } = useTone();
   const t = useT();
@@ -30,7 +32,7 @@ export function LocationBanner() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -40,4 +42,4 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   text: { flex: 1, color: colors.textMuted, fontSize: font.small },
-});
+}));

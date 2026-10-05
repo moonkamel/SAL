@@ -1,14 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useI18n, useT } from '@/src/i18n';
 import { getVlille } from '@/src/lib/api';
-import { colors, font, fonts, palette, radius, spacing } from '@/src/theme';
+import { font, fonts, radius, spacing } from '@/src/theme';
 import { formatDistance } from '@/shared/format';
 import type { LatLng, VlilleResponse, VlilleStation } from '@/shared/types';
 
 import { pickStation } from './pickers';
 import { useLiveData } from './useLiveData';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 interface Props {
   from: LatLng;
@@ -17,6 +18,7 @@ interface Props {
 
 /** Où prendre un V'Lille près de soi, et où le déposer près du lieu (temps réel). */
 export function VlilleCard({ from, to }: Props) {
+  const styles = useStyles();
   const start = useLiveData<VlilleResponse>(
     (signal) => getVlille(from, 3, signal),
     60_000,
@@ -70,6 +72,8 @@ export function VlilleCard({ from, to }: Props) {
 }
 
 function Header() {
+  const colors = useColors();
+  const styles = useStyles();
   const t = useT();
   return (
     <View style={styles.header}>
@@ -96,11 +100,13 @@ function Row({
   unit: 'bike' | 'dock';
   empty: string;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const { t, lang } = useI18n();
   if (!station || count === undefined) {
     return <Text style={styles.muted}>{empty}</Text>;
   }
-  const tone = count >= 3 ? colors.open : palette.gold;
+  const tone = count >= 3 ? colors.open : colors.gold;
   const amount =
     unit === 'bike'
       ? count > 1
@@ -127,7 +133,7 @@ function Row({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   card: {
     backgroundColor: colors.surfaceRaised,
     borderRadius: radius.md,
@@ -156,4 +162,4 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: font.small, fontWeight: '800' },
   muted: { color: colors.textMuted, fontSize: font.small },
-});
+}));

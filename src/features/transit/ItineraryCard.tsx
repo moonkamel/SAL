@@ -1,15 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Fragment } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { PressableScale } from '@/src/components/PressableScale';
 import { useT } from '@/src/i18n';
-import { colors, font, fonts, radius, spacing } from '@/src/theme';
+import { font, fonts, radius, spacing } from '@/src/theme';
 import { formatDuration } from '@/shared/format';
 import { formatClock, minutesUntil } from '@/shared/trip';
 import type { TransitItinerary } from '@/shared/types';
 
 import { LineBadge } from './LineBadge';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 interface Props {
   itinerary: TransitItinerary;
@@ -20,6 +21,8 @@ interface Props {
 
 /** Une proposition de trajet : horaires, durée, lignes, marche et prix. */
 export function ItineraryCard({ itinerary, selected, onPress, now }: Props) {
+  const colors = useColors();
+  const styles = useStyles();
   const firstRide = itinerary.segments.find((s) => s.kind === 'ride');
   const leaveIn = minutesUntil(itinerary.departureTime, now);
   const t = useT();
@@ -76,7 +79,7 @@ export function ItineraryCard({ itinerary, selected, onPress, now }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
@@ -95,4 +98,4 @@ const styles = StyleSheet.create({
   walkText: { color: colors.textMuted, fontSize: font.tiny, fontWeight: '700' },
   meta: { color: colors.textMuted, fontSize: font.small },
   next: { color: colors.gold, fontSize: font.small, fontWeight: '700' },
-});
+}));

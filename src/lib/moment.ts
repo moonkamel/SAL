@@ -1,6 +1,7 @@
 // Petit libellé contextuel de l'accueil : « SAMEDI SOIR · LILLE ».
 
 import { type Lang, translate, tx } from '@/shared/i18n';
+import type { AgendaWhen } from '@/shared/types';
 
 const DAYS = [
   tx('DIMANCHE'),
@@ -34,4 +35,14 @@ export function momentLabel(date: Date = new Date(), lang: Lang = 'fr'): string 
 export function isDaytime(date: Date = new Date()): boolean {
   const hour = date.getHours();
   return hour >= 6 && hour < 19;
+}
+
+/**
+ * Périodes proposées dans l'agenda. Le dimanche, « cette semaine » et « ce week-end »
+ * se résument à aujourd'hui : on propose plutôt la semaine prochaine.
+ */
+export function agendaPeriods(date: Date = new Date()): AgendaWhen[] {
+  // Avant 6 h, on est encore dans la soirée de la veille.
+  const day = date.getHours() < 6 ? (date.getDay() + 6) % 7 : date.getDay();
+  return day === 0 ? ['today', 'tomorrow', 'nextweek'] : ['today', 'tomorrow', 'week', 'weekend'];
 }

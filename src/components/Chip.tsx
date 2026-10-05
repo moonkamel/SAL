@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, Text } from 'react-native';
 
-import { colors, font, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { font, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { themedStyles } from '@/src/theme/tone';
 
 interface Props {
   label: string;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function Chip({ label, onPress, selected, accessibilityHint }: Props) {
+  const styles = useStyles();
   return (
     <Pressable
       onPress={onPress}
@@ -27,7 +29,7 @@ export function Chip({ label, onPress, selected, accessibilityHint }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   chip: {
     minHeight: TOUCH_TARGET - 4,
     paddingHorizontal: spacing.lg,
@@ -40,4 +42,4 @@ const styles = StyleSheet.create({
   selected: { backgroundColor: colors.accent, borderColor: colors.accent },
   label: { color: colors.text, fontSize: font.small + 1, fontWeight: '600' },
   selectedLabel: { color: colors.accentText },
-});
+}));
