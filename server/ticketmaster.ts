@@ -104,26 +104,11 @@ function category(ev: TmEvent): EventCategory {
   return 'autre';
 }
 
-/**
- * Meilleure photo : jamais une image « de secours » de Ticketmaster (photo générique
- * de la catégorie, ex. la tour Eiffel pour tous les concerts sans visuel) ; d'abord
- * celles de l'événement puis celles de l'artiste ; format paysage 16:9, assez grande
- * pour l'en-tête de la fiche (≥ 1024 px) sans être énorme.
- */
-export function bestImage(...sets: (TmImage[] | undefined)[]): string | undefined {
-  for (const images of sets) {
-    const usable = (images ?? []).filter((i) => i.url?.startsWith('https://') && i.fallback !== true);
-    if (!usable.length) continue;
-    const byWidth = (a: TmImage, b: TmImage) => (a.width ?? 0) - (b.width ?? 0);
-    const wide = usable.filter((i) => i.ratio === '16_9').sort(byWidth);
-    const pick =
-      wide.find((i) => (i.width ?? 0) >= 1024) ??
-      wide.at(-1) ??
-      usable.filter((i) => i.ratio === '3_2' || i.ratio === '4_3').sort(byWidth).at(-1) ??
-      usable.sort(byWidth).at(-1);
-    if (pick?.url) return pick.url;
-  }
-  return undefined;
+/** Image la plus adaptée aux cartes : format 16:9, la plus petite au-delà de 600 px. */
+export function bestImage(images: TmImage[] | undefined): string | undefined {
+  const usable = (images ?? []).filter((i) => i.url?.startsWith('https://'));
+  const wide = usable.filter((i) => i.ratio === '16_9').sort((a, b) => (a.width ?? 0) - (b.width ?? 0));
+  return (wide.find((i) => (i.width ?? 0) >= 600) ?? wide.at(-1) ?? usable[0])?.url;
 }
 
 const clean = (s: string | undefined) => plainText(s)?.trim() || undefined;
@@ -220,7 +205,7 @@ export function fromTicketmaster(
     free: false,
     url: ev.url,
     ticketUrl: ev.url,
-    imageUrl: bestImage(ev.images, ev._embedded?.attractions?.[0]?.images),
+    imageUrl: bestImage(ev.images),
     ...(longDescription && longDescription !== description ? { longDescription } : {}),
     ...(practical ? { practical } : {}),
     featured: false,

@@ -476,33 +476,27 @@ describe('Ticketmaster', () => {
     expect(e?.id).toBe('tm-Z1');
     expect(e?.category).toBe('concert');
     expect(e?.venueName).toBe('Zénith de Lille');
-    expect(e?.imageUrl).toBe('https://img/c.jpg');
+    expect(e?.imageUrl).toBe('https://img/b.jpg');
     expect(e?.price).toBe('de 39 € à 59,50 €');
     expect(e?.ticketUrl).toBe('https://www.ticketmaster.fr/x');
     expect(e?.source).toBe('ticketmaster');
   });
 
-  it('ignore les photos génériques de Ticketmaster et prend celle de l’artiste', async () => {
-    const { bestImage, fromTicketmaster } = await import('@/server/ticketmaster');
-    const generic = [{ url: 'https://img/eiffel.jpg', width: 1024, ratio: '16_9', fallback: true }];
-    const artist = [{ url: 'https://img/linh.jpg', width: 1136, ratio: '16_9', fallback: false }];
-    expect(bestImage(generic, artist)).toBe('https://img/linh.jpg');
-    expect(bestImage(generic)).toBeUndefined();
+  it('infos pratiques : à savoir, âge, liens de l’artiste', async () => {
+    const { fromTicketmaster } = await import('@/server/ticketmaster');
     const e = fromTicketmaster(
       {
         ...base,
-        images: generic,
         pleaseNote: 'Ouverture des portes à 19h.',
         ageRestrictions: { legalAgeEnforced: true },
         _embedded: {
           ...base._embedded,
-          attractions: [{ name: 'LINH', images: artist, externalLinks: { spotify: [{ url: 'https://open.spotify.com/x' }] } }],
+          attractions: [{ name: 'LINH', externalLinks: { spotify: [{ url: 'https://open.spotify.com/x' }] } }],
         },
       },
       GRAND_PLACE,
       labels,
     );
-    expect(e?.imageUrl).toBe('https://img/linh.jpg');
     expect(e?.practical?.notes).toEqual(['Ouverture des portes à 19h.']);
     expect(e?.practical?.ageMin).toBe(18);
     expect(e?.practical?.links).toEqual([{ kind: 'spotify', url: 'https://open.spotify.com/x' }]);
