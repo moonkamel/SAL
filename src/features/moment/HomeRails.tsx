@@ -64,13 +64,15 @@ export function TonightRail({ near }: { near: LatLng }) {
     [...refreshKey(near), lang, useWeek],
   );
 
-  if (!today.data && !today.error) return null; // chargement discret
-  if (useWeek && !week.data && !week.error) return null;
+  // Le lien vers l'agenda complet passe avant l'aperçu du jour, et reste visible pendant le chargement.
+  if (!today.data && !today.error) return <AgendaLink />;
+  if (useWeek && !week.data && !week.error) return <AgendaLink />;
   const events = useWeek ? (week.data?.events ?? []) : today.data!.events;
   if (!events.length) return <AgendaLink />;
   const when: AgendaWhen = useWeek ? 'week' : 'today';
   return (
     <>
+      <AgendaLink />
       <Rail
         title={useWeek ? t('Cette semaine à Lille') : t('Aujourd’hui à Lille')}
         onSeeAll={() => router.push({ pathname: '/agenda', params: { when } })}
@@ -79,8 +81,6 @@ export function TonightRail({ near }: { near: LatLng }) {
           <EventCard key={e.id} event={e} compact onPress={() => openEvent(e)} />
         ))}
       </Rail>
-      {/* Toujours visible : l'aperçu ne montre qu'une journée, l'agenda complet couvre la semaine. */}
-      <AgendaLink tight />
     </>
   );
 }
@@ -109,13 +109,13 @@ export function OffersRail({ near }: { near: LatLng }) {
   );
 }
 
-/** Accès à l'agenda quand rien n'est prévu aujourd'hui (demain, la semaine…). */
-function AgendaLink({ tight }: { tight?: boolean } = {}) {
+/** Accès à l'agenda complet (aujourd'hui, demain, la semaine, le week-end). */
+function AgendaLink() {
   const styles = useStyles();
   const { c } = useTone();
   const t = useT();
   return (
-    <View style={[styles.linkWrap, tight && { marginTop: spacing.md }]}>
+    <View style={styles.linkWrap}>
       <PressableScale
         onPress={() => router.push('/agenda')}
         style={[styles.link, { backgroundColor: c.surface, borderColor: c.border }]}
