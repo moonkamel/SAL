@@ -406,6 +406,35 @@ export async function placeDetails(
   return details;
 }
 
+// Fiche Google d'une salle (onglet « Avis » des événements) : une semaine de cache.
+const venueCache = new TtlCache<string | null>(7 * 24 * 3_600_000, 500);
+
+/**
+ * place_id Google d'une salle de spectacle à partir de son nom et de sa position.
+ * Recherche « IDs seulement » (champ places.id) : le niveau le moins cher de Google.
+ */
+export async function findVenuePlaceId(name: string, location: LatLng, address?: string): Promise<string | null> {
+  const query = [name, address].filter(Boolean).join(', ').slice(0, 200);
+  const key = `${query}|${location.lat.toFixed(4)},${location.lng.toFixed(4)}`;
+  const hit = venueCache.get(key);
+  if (hit !== undefined) return hit;
+  const res = await fetch(`${PLACES_BASE}/places:searchText`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey(), 'X-Goog-FieldMask': 'places.id' },
+    body: JSON.stringify({
+      textQuery: query,
+      regionCode: 'FR',
+      pageSize: 1,
+      locationBias: { circle: { center: { latitude: location.lat, longitude: location.lng }, radius: 300 } },
+    }),
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) throw new PlacesError(tx('La recherche Google Places a échoué'), 502);
+  const id = ((await res.json()) as { places?: { id?: string }[] }).places?.[0]?.id ?? null;
+  venueCache.set(key, id);
+  return id;
+}
+
 // Photo principale d'une fiche Google : la référence change rarement, une journée de cache.
 const mainPhotoCache = new TtlCache<string | null>(24 * 3_600_000, 500);
 

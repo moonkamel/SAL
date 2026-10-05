@@ -3,7 +3,7 @@
 
 import { haversineMeters } from '@/shared/geo';
 import { type Lang, translate } from '@/shared/i18n';
-import type { AgendaEvent, EventCategory, LatLng } from '@/shared/types';
+import type { AgendaEvent, EventCategory, EventPractical, LatLng } from '@/shared/types';
 
 import { TtlCache } from './cache';
 import { detectGenres, plainText } from './eventText';
@@ -13,27 +13,41 @@ export const TICKETMASTER_URL = process.env.TICKETMASTER_URL ?? 'https://app.tic
 const LILLE = { lat: 50.6366, lng: 3.0635 };
 const RADIUS_KM = 20;
 
+type TmImage = { url?: string; width?: number; height?: number; ratio?: string; fallback?: boolean };
+type TmLinks = Partial<Record<'homepage' | 'spotify' | 'youtube' | 'instagram' | 'facebook' | 'deezer', { url?: string }[]>>;
+
 export interface TmEvent {
   id: string;
   name?: string;
   url?: string;
+  description?: string;
   info?: string;
   pleaseNote?: string;
+  accessibility?: { info?: string };
+  ageRestrictions?: { legalAgeEnforced?: boolean };
+  promoter?: { name?: string };
+  seatmap?: { staticUrl?: string };
   dates?: {
     start?: { dateTime?: string; localDate?: string; localTime?: string };
     end?: { dateTime?: string };
     status?: { code?: string };
   };
-  images?: { url?: string; width?: number; ratio?: string }[];
+  images?: TmImage[];
   classifications?: { segment?: { name?: string }; genre?: { name?: string }; subGenre?: { name?: string } }[];
   priceRanges?: { min?: number; max?: number; currency?: string }[];
   _embedded?: {
     venues?: {
       name?: string;
+      url?: string;
       address?: { line1?: string };
       city?: { name?: string };
       location?: { latitude?: string; longitude?: string };
+      parkingDetail?: string;
+      accessibleSeatingDetail?: string;
+      boxOfficeInfo?: { phoneNumberDetail?: string; openHoursDetail?: string };
+      generalInfo?: { generalRule?: string; childRule?: string };
     }[];
+    attractions?: { name?: string; images?: TmImage[]; externalLinks?: TmLinks }[];
   };
 }
 
@@ -90,11 +104,64 @@ function category(ev: TmEvent): EventCategory {
   return 'autre';
 }
 
-/** Image la plus adaptée aux cartes : format 16:9, la plus petite au-delà de 600 px. */
-function bestImage(images: TmEvent['images']): string | undefined {
-  const usable = (images ?? []).filter((i) => i.url?.startsWith('https://'));
-  const wide = usable.filter((i) => i.ratio === '16_9').sort((a, b) => (a.width ?? 0) - (b.width ?? 0));
-  return (wide.find((i) => (i.width ?? 0) >= 600) ?? wide.at(-1) ?? usable[0])?.url;
+/**
+ * Meilleure photo : jamais une image « de secours » de Ticketmaster (photo générique
+ * de la catégorie, ex. la tour Eiffel pour tous les concerts sans visuel) ; d'abord
+ * celles de l'événement puis celles de l'artiste ; format paysage 16:9, assez grande
+ * pour l'en-tête de la fiche (≥ 1024 px) sans être énorme.
+ */
+export function bestImage(...sets: (TmImage[] | undefined)[]): string | undefined {
+  for (const images of sets) {
+    const usable = (images ?? []).filter((i) => i.url?.startsWith('https://') && i.fallback !== true);
+    if (!usable.length) continue;
+    const byWidth = (a: TmImage, b: TmImage) => (a.width ?? 0) - (b.width ?? 0);
+    const wide = usable.filter((i) => i.ratio === '16_9').sort(byWidth);
+    const pick =
+      wide.find((i) => (i.width ?? 0) >= 1024) ??
+      wide.at(-1) ??
+      usable.filter((i) => i.ratio === '3_2' || i.ratio === '4_3').sort(byWidth).at(-1) ??
+      usable.sort(byWidth).at(-1);
+    if (pick?.url) return pick.url;
+  }
+  return undefined;
+}
+
+const clean = (s: string | undefined) => plainText(s)?.trim() || undefined;
+
+function practicalInfo(ev: TmEvent): EventPractical | undefined {
+  const venue = ev._embedded?.venues?.[0];
+  const artist = ev._embedded?.attractions?.[0];
+  const notes = [
+    clean(ev.pleaseNote),
+    clean(venue?.generalInfo?.generalRule),
+    clean(venue?.generalInfo?.childRule),
+    clean(venue?.boxOfficeInfo?.openHoursDetail),
+    ev.accessibility?.info ? clean(ev.accessibility.info) : clean(venue?.accessibleSeatingDetail),
+  ].filter((n): n is string => !!n);
+  const LINKS: [keyof TmLinks, NonNullable<EventPractical['links']>[number]['kind']][] = [
+    ['homepage', 'site'],
+    ['spotify', 'spotify'],
+    ['youtube', 'youtube'],
+    ['instagram', 'instagram'],
+    ['facebook', 'facebook'],
+    ['deezer', 'deezer'],
+  ];
+  const links = LINKS.flatMap(([key, kind]) => {
+    const url = artist?.externalLinks?.[key]?.[0]?.url;
+    return url?.startsWith('https://') ? [{ kind, url }] : [];
+  });
+  const phone = clean(venue?.boxOfficeInfo?.phoneNumberDetail);
+  const practical: EventPractical = {
+    ...(ev.ageRestrictions?.legalAgeEnforced ? { ageMin: 18 } : {}),
+    ...(clean(venue?.parkingDetail) ? { access: clean(venue?.parkingDetail) } : {}),
+    ...(phone && phone.length < 60 ? { phone } : {}),
+    ...(notes.length ? { notes: [...new Set(notes)] } : {}),
+    ...(ev.promoter?.name ? { organizer: ev.promoter.name } : {}),
+    ...(ev.seatmap?.staticUrl?.startsWith('https://') ? { seatmapUrl: ev.seatmap.staticUrl } : {}),
+    ...(links.length ? { links } : {}),
+    ...(ev.dates?.status?.code === 'rescheduled' ? { status: 'reprogramme' as const } : {}),
+  };
+  return Object.keys(practical).length ? practical : undefined;
 }
 
 function price(ev: TmEvent, lang: Lang): string | undefined {
@@ -131,7 +198,10 @@ export function fromTicketmaster(
   const location = { lat, lng };
   const c = ev.classifications?.[0];
   const cat = category(ev);
-  const description = plainText(ev.info ?? ev.pleaseNote)?.slice(0, 300);
+  const longDescription = clean(ev.description ?? ev.info);
+  const description = longDescription?.slice(0, 300);
+  const practical = practicalInfo(ev);
+  const priceText = price(ev, lang);
   const genres =
     cat === 'concert' ? detectGenres(title, c?.genre?.name, c?.subGenre?.name, description) : [];
   const address = [venue.address?.line1, venue.city?.name].filter(Boolean).join(', ');
@@ -146,11 +216,13 @@ export function fromTicketmaster(
     start: start.toISOString(),
     ...(end ? { end: end.toISOString() } : {}),
     ...labels(start, end),
-    price: price(ev, lang),
+    price: priceText,
     free: false,
     url: ev.url,
     ticketUrl: ev.url,
-    imageUrl: bestImage(ev.images),
+    imageUrl: bestImage(ev.images, ev._embedded?.attractions?.[0]?.images),
+    ...(longDescription && longDescription !== description ? { longDescription } : {}),
+    ...(practical ? { practical } : {}),
     featured: false,
     source: 'ticketmaster',
     distanceMeters: Math.round(haversineMeters(near, location)),

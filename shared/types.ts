@@ -290,6 +290,38 @@ export interface AgendaEvent {
   longDescription?: string;
   /** Billetterie ou inscription. */
   ticketUrl?: string;
+  /** Crédit de la photo (« © Ville de Lille »). */
+  imageCredit?: string;
+  /** Onglet « Infos pratiques » de la fiche. */
+  practical?: EventPractical;
+}
+
+export type EventAccessibility = 'pmr' | 'auditif' | 'visuel' | 'mental' | 'psychique';
+
+/** Infos pratiques d'un événement (selon ce que la source fournit). */
+export interface EventPractical {
+  /** Prochaines dates (ISO), si l'événement se répète. */
+  nextDates?: string[];
+  /** Tarifs et conditions, en entier. */
+  priceDetail?: string;
+  /** Âge minimum / maximum conseillé. */
+  ageMin?: number;
+  ageMax?: number;
+  accessibility?: EventAccessibility[];
+  /** Venir sur place : transports, parking. */
+  access?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  /** « À savoir » : règles de la salle, horaires d'ouverture des portes… */
+  notes?: string[];
+  organizer?: string;
+  /** Événement reporté, complet, reprogrammé… */
+  status?: 'reporte' | 'complet' | 'reprogramme' | 'en-ligne';
+  /** Plan de salle (image). */
+  seatmapUrl?: string;
+  /** Artiste : site, Spotify, YouTube, Instagram… */
+  links?: { kind: 'site' | 'spotify' | 'youtube' | 'instagram' | 'facebook' | 'deezer'; url: string }[];
 }
 
 export type MusicGenre =

@@ -15,6 +15,7 @@ export const LIMITS = {
   surprise: { max: 10, windowMs: 60_000 },
   place: { max: 60, windowMs: 60_000 },
   photo: { max: 240, windowMs: 60_000 },
+  venue: { max: 30, windowMs: 60_000 },
   route: { max: 30, windowMs: 60_000 },
   admin: { max: 60, windowMs: 60_000 },
 } as const;

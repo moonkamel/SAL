@@ -7,6 +7,7 @@ import {
   guessCategory,
   isCulturalHighlight,
   openAgendaConfig,
+  openAgendaPractical,
   outingDays,
   sortEvents,
   windowFor,
@@ -475,10 +476,36 @@ describe('Ticketmaster', () => {
     expect(e?.id).toBe('tm-Z1');
     expect(e?.category).toBe('concert');
     expect(e?.venueName).toBe('Zénith de Lille');
-    expect(e?.imageUrl).toBe('https://img/b.jpg');
+    expect(e?.imageUrl).toBe('https://img/c.jpg');
     expect(e?.price).toBe('de 39 € à 59,50 €');
     expect(e?.ticketUrl).toBe('https://www.ticketmaster.fr/x');
     expect(e?.source).toBe('ticketmaster');
+  });
+
+  it('ignore les photos génériques de Ticketmaster et prend celle de l’artiste', async () => {
+    const { bestImage, fromTicketmaster } = await import('@/server/ticketmaster');
+    const generic = [{ url: 'https://img/eiffel.jpg', width: 1024, ratio: '16_9', fallback: true }];
+    const artist = [{ url: 'https://img/linh.jpg', width: 1136, ratio: '16_9', fallback: false }];
+    expect(bestImage(generic, artist)).toBe('https://img/linh.jpg');
+    expect(bestImage(generic)).toBeUndefined();
+    const e = fromTicketmaster(
+      {
+        ...base,
+        images: generic,
+        pleaseNote: 'Ouverture des portes à 19h.',
+        ageRestrictions: { legalAgeEnforced: true },
+        _embedded: {
+          ...base._embedded,
+          attractions: [{ name: 'LINH', images: artist, externalLinks: { spotify: [{ url: 'https://open.spotify.com/x' }] } }],
+        },
+      },
+      GRAND_PLACE,
+      labels,
+    );
+    expect(e?.imageUrl).toBe('https://img/linh.jpg');
+    expect(e?.practical?.notes).toEqual(['Ouverture des portes à 19h.']);
+    expect(e?.practical?.ageMin).toBe(18);
+    expect(e?.practical?.links).toEqual([{ kind: 'spotify', url: 'https://open.spotify.com/x' }]);
   });
 
   it('écarte les événements annulés ou sans salle', async () => {
@@ -522,5 +549,38 @@ describe('agenda : doublons entre sources', () => {
     expect(sameEvent(ev({ title: 'Soirée A', longDescription: long }), ev({ title: 'Soirée B', longDescription: long }))).toBe(true);
     // Deux concerts différents au même endroit, même heure : gardés tous les deux.
     expect(sameEvent(ev({ title: 'Groupe A', description: 'Rock' }), ev({ title: 'Groupe B', description: 'Jazz' }))).toBe(false);
+  });
+});
+
+describe('OpenAgenda : infos pratiques', () => {
+  it('prochaines dates, âge, accessibilité, accès, contacts, statut', () => {
+    const now = new Date('2026-10-05T12:00:00Z');
+    const shown = new Date('2026-10-06T18:00:00Z');
+    const p = openAgendaPractical(
+      {
+        timings: [
+          { begin: '2026-10-01T18:00:00Z' },
+          { begin: '2026-10-06T18:00:00Z' },
+          { begin: '2026-10-13T18:00:00Z' },
+        ],
+        age: { min: 12, max: null },
+        accessibility: { mi: true, hi: true, vi: false },
+        location: { access: { fr: 'Métro ligne 1, station Rihour' }, website: 'https://salle.fr', phone: '03 20 00 00 00' },
+        registration: [{ type: 'email', value: 'resa@salle.fr' }],
+        status: 5,
+      },
+      shown,
+      now,
+      '10 € / 5 € réduit, gratuit pour les moins de 12 ans',
+    );
+    expect(p?.nextDates).toEqual(['2026-10-13T18:00:00.000Z']);
+    expect(p?.ageMin).toBe(12);
+    expect(p?.accessibility).toEqual(['pmr', 'auditif']);
+    expect(p?.access).toBe('Métro ligne 1, station Rihour');
+    expect(p?.phone).toBe('03 20 00 00 00');
+    expect(p?.email).toBe('resa@salle.fr');
+    expect(p?.website).toBe('https://salle.fr');
+    expect(p?.status).toBe('complet');
+    expect(p?.priceDetail).toContain('réduit');
   });
 });

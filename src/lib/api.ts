@@ -189,6 +189,22 @@ export function partnerLinkUrl(path: string): string {
   return `${apiOrigin()}${path}`;
 }
 
+// Salle d'un événement → sa fiche Google (pour les avis). Gardé pendant la session.
+const venueIds = new Map<string, string | null>();
+
+export async function findVenue(
+  event: Pick<AgendaEvent, 'venueName' | 'location' | 'address'>,
+  signal?: AbortSignal,
+): Promise<string | null> {
+  const key = `${event.venueName}|${event.location.lat},${event.location.lng}`;
+  if (venueIds.has(key)) return venueIds.get(key)!;
+  const q = new URLSearchParams({ name: event.venueName, near: `${event.location.lat},${event.location.lng}` });
+  if (event.address) q.set('address', event.address);
+  const res = await request<{ placeId: string | null }>(`/api/venue?${q}`, { signal });
+  venueIds.set(key, res.placeId);
+  return res.placeId;
+}
+
 export function photoUrl(photoName: string, width = 400): string {
   return `${apiOrigin()}/api/photo?name=${encodeURIComponent(photoName)}&w=${width}`;
 }

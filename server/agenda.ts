@@ -4,7 +4,7 @@
 
 import { haversineMeters } from '@/shared/geo';
 import { type Lang, LANG_INFO, translate } from '@/shared/i18n';
-import type { AgendaEvent, AgendaWhen, LatLng } from '@/shared/types';
+import type { AgendaEvent, AgendaWhen, EventPractical, LatLng } from '@/shared/types';
 
 import { isAutoTranslateEnabled, lastTranslateError, translateFields } from './autoTranslate';
 
@@ -175,12 +175,22 @@ interface OpenAgendaEvent {
     address?: string;
     latitude?: number;
     longitude?: number;
+    /** Accès : transports en commun, parking (multilingue). */
+    access?: Multilingual;
+    website?: string;
+    phone?: string;
+    email?: string;
   };
   image?: { base?: string; filename?: string } | string | null;
+  imageCredits?: string | null;
+  /** Handicaps pris en charge : moteur, auditif, visuel, mental, psychique. */
+  accessibility?: { mi?: boolean; hi?: boolean; vi?: boolean; ii?: boolean; pi?: boolean } | null;
+  /** 1 sur place, 2 en ligne, 3 les deux. */
+  attendanceMode?: number;
   conditions?: Multilingual;
   longDescription?: Multilingual;
   age?: { min?: number | null; max?: number | null } | null;
-  /** 6 = annulé (OpenAgenda). */
+  /** 1 programmé, 2 reprogrammé, 3 en ligne, 4 reporté, 5 complet, 6 annulé. */
   status?: number;
   registration?: { type?: string; value?: string }[];
 }
@@ -260,6 +270,7 @@ export function fromOpenAgenda(
       ? detectGenres(title, description, keywords.join(' '), longDescription)
       : [];
   const ticket = ev.registration?.find((r) => r.type === 'link' && r.value?.startsWith('http'));
+  const practical = openAgendaPractical(ev, timing.start, now, conditions);
   const nativeTitle = nativeText(ev.title, lang);
   const event: AgendaEvent = {
     id: `oa-${agendaUid}-${ev.uid ?? ev.slug ?? title}`,
@@ -284,6 +295,8 @@ export function fromOpenAgenda(
     distanceMeters: Math.round(haversineMeters(near, location)),
     ...(longDescription && longDescription !== description ? { longDescription } : {}),
     ...(genres.length ? { genres } : {}),
+    ...(ev.imageCredits?.trim() ? { imageCredit: ev.imageCredits.trim() } : {}),
+    ...(practical ? { practical } : {}),
   };
   if (nativeTitle) {
     natives.add(event);
@@ -292,6 +305,55 @@ export function fromOpenAgenda(
     else delete event.longDescription;
   }
   return event;
+}
+
+const OA_STATUS: Record<number, EventPractical['status']> = { 2: 'reprogramme', 3: 'en-ligne', 4: 'reporte', 5: 'complet' };
+
+/** Onglet « Infos pratiques » à partir des champs OpenAgenda. */
+export function openAgendaPractical(
+  ev: OpenAgendaEvent,
+  shownStart: Date,
+  now: Date,
+  conditions: string | undefined,
+): EventPractical | undefined {
+  const nextDates = (ev.timings ?? [])
+    .map((t) => (t.begin ? new Date(t.begin) : null))
+    .filter((d): d is Date => !!d && !Number.isNaN(d.getTime()) && d > now && d.getTime() !== shownStart.getTime())
+    .sort((a, b) => a.getTime() - b.getTime())
+    .slice(0, 8)
+    .map((d) => d.toISOString());
+  const a = ev.accessibility ?? {};
+  const accessibility = (
+    [
+      [a.mi, 'pmr'],
+      [a.hi, 'auditif'],
+      [a.vi, 'visuel'],
+      [a.ii, 'mental'],
+      [a.pi, 'psychique'],
+    ] as const
+  )
+    .filter(([on]) => on)
+    .map(([, k]) => k);
+  const reg = ev.registration ?? [];
+  const loc = ev.location;
+  const access = plainText(text(loc?.access));
+  const practical: EventPractical = {
+    ...(nextDates.length ? { nextDates } : {}),
+    ...(conditions && conditions.length > 0 ? { priceDetail: conditions } : {}),
+    ...(typeof ev.age?.min === 'number' && ev.age.min > 0 ? { ageMin: ev.age.min } : {}),
+    ...(typeof ev.age?.max === 'number' && ev.age.max > 0 && ev.age.max < 99 ? { ageMax: ev.age.max } : {}),
+    ...(accessibility.length ? { accessibility } : {}),
+    ...(access ? { access } : {}),
+    ...(reg.find((r) => r.type === 'phone')?.value || loc?.phone
+      ? { phone: reg.find((r) => r.type === 'phone')?.value ?? loc?.phone }
+      : {}),
+    ...(reg.find((r) => r.type === 'email')?.value || loc?.email
+      ? { email: reg.find((r) => r.type === 'email')?.value ?? loc?.email }
+      : {}),
+    ...(loc?.website?.startsWith('http') ? { website: loc.website } : {}),
+    ...(ev.status && OA_STATUS[ev.status] ? { status: OA_STATUS[ev.status] } : {}),
+  };
+  return Object.keys(practical).length ? practical : undefined;
 }
 
 const openAgendaCache = new TtlCache<OpenAgendaEvent[]>(15 * 60_000, 50);
