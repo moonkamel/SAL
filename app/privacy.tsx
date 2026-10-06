@@ -50,6 +50,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
     title: 'Liens partenaires',
     body: [
       'Certains liens (réservation, billetterie, VTC) sont des liens partenaires : nous comptons le nombre de clics par lieu, sans aucune donnée personnelle, et pouvons recevoir une commission.',
+      'Sur le site web uniquement, le script de notre plateforme d’affiliation (impact.com) mesure les visites et les clics vers les partenaires, afin d’attribuer ces commissions.',
     ],
   },
   {
