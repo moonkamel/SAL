@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -8,10 +8,14 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { colors, radius, spacing } from '@/src/theme';
+import { useT } from '@/src/i18n';
+import { radius, spacing } from '@/src/theme';
+import { themedStyles } from '@/src/theme/tone';
 
 /** Carte fantôme pendant le chargement : la mise en page apparaît avant les données. */
 export function SkeletonCard() {
+  const styles = useStyles();
+  const t = useT();
   const pulse = useSharedValue(0.45);
   useEffect(() => {
     pulse.value = withRepeat(
@@ -23,7 +27,7 @@ export function SkeletonCard() {
   const animated = useAnimatedStyle(() => ({ opacity: pulse.value }));
 
   return (
-    <Animated.View style={[styles.card, animated]} accessibilityLabel="Chargement">
+    <Animated.View style={[styles.card, animated]} accessibilityLabel={t('Chargement')}>
       <View style={styles.photo} />
       <View style={styles.body}>
         <View style={[styles.line, { width: '60%', height: 18 }]} />
@@ -34,7 +38,7 @@ export function SkeletonCard() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -44,4 +48,4 @@ const styles = StyleSheet.create({
   photo: { height: 180, backgroundColor: colors.surfaceRaised },
   body: { padding: spacing.lg, gap: spacing.sm },
   line: { height: 12, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised },
-});
+}));

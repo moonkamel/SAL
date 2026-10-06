@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 
-import { colors, font, gradients, radius, shadows, spacing, TOUCH_TARGET } from '@/src/theme';
+import { font, gradients, radius, shadows, spacing, TOUCH_TARGET } from '@/src/theme';
+import { useT } from '@/src/i18n';
+import { useTone, themedStyles, useColors } from '@/src/theme/tone';
 
 interface Props {
   initialValue?: string;
@@ -12,46 +14,56 @@ interface Props {
 }
 
 export function SearchBar({ initialValue = '', autoFocus, onSubmit }: Props) {
+  const colors = useColors();
+  const styles = useStyles();
   const [value, setValue] = useState(initialValue);
   const [focused, setFocused] = useState(false);
+  const { tone, c } = useTone();
+  const t = useT();
   const submit = () => {
     const q = value.trim();
     if (q) onSubmit(q);
   };
 
   return (
-    <View style={[styles.container, focused && styles.focused]}>
-      <Ionicons name="search" size={22} color={colors.textMuted} />
+    <View
+      style={[
+        styles.container,
+        tone === 'day' && { backgroundColor: c.surface, borderColor: c.border, boxShadow: c.cardShadow },
+        focused && { borderColor: c.gold },
+      ]}
+    >
+      <Ionicons name="search" size={22} color={c.textMuted} />
       <TextInput
-        style={styles.input}
+        style={[styles.input, { color: c.text }]}
         value={value}
         onChangeText={setValue}
         onSubmitEditing={submit}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        selectionColor={colors.gold}
-        placeholder="Manger japonais, aller danser…"
-        placeholderTextColor={colors.textFaint}
+        selectionColor={c.gold}
+        placeholder={t('Manger japonais, aller danser…')}
+        placeholderTextColor={c.textFaint}
         returnKeyType="search"
         autoFocus={autoFocus}
         autoCorrect={false}
-        accessibilityLabel="Rechercher un lieu"
+        accessibilityLabel={t('Rechercher un lieu')}
         maxLength={120}
       />
       {value.length > 0 && (
         <Pressable
           onPress={() => setValue('')}
           hitSlop={12}
-          accessibilityLabel="Effacer la recherche"
+          accessibilityLabel={t('Effacer la recherche')}
         >
-          <Ionicons name="close-circle" size={22} color={colors.textFaint} />
+          <Ionicons name="close-circle" size={22} color={c.textFaint} />
         </Pressable>
       )}
       <Pressable
         onPress={submit}
         style={({ pressed }) => [styles.goWrap, pressed && { opacity: 0.85 }]}
         accessibilityRole="button"
-        accessibilityLabel="Lancer la recherche"
+        accessibilityLabel={t('Lancer la recherche')}
       >
         <LinearGradient colors={gradients.brick} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.go}>
           <Ionicons name="arrow-forward" size={24} color={colors.accentText} />
@@ -61,7 +73,7 @@ export function SearchBar({ initialValue = '', autoFocus, onSubmit }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -74,9 +86,8 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.lg,
     paddingRight: spacing.xs + 2,
     minHeight: 68,
-    boxShadow: shadows.raised,
+    boxShadow: colors.raisedShadow,
   },
-  focused: { borderColor: colors.gold },
   input: {
     flex: 1,
     color: colors.text,
@@ -92,4 +103,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

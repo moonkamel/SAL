@@ -24,7 +24,7 @@ const TRACKING_USAGE =
 const LOCATION_WHEN_IN_USE =
   'Sortir à Lille utilise votre position pour vous proposer les lieux les plus proches et calculer le trajet pour y aller.';
 const LOCATION_ALWAYS =
-  'Pendant le guidage, Sortir à Lille continue d’utiliser votre position quand l’écran est verrouillé pour vous indiquer le chemin. La localisation s’arrête à l’arrivée.';
+  'Sortir à Lille utilise votre position pour vous proposer les lieux les plus proches et calculer le trajet pour y aller.';
 
 const config: ExpoConfig = {
   name: 'Sortir à Lille',
@@ -35,6 +35,13 @@ const config: ExpoConfig = {
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'dark',
+  // Textes des autorisations iPhone (localisation, suivi publicitaire) dans chaque langue.
+  locales: {
+    en: './locales/ios/en.json',
+    nl: './locales/ios/nl.json',
+    de: './locales/ios/de.json',
+    es: './locales/ios/es.json',
+  },
   backgroundColor: '#0B0B12',
   ios: {
     bundleIdentifier: IOS_BUNDLE_ID,
@@ -53,19 +60,23 @@ const config: ExpoConfig = {
       backgroundImage: './assets/android-icon-background.png',
       monochromeImage: './assets/android-icon-monochrome.png',
     },
-    // Le guidage tourne dans un service de premier plan (notification « Guidage en cours ») :
-    // pas besoin de ACCESS_BACKGROUND_LOCATION, soumis à un examen strict sur Google Play.
     permissions: [
       'ACCESS_COARSE_LOCATION',
       'ACCESS_FINE_LOCATION',
-      'FOREGROUND_SERVICE',
-      'FOREGROUND_SERVICE_LOCATION',
-      'POST_NOTIFICATIONS',
     ],
     // Ajoutées par défaut par Expo, inutiles ici.
     blockedPermissions: [
       'android.permission.READ_EXTERNAL_STORAGE',
       'android.permission.WRITE_EXTERNAL_STORAGE',
+      // Déclarées par le SDK de navigation Google (guidage), qu'on n'utilise plus :
+      // Google Play exigerait de justifier un service de localisation en arrière-plan.
+      'android.permission.ACCESS_BACKGROUND_LOCATION',
+      'android.permission.FOREGROUND_SERVICE',
+      'android.permission.FOREGROUND_SERVICE_LOCATION',
+      'android.permission.FOREGROUND_SERVICE_DATA_SYNC',
+      'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
+      'android.permission.SCHEDULE_EXACT_ALARM',
+      'android.permission.USE_EXACT_ALARM',
     ],
     predictiveBackGestureEnabled: false,
   },
@@ -80,14 +91,16 @@ const config: ExpoConfig = {
       {
         locationWhenInUsePermission: LOCATION_WHEN_IN_USE,
         locationAlwaysAndWhenInUsePermission: LOCATION_ALWAYS,
-        // iOS : mode d'arrière-plan « location » pour poursuivre le guidage écran verrouillé
-        // (l'autorisation « Lorsque l'app est active » suffit, avec l'indicateur bleu).
-        isIosBackgroundLocationEnabled: true,
+        // Pas de guidage dans l'app (il se fait dans Google Maps) : pas d'arrière-plan.
+        isIosBackgroundLocationEnabled: false,
         isAndroidBackgroundLocationEnabled: false,
+        isAndroidForegroundServiceEnabled: false,
       },
     ],
     'expo-system-ui',
     'expo-web-browser',
+    // Notifications locales (programme du week-end, rappels d'événements) : pas de serveur push.
+    ['expo-notifications', { icon: './assets/notification-icon.png', color: '#D9502F' }],
     [
       'react-native-google-mobile-ads',
       {

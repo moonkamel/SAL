@@ -5,6 +5,7 @@ import { haversineMeters } from '@/shared/geo';
 import type { LatLng, RouteOption, TravelMode } from '@/shared/types';
 
 import { PlacesError } from './places';
+import { type Lang, translate, tx } from '@/shared/i18n';
 
 const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
 
@@ -31,13 +32,13 @@ export const TRAVEL_MODES: TravelMode[] = ['walk', 'bicycle', 'drive', 'transit'
 export const MAX_ROUTE_METERS = 100_000;
 
 const VEHICLE_LABEL: Record<string, string> = {
-  SUBWAY: 'Métro',
-  METRO_RAIL: 'Métro',
-  TRAM: 'Tram',
-  LIGHT_RAIL: 'Tram',
-  BUS: 'Bus',
-  HEAVY_RAIL: 'Train',
-  RAIL: 'Train',
+  SUBWAY: tx('Métro'),
+  METRO_RAIL: tx('Métro'),
+  TRAM: tx('Tram'),
+  LIGHT_RAIL: tx('Tram'),
+  BUS: tx('Bus'),
+  HEAVY_RAIL: tx('Train'),
+  RAIL: tx('Train'),
 };
 
 interface GoogleRoute {
@@ -54,13 +55,13 @@ interface GoogleRoute {
 }
 
 /** « Métro 1 », « Tram R », « Bus L1 » — dans l'ordre du trajet, sans doublon. */
-export function transitLines(route: GoogleRoute): string[] {
+export function transitLines(route: GoogleRoute, lang: Lang = 'fr'): string[] {
   const lines: string[] = [];
   for (const leg of route.legs ?? []) {
     for (const step of leg.steps ?? []) {
       const line = step.transitDetails?.transitLine;
       if (!line) continue;
-      const vehicle = VEHICLE_LABEL[line.vehicle?.type ?? ''] ?? '';
+      const vehicle = translate(lang, VEHICLE_LABEL[line.vehicle?.type ?? ''] ?? '');
       const label = [vehicle, line.nameShort ?? line.name].filter(Boolean).join(' ');
       if (label && !lines.includes(label)) lines.push(label);
     }
@@ -68,7 +69,7 @@ export function transitLines(route: GoogleRoute): string[] {
   return lines;
 }
 
-export function mapRoute(mode: TravelMode, route: GoogleRoute | undefined): RouteOption {
+export function mapRoute(mode: TravelMode, route: GoogleRoute | undefined, lang: Lang = 'fr'): RouteOption {
   const seconds = route?.duration ? Number.parseInt(route.duration, 10) : NaN;
   if (!route || !route.polyline?.encodedPolyline || Number.isNaN(seconds)) {
     return { mode, available: false };
@@ -79,13 +80,13 @@ export function mapRoute(mode: TravelMode, route: GoogleRoute | undefined): Rout
     durationSeconds: seconds,
     distanceMeters: route.distanceMeters ?? 0,
     polyline: route.polyline.encodedPolyline,
-    ...(mode === 'transit' ? { transitLines: transitLines(route) } : {}),
+    ...(mode === 'transit' ? { transitLines: transitLines(route, lang) } : {}),
   };
 }
 
-async function computeRoute(from: LatLng, to: LatLng, mode: TravelMode): Promise<RouteOption> {
+async function computeRoute(from: LatLng, to: LatLng, mode: TravelMode, lang: Lang): Promise<RouteOption> {
   const key = process.env.GOOGLE_PLACES_API_KEY;
-  if (!key) throw new PlacesError('GOOGLE_PLACES_API_KEY manquante côté serveur', 500);
+  if (!key) throw new PlacesError(tx('GOOGLE_PLACES_API_KEY manquante côté serveur'), 500);
 
   const res = await fetch(ROUTES_URL, {
     method: 'POST',
@@ -107,17 +108,17 @@ async function computeRoute(from: LatLng, to: LatLng, mode: TravelMode): Promise
   if (!res.ok) {
     // Un mode indisponible (ex. vélo non couvert) ne doit pas faire échouer les autres.
     console.warn(`[routes] ${mode} a échoué`, res.status, await res.text());
-    if (res.status === 403) throw new PlacesError('Routes API non activée pour cette clé', 502);
+    if (res.status === 403) throw new PlacesError(tx('Routes API non activée pour cette clé'), 502);
     return { mode, available: false };
   }
   const json = (await res.json()) as { routes?: GoogleRoute[] };
-  return mapRoute(mode, json.routes?.[0]);
+  return mapRoute(mode, json.routes?.[0], lang);
 }
 
 /** Calcule les itinéraires pour tous les modes en parallèle. */
-export async function computeAllRoutes(from: LatLng, to: LatLng): Promise<RouteOption[]> {
+export async function computeAllRoutes(from: LatLng, to: LatLng, lang: Lang = 'fr'): Promise<RouteOption[]> {
   if (haversineMeters(from, to) > MAX_ROUTE_METERS) {
-    throw new PlacesError('Destination trop éloignée', 400);
+    throw new PlacesError(tx('Destination trop éloignée'), 400);
   }
-  return Promise.all(TRAVEL_MODES.map((mode) => computeRoute(from, to, mode)));
+  return Promise.all(TRAVEL_MODES.map((mode) => computeRoute(from, to, mode, lang)));
 }

@@ -10,7 +10,6 @@ import {
   Pressable,
   ScrollView,
   Share,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -19,15 +18,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GoogleAttribution } from '@/src/components/GoogleAttribution';
 import { GradientButton } from '@/src/components/GradientButton';
 import { AmbianceTags } from '@/src/features/lille/AmbianceTags';
-import { TransitCard } from '@/src/features/lille/TransitCard';
+import { OfferCard } from '@/src/features/offers/OfferCard';
 import { PartnerLinks } from '@/src/features/partners/PartnerLinks';
 import { PhotoCarousel } from '@/src/components/PhotoCarousel';
 import { PlacesMap } from '@/src/components/PlacesMap';
 import { ReviewItem } from '@/src/components/ReviewItem';
 import { useFavorites } from '@/src/features/favorites/FavoritesProvider';
 import { useUserLocation } from '@/src/features/location/LocationProvider';
+import { type T, useI18n } from '@/src/i18n';
 import { ApiRequestError, getPlace, placeWebUrl } from '@/src/lib/api';
-import { colors, font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
+import { font, fonts, radius, spacing, TOUCH_TARGET } from '@/src/theme';
 import {
   formatDistance,
   formatOpening,
@@ -38,18 +38,20 @@ import {
 } from '@/shared/format';
 import { estimateWalkMinutes, haversineMeters } from '@/shared/geo';
 import { shareMessage } from '@/shared/share';
+import type { Lang } from '@/shared/i18n';
 import type { PlaceDetails } from '@/shared/types';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 /** Feuille de partage native (WhatsApp, SMS, Messenger…). */
-async function sharePlace(place: PlaceDetails) {
+async function sharePlace(place: PlaceDetails, lang: Lang, t: T) {
   const url = placeWebUrl(place.id) ?? place.googleMapsUri;
   try {
     await Share.share(
       // iOS affiche l'aperçu du lien à part ; Android n'utilise que le message.
       Platform.OS === 'ios' && url
-        ? { message: shareMessage({ ...place, googleMapsUri: undefined }), url }
-        : { message: shareMessage(place, placeWebUrl(place.id)) },
-      { dialogTitle: `Partager ${place.name}` },
+        ? { message: shareMessage({ ...place, googleMapsUri: undefined }, undefined, lang), url }
+        : { message: shareMessage(place, placeWebUrl(place.id), lang) },
+      { dialogTitle: t('Partager {name}', { name: place.name }) },
     );
   } catch {
     // Partage annulé ou indisponible : rien à faire.
@@ -62,12 +64,15 @@ type State =
   | { kind: 'done'; place: PlaceDetails };
 
 export default function PlaceScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { id, surprise } = useLocalSearchParams<{ id: string; surprise?: string }>();
   const insets = useSafeAreaInsets();
   const { coords, status } = useUserLocation();
   const { isFavorite, toggle } = useFavorites();
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [hoursOpen, setHoursOpen] = useState(false);
+  const { t, lang } = useI18n();
 
   const load = useCallback(
     (signal?: AbortSignal) => {
@@ -78,11 +83,13 @@ export default function PlaceScreen() {
           if (signal?.aborted) return;
           setState({
             kind: 'error',
-            message: error instanceof ApiRequestError ? error.message : 'Impossible de charger ce lieu.',
+            message: error instanceof ApiRequestError ? error.message : t('Impossible de charger ce lieu.'),
           });
         });
     },
-    [id],
+    // La langue change la fiche (Google la renvoie traduite).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [id, lang],
   );
 
   useEffect(() => {
@@ -108,20 +115,22 @@ export default function PlaceScreen() {
       options={{
         title: '',
         headerTransparent: true,
+        // Posé sur la photo : flèche de retour toujours claire.
+        headerTintColor: state.kind === 'done' && state.place.photos.length > 0 ? colors.onPhoto : colors.text,
         headerRight: () => (
           <View style={styles.headerActions}>
             {state.kind === 'done' && (
               <Pressable
-                onPress={() => void sharePlace(state.place)}
+                onPress={() => void sharePlace(state.place, lang, t)}
                 hitSlop={12}
                 style={styles.headerButton}
                 accessibilityRole="button"
-                accessibilityLabel="Partager ce lieu"
+                accessibilityLabel={t('Partager ce lieu')}
               >
                 <Ionicons
                   name={Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'}
                   size={24}
-                  color={colors.text}
+                  color={colors.onPhoto}
                 />
               </Pressable>
             )}
@@ -130,12 +139,12 @@ export default function PlaceScreen() {
             hitSlop={12}
             style={styles.headerButton}
             accessibilityRole="button"
-            accessibilityLabel={favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+            accessibilityLabel={favorite ? t('Retirer des favoris') : t('Ajouter aux favoris')}
           >
             <Ionicons
               name={favorite ? 'heart' : 'heart-outline'}
               size={26}
-              color={favorite ? colors.accent : colors.text}
+              color={favorite ? colors.accent : colors.onPhoto}
             />
           </Pressable>
           </View>
@@ -154,7 +163,7 @@ export default function PlaceScreen() {
           <>
             <Text style={styles.message}>{state.message}</Text>
             <Pressable style={styles.secondaryButton} onPress={() => load()}>
-              <Text style={styles.secondaryText}>Réessayer</Text>
+              <Text style={styles.secondaryText}>{t('Réessayer')}</Text>
             </Pressable>
           </>
         )}
@@ -173,10 +182,10 @@ export default function PlaceScreen() {
 
         <View style={styles.body}>
           {surprise && (
-            <View style={styles.surprise} accessible accessibilityLabel={`Surprise : ${surprise}`}>
+            <View style={styles.surprise} accessible accessibilityLabel={t('Surprise : {reason}', { reason: surprise })}>
               <Ionicons name="dice" size={16} color={colors.gold} />
               <Text style={styles.surpriseText}>
-                Surprise ! <Text style={styles.surpriseReason}>{surprise}</Text>
+                {t('Surprise !')} <Text style={styles.surpriseReason}>{surprise}</Text>
               </Text>
             </View>
           )}
@@ -186,14 +195,14 @@ export default function PlaceScreen() {
             {p.rating !== undefined && (
               <>
                 <Ionicons name="star" size={18} color={colors.star} />
-                <Text style={styles.rating}>{formatRating(p.rating)}</Text>
+                <Text style={styles.rating}>{formatRating(p.rating, lang)}</Text>
                 {p.userRatingCount !== undefined && (
-                  <Text style={styles.muted}>({formatRatingCount(p.userRatingCount)} Google)</Text>
+                  <Text style={styles.muted}>({formatRatingCount(p.userRatingCount, lang)} Google)</Text>
                 )}
               </>
             )}
             {p.priceLevel !== undefined && (
-              <Text style={styles.muted}> · {formatPrice(p.priceLevel)}</Text>
+              <Text style={styles.muted}> · {formatPrice(p.priceLevel, lang)}</Text>
             )}
           </View>
 
@@ -203,12 +212,12 @@ export default function PlaceScreen() {
               disabled={!p.weekdayHours?.length}
               style={styles.row}
               accessibilityRole="button"
-              accessibilityLabel="Afficher les horaires"
+              accessibilityLabel={t('Afficher les horaires')}
             >
               <Text
                 style={[styles.opening, { color: p.opening.openNow ? colors.open : colors.closed }]}
               >
-                {formatOpening(p.opening)}
+                {formatOpening(p.opening, lang)}
               </Text>
               {!!p.weekdayHours?.length && (
                 <Ionicons
@@ -231,8 +240,10 @@ export default function PlaceScreen() {
 
           <AmbianceTags ambiance={p.ambiance} />
 
+          {p.offers?.map((offer) => <OfferCard key={offer.id} offer={offer} />)}
+
           <View style={styles.infoCard}>
-            <InfoRow icon="walk" text={`${formatDistance(distance)} · ${formatWalk(estimateWalkMinutes(distance))}`} />
+            <InfoRow icon="walk" text={`${formatDistance(distance, lang)} · ${formatWalk(estimateWalkMinutes(distance), lang)}`} />
             <InfoRow icon="location-outline" text={p.address} />
             {p.phone && (
               <InfoRow
@@ -260,12 +271,9 @@ export default function PlaceScreen() {
 
           <PartnerLinks links={p.partnerLinks} />
 
-          {/* Pour rentrer : métro, tram et bus au plus près du lieu, en temps réel. */}
-          <TransitCard near={p.location} title="Pour rentrer en transports" />
-
           {p.reviews.length > 0 && (
             <View>
-              <Text style={styles.sectionTitle}>Avis récents</Text>
+              <Text style={styles.sectionTitle}>{t('Avis récents')}</Text>
               {p.reviews.map((r) => (
                 <ReviewItem key={`${r.authorName}-${r.publishTime}`} review={r} />
               ))}
@@ -278,7 +286,7 @@ export default function PlaceScreen() {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
         <GradientButton
-          title="Y aller"
+          title={t('Y aller')}
           icon="navigate"
           onPress={() =>
             router.push({
@@ -291,7 +299,7 @@ export default function PlaceScreen() {
               },
             })
           }
-          accessibilityLabel={`Y aller : ${p.name}`}
+          accessibilityLabel={t('Y aller : {name}', { name: p.name })}
         />
       </View>
     </View>
@@ -307,6 +315,8 @@ function InfoRow({
   text: string;
   onPress?: () => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Pressable
       onPress={onPress}
@@ -323,7 +333,7 @@ function InfoRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.background },
   center: { alignItems: 'center', justifyContent: 'center', gap: spacing.lg, padding: spacing.xl },
   message: { color: colors.text, fontSize: font.body, textAlign: 'center' },
@@ -336,7 +346,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(230, 180, 90, 0.12)',
+    backgroundColor: colors.goldTint,
   },
   surpriseText: { color: colors.gold, fontSize: font.small, fontWeight: '800' },
   surpriseReason: { color: colors.text, fontWeight: '600' },
@@ -395,4 +405,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   secondaryText: { color: colors.text, fontSize: font.body, fontWeight: '600' },
-});
+}));

@@ -53,7 +53,7 @@ describe('pipeline de recherche', () => {
     vi.unstubAllEnvs();
   });
 
-  it('appelle Text Search avec le biais de localisation et un FieldMask minimal', async () => {
+  it('appelle Text Search limité à Lille et un FieldMask minimal', async () => {
     const { search } = await import('@/server/search');
     await search({ query: 'manger japonais', location: LOCATION, filters: { openNow: true } });
 
@@ -69,9 +69,10 @@ describe('pipeline de recherche', () => {
     expect(body.textQuery).toBe('manger japonais'); // pas de clé Anthropic → requête brute
     expect(body.languageCode).toBe('fr');
     expect(body.openNow).toBe(true);
-    expect(body.locationBias.circle).toEqual({
-      center: { latitude: LOCATION.lat, longitude: LOCATION.lng },
-      radius: 5000,
+    expect(body.locationBias).toBeUndefined();
+    expect(body.locationRestriction.rectangle).toEqual({
+      low: { latitude: 50.6, longitude: 3.02 },
+      high: { latitude: 50.658, longitude: 3.108 },
     });
   });
 
@@ -156,6 +157,13 @@ describe('horaires (heure de Lille)', () => {
 
   it('ajoute le jour sinon', () => {
     expect(formatLocalTime('2026-09-29T10:00:00Z', now)).toBe('mar. 12:00');
+  });
+
+  it('fermeture dans la nuit : l’heure seule', () => {
+    // Lundi 02:00 à Lille, dans 6 h : « ferme à 02:00 ».
+    expect(formatLocalTime('2026-09-28T00:00:00Z', now)).toBe('02:00');
+    // Lundi 09:00 : un autre jour, on garde le jour.
+    expect(formatLocalTime('2026-09-28T07:00:00Z', now)).toBe('lun. 09:00');
   });
 
   it('ouvert / fermé', () => {

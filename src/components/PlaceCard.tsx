@@ -4,8 +4,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AmbianceTags } from '@/src/features/lille/AmbianceTags';
+import { useI18n } from '@/src/i18n';
 import { photoUrl } from '@/src/lib/api';
-import { colors, font, fonts, gradients, radius, shadows, spacing } from '@/src/theme';
+import { font, fonts, radius, spacing } from '@/src/theme';
 import {
   formatDistance,
   formatOpening,
@@ -17,6 +18,7 @@ import {
 import type { PlaceSummary } from '@/shared/types';
 
 import { PressableScale } from './PressableScale';
+import { themedStyles, useColors } from '@/src/theme/tone';
 
 interface Props {
   place: PlaceSummary;
@@ -26,8 +28,11 @@ interface Props {
 }
 
 export function PlaceCard({ place, onPress, compact }: Props) {
+  const colors = useColors();
+  const styles = useStyles();
   const photoAuthor = place.photo?.attributions[0]?.displayName;
   const photoHeight = compact ? 110 : 190;
+  const { t, lang } = useI18n();
 
   return (
     <PressableScale
@@ -52,13 +57,13 @@ export function PlaceCard({ place, onPress, compact }: Props) {
             <Ionicons name="image-outline" size={32} color={colors.textFaint} />
           </View>
         )}
-        <LinearGradient colors={gradients.photo} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={colors.photoFade} style={StyleSheet.absoluteFill} />
 
         <View style={styles.topRow}>
           {place.sponsored ? (
             <View style={styles.sponsoredBadge}>
               <Ionicons name="sparkles" size={12} color={colors.background} />
-              <Text style={styles.sponsoredText}>Sponsorisé</Text>
+              <Text style={styles.sponsoredText}>{t('Sponsorisé')}</Text>
             </View>
           ) : (
             <View />
@@ -66,9 +71,9 @@ export function PlaceCard({ place, onPress, compact }: Props) {
           {place.rating !== undefined && (
             <View style={styles.ratingPill}>
               <Ionicons name="star" size={13} color={colors.star} />
-              <Text style={styles.ratingText}>{formatRating(place.rating)}</Text>
+              <Text style={styles.ratingText}>{formatRating(place.rating, lang)}</Text>
               {place.userRatingCount !== undefined && (
-                <Text style={styles.ratingCount}>{formatRatingCount(place.userRatingCount)}</Text>
+                <Text style={styles.ratingCount}>{formatRatingCount(place.userRatingCount, lang)}</Text>
               )}
             </View>
           )}
@@ -80,7 +85,7 @@ export function PlaceCard({ place, onPress, compact }: Props) {
           </Text>
           {photoAuthor && (
             <Text style={styles.photoCredit} numberOfLines={1}>
-              Photo : {photoAuthor}
+              {t('Photo : {author}', { author: photoAuthor })}
             </Text>
           )}
         </View>
@@ -94,11 +99,11 @@ export function PlaceCard({ place, onPress, compact }: Props) {
           <View style={styles.meta}>
             <Ionicons name="walk" size={15} color={colors.gold} />
             <Text style={styles.metaText}>
-              {formatDistance(place.distanceMeters)} · {formatWalk(place.walkMinutes)}
+              {formatDistance(place.distanceMeters, lang)} · {formatWalk(place.walkMinutes, lang)}
             </Text>
           </View>
           {place.priceLevel !== undefined && (
-            <Text style={styles.price}>{formatPrice(place.priceLevel)}</Text>
+            <Text style={styles.price}>{formatPrice(place.priceLevel, lang)}</Text>
           )}
         </View>
         <AmbianceTags ambiance={place.ambiance} />
@@ -116,7 +121,7 @@ export function PlaceCard({ place, onPress, compact }: Props) {
                 { color: place.opening.openNow ? colors.open : colors.closed },
               ]}
             >
-              {formatOpening(place.opening)}
+              {formatOpening(place.opening, lang)}
             </Text>
           </View>
         )}
@@ -125,13 +130,13 @@ export function PlaceCard({ place, onPress, compact }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderCurve: 'continuous',
     overflow: 'hidden',
-    boxShadow: shadows.card,
+    boxShadow: colors.cardShadow,
   },
   photoPlaceholder: {
     backgroundColor: colors.surfaceRaised,
@@ -168,8 +173,8 @@ const styles = StyleSheet.create({
   ratingText: { color: colors.text, fontSize: font.small - 1, fontWeight: '800' },
   ratingCount: { color: colors.textMuted, fontSize: font.tiny },
   titleBlock: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.md },
-  name: { color: colors.text, fontFamily: fonts.display, fontSize: font.title, lineHeight: 28 },
-  photoCredit: { color: colors.textMuted, fontSize: font.tiny - 1, marginTop: 2 },
+  name: { color: colors.onPhoto, fontFamily: fonts.display, fontSize: font.title, lineHeight: 28 },
+  photoCredit: { color: colors.onPhotoMuted, fontSize: font.tiny - 1, marginTop: 2 },
   body: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: 6 },
   address: { color: colors.textMuted, fontSize: font.small },
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -178,4 +183,4 @@ const styles = StyleSheet.create({
   price: { color: colors.gold, fontSize: font.small, fontWeight: '800', letterSpacing: 1 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   opening: { fontSize: font.small, fontWeight: '700' },
-});
+}));

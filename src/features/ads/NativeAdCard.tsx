@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import {
   NativeAd,
   NativeAdView,
@@ -9,15 +9,19 @@ import {
 } from 'react-native-google-mobile-ads';
 
 import { useGuidanceActive } from '@/src/features/navigation/guidanceState';
-import { colors, font, radius, spacing } from '@/src/theme';
+import { useT } from '@/src/i18n';
+import { font, radius, spacing } from '@/src/theme';
 
 import { adUnit } from './adUnits';
 import { useAds } from './AdsProvider';
+import { themedStyles } from '@/src/theme/tone';
 
 /** Pub native insérée dans la liste des résultats, clairement marquée « Annonce ». */
 export function NativeAdCard() {
+  const styles = useStyles();
   const { canRequestAds } = useAds();
   const guiding = useGuidanceActive();
+  const t = useT();
   const [ad, setAd] = useState<NativeAd | null>(null);
 
   useEffect(() => {
@@ -48,7 +52,7 @@ export function NativeAdCard() {
     <NativeAdView nativeAd={ad} style={styles.card}>
       <View style={styles.header}>
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>Annonce</Text>
+          <Text style={styles.badgeText}>{t('Annonce')}</Text>
         </View>
         {ad.advertiser && (
           <NativeAsset assetType={NativeAssetType.ADVERTISER}>
@@ -82,7 +86,7 @@ export function NativeAdCard() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -120,4 +124,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: font.small + 1,
   },
-});
+}));

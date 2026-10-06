@@ -1,17 +1,16 @@
-import { transitNear } from '@/server/ilevia';
-import { isNearLille, parseLatLng } from '@/server/params';
+import { stopDepartures } from '@/server/ilevia';
 import { PlacesError } from '@/server/places';
+import { tx } from '@/shared/i18n';
 
-/** GET /api/transit?near=lat,lng → prochains passages aux arrêts Ilévia les plus proches. */
+/** GET /api/transit?stop=Rihour → prochains passages Ilévia en temps réel à cet arrêt. */
 export async function GET(request: Request): Promise<Response> {
-  const near = parseLatLng(new URL(request.url).searchParams.get('near'));
-  if (!near) return Response.json({ error: 'Position invalide' }, { status: 400 });
-  if (!isNearLille(near)) return Response.json({ stops: [] });
+  const stop = (new URL(request.url).searchParams.get('stop') ?? '').trim().slice(0, 80);
+  if (!stop) return Response.json({ error: tx('Arrêt manquant') }, { status: 400 });
 
   try {
-    return Response.json(await transitNear(near));
+    return Response.json(await stopDepartures(stop));
   } catch (error) {
     const status = error instanceof PlacesError ? error.status : 500;
-    return Response.json({ error: 'Horaires Ilévia indisponibles' }, { status });
+    return Response.json({ error: tx('Horaires Ilévia indisponibles') }, { status });
   }
 }

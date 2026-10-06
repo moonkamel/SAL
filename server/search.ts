@@ -14,8 +14,11 @@ import type {
   SearchResponse,
 } from '@/shared/types';
 
+import type { Lang } from '@/shared/i18n';
+
 import { TtlCache } from './cache';
 import { placeDetails, type RawPlace, textSearch } from './places';
+import { isInLille } from '@/shared/lille';
 import { scorePlace } from './ranking';
 import { rewriteQuery } from './rewrite';
 import { activeCampaigns, type SponsoredCampaign } from './sponsored';
@@ -69,14 +72,18 @@ export function withAmbianceHints(query: string, ambiance: Ambiance[]): string {
 const ttlSeconds = Number(process.env.SEARCH_CACHE_TTL_SECONDS ?? 300);
 const cache = new TtlCache<CachedSearch>(ttlSeconds * 1000);
 
-/** ~110 m de précision : deux utilisateurs voisins partagent le même cache. */
-function roundCoord(value: number): string {
-  return value.toFixed(3);
+/**
+ * Pas de 0,005° (~550 m) : les utilisateurs d'un même quartier partagent le cache.
+ * Les distances restent calculées depuis la position exacte de chacun.
+ */
+export function roundCoord(value: number): string {
+  return (Math.round(value / 0.005) * 0.005).toFixed(3);
 }
 
-export function cacheKey(req: SearchRequest): string {
+export function cacheKey(req: SearchRequest, lang: Lang = 'fr'): string {
   const f = req.filters ?? {};
   return JSON.stringify([
+    lang,
     req.query.trim().toLowerCase().replace(/\s+/g, ' '),
     roundCoord(req.location.lat),
     roundCoord(req.location.lng),
@@ -87,8 +94,8 @@ export function cacheKey(req: SearchRequest): string {
   ]);
 }
 
-async function fetchPlaces(req: SearchRequest): Promise<CachedSearch> {
-  const key = cacheKey(req);
+async function fetchPlaces(req: SearchRequest, lang: Lang): Promise<CachedSearch> {
+  const key = cacheKey(req, lang);
   const hit = cache.get(key);
   if (hit) return hit;
 
@@ -110,9 +117,16 @@ async function fetchPlaces(req: SearchRequest): Promise<CachedSearch> {
     openNow: f.openNow ?? rewrite?.openNow,
     minRating: f.minRating ?? rewrite?.minRating,
     priceLevels,
+    lang,
   });
 
-  const result: CachedSearch = { places, effectiveQuery, rewritten: rewrite !== null, ambiance };
+  const result: CachedSearch = {
+    // Lille intramuros seulement (pas La Madeleine, Lambersart, Lomme…).
+    places: places.filter((p) => isInLille({ location: p.location, address: p.address })),
+    effectiveQuery,
+    rewritten: rewrite !== null,
+    ambiance,
+  };
   cache.set(key, result);
   return result;
 }
@@ -175,6 +189,7 @@ async function resolveSponsored(
   campaigns: SponsoredCampaign[],
   organic: PlaceSummary[],
   req: SearchRequest,
+  lang: Lang,
 ): Promise<PlaceSummary[]> {
   const resolved = await Promise.all(
     campaigns.map(async (c): Promise<PlaceSummary | null> => {
@@ -184,10 +199,11 @@ async function resolveSponsored(
         // Absent des résultats Google : on charge sa fiche (sans avis, donc moins cher).
         // Avec un filtre d'ambiance, il faut la fiche complète pour le vérifier.
         const mode = req.filters?.ambiance?.length ? 'full' : 'summary';
-        let details = sponsoredDetailsCache.get(`${mode}|${c.placeId}`);
+        const key = `${mode}|${lang}|${c.placeId}`;
+        let details = sponsoredDetailsCache.get(key);
         if (!details) {
-          details = await placeDetails(c.placeId, mode);
-          sponsoredDetailsCache.set(`${mode}|${c.placeId}`, details);
+          details = await placeDetails(c.placeId, mode, lang);
+          sponsoredDetailsCache.set(key, details);
         }
         return { ...detailsToSummary(details, req.location, true), ambiance: details.ambiance };
       } catch (error) {
@@ -199,13 +215,13 @@ async function resolveSponsored(
   return resolved.filter((p): p is PlaceSummary => p !== null && passesFilters(p, req.filters));
 }
 
-export async function search(req: SearchRequest): Promise<SearchResponse> {
-  const { places, effectiveQuery, rewritten, ambiance } = await fetchPlaces(req);
+export async function search(req: SearchRequest, lang: Lang = 'fr'): Promise<SearchResponse> {
+  const { places, effectiveQuery, rewritten, ambiance } = await fetchPlaces(req, lang);
   const organic = rankPlaces(places, req, ambiance);
-  const campaigns = activeCampaigns({
+  const campaigns = await activeCampaigns({
     queries: [req.query, effectiveQuery],
     location: req.location,
   });
-  const sponsored = campaigns.length ? await resolveSponsored(campaigns, organic, req) : [];
+  const sponsored = campaigns.length ? await resolveSponsored(campaigns, organic, req, lang) : [];
   return { places: mergeSponsored(sponsored, organic), effectiveQuery, rewritten };
 }

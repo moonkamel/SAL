@@ -1,6 +1,7 @@
 import type { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
 
+import { tx } from '@/shared/i18n';
 import type { Weather } from '@/shared/types';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -23,10 +24,10 @@ export function weatherIcon(w: Weather): IconName {
 }
 
 export const WEATHER_LABELS: Record<Weather['condition'], string> = {
-  clear: 'ciel dégagé',
-  cloudy: 'nuageux',
-  fog: 'brouillard',
-  rain: 'pluie',
-  snow: 'neige',
-  storm: 'orage',
+  clear: tx('ciel dégagé'),
+  cloudy: tx('nuageux'),
+  fog: tx('brouillard'),
+  rain: tx('pluie'),
+  snow: tx('neige'),
+  storm: tx('orage'),
 };

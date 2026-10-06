@@ -2,7 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/src/components/PressableScale';
-import { colors, font, fonts, radius, shadows, spacing } from '@/src/theme';
+import { useT } from '@/src/i18n';
+import { font, fonts, radius, spacing } from '@/src/theme';
+import { useTone, themedStyles } from '@/src/theme/tone';
 import type { Suggestion, WeatherResponse } from '@/shared/types';
 
 import { WEATHER_LABELS, weatherIcon } from './weatherIcons';
@@ -14,31 +16,36 @@ interface Props {
 
 /** Idée de sortie selon le temps qu'il fait (Open-Meteo). */
 export function WeatherCard({ data, onPress }: Props) {
+  const styles = useStyles();
   const { weather, suggestion } = data;
+  const { c } = useTone();
+  const t = useT();
   return (
     <PressableScale
       onPress={() => onPress(suggestion)}
-      style={styles.card}
+      style={[styles.card, { backgroundColor: c.surface, borderColor: c.border, boxShadow: c.cardShadow }]}
       accessibilityRole="button"
-      accessibilityLabel={`${Math.round(weather.temperature)} degrés, ${WEATHER_LABELS[weather.condition]}. ${suggestion.title}. ${suggestion.subtitle} Rechercher : ${suggestion.query}`}
+      accessibilityLabel={`${t('{n} degrés', { n: Math.round(weather.temperature) })}, ${t(WEATHER_LABELS[weather.condition])}. ${suggestion.title}. ${suggestion.subtitle} ${t('Rechercher : {q}', { q: t(suggestion.query) })}`}
     >
       <View style={styles.weather}>
-        <Ionicons name={weatherIcon(weather)} size={28} color={colors.gold} />
-        <Text style={styles.temp}>{Math.round(weather.temperature)}°</Text>
+        <Ionicons name={weatherIcon(weather)} size={28} color={c.gold} />
+        <Text style={[styles.temp, { color: c.text }]}>{Math.round(weather.temperature)}°</Text>
       </View>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={styles.title}>{suggestion.title}</Text>
-        <Text style={styles.subtitle}>{suggestion.subtitle}</Text>
-        <Text style={styles.cta}>
-          Voir : {suggestion.query}
-          {suggestion.ambiance?.includes('terrace') ? ' en terrasse' : ''} →
+        <Text style={[styles.title, { color: c.text }]}>{suggestion.title}</Text>
+        <Text style={[styles.subtitle, { color: c.textMuted }]}>{suggestion.subtitle}</Text>
+        <Text style={[styles.cta, { color: c.gold }]}>
+          {suggestion.ambiance?.includes('terrace')
+            ? t('Voir : {q} en terrasse', { q: t(suggestion.query) })
+            : t('Voir : {q}', { q: t(suggestion.query) })}{' '}
+          →
         </Text>
       </View>
     </PressableScale>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles((colors) => ({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -49,11 +56,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    boxShadow: shadows.card,
+    boxShadow: colors.cardShadow,
   },
   weather: { alignItems: 'center', minWidth: 52 },
   temp: { color: colors.text, fontFamily: fonts.display, fontSize: font.title },
   title: { color: colors.text, fontFamily: fonts.displayMedium, fontSize: font.body + 1 },
   subtitle: { color: colors.textMuted, fontSize: font.small },
   cta: { color: colors.gold, fontSize: font.small, fontWeight: '700', marginTop: spacing.xs },
-});
+}));

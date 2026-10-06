@@ -1,0 +1,16 @@
+[
+  {
+    "id": "jazz-illustration-2026-10-03",
+    "title": "Concert jazz manouche",
+    "description": "Trio en live, entrée libre.",
+    "category": "concert",
+    "venueName": "L'Illustration",
+    "placeId": "ChIJU5O4oHgqw0cRWNWgIyAf91A",
+    "location": { "lat": 50.6394789, "lng": 3.0584516 },
+    "start": "2026-10-03T21:00:00+02:00",
+    "end": "2026-10-03T23:30:00+02:00",
+    "price": "Gratuit",
+    "featured": true,
+    "active": true
+  }
+]

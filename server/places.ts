@@ -10,6 +10,9 @@ import type {
   PriceLevel,
   Review,
 } from '@/shared/types';
+import { type Lang, LANG_INFO, tx } from '@/shared/i18n';
+import { TtlCache } from './cache';
+import { LILLE_RECTANGLE } from '@/shared/lille';
 
 const PLACES_BASE = 'https://places.googleapis.com/v1';
 
@@ -105,7 +108,7 @@ export class PlacesError extends Error {
 
 function apiKey(): string {
   const key = process.env.GOOGLE_PLACES_API_KEY;
-  if (!key) throw new PlacesError('GOOGLE_PLACES_API_KEY manquante côté serveur', 500);
+  if (!key) throw new PlacesError(tx('GOOGLE_PLACES_API_KEY manquante côté serveur'), 500);
   return key;
 }
 
@@ -187,6 +190,8 @@ export interface TextSearchParams {
   minRating?: number;
   priceLevels?: PriceLevel[];
   ambiance?: Ambiance[];
+  /** Langue des noms, adresses et horaires renvoyés. */
+  lang?: Lang;
 }
 
 // --- Prix ---
@@ -216,7 +221,15 @@ const hourFormat = new Intl.DateTimeFormat('fr-FR', {
   hour: '2-digit',
   minute: '2-digit',
 });
-const dayFormat = new Intl.DateTimeFormat('fr-FR', { timeZone: TIME_ZONE, weekday: 'short' });
+const dayFormats = new Map<Lang, Intl.DateTimeFormat>();
+function dayFormat(lang: Lang): Intl.DateTimeFormat {
+  let f = dayFormats.get(lang);
+  if (!f) {
+    f = new Intl.DateTimeFormat(LANG_INFO[lang].locale, { timeZone: TIME_ZONE, weekday: 'short' });
+    dayFormats.set(lang, f);
+  }
+  return f;
+}
 const dateKeyFormat = new Intl.DateTimeFormat('fr-FR', {
   timeZone: TIME_ZONE,
   year: 'numeric',
@@ -225,27 +238,31 @@ const dateKeyFormat = new Intl.DateTimeFormat('fr-FR', {
 });
 
 /** « 23:00 » si c'est aujourd'hui (heure de Lille), sinon « mar. 12:00 ». */
-export function formatLocalTime(iso: string, now: Date = new Date()): string {
+export function formatLocalTime(iso: string, now: Date = new Date(), lang: Lang = 'fr'): string {
   const date = new Date(iso);
   const time = hourFormat.format(date);
   if (dateKeyFormat.format(date) === dateKeyFormat.format(now)) return time;
-  return `${dayFormat.format(date)} ${time}`;
+  // Fermeture dans la nuit (minuit, 2 h…) : « ferme à 02:00 », pas « sam. 02:00 ».
+  const hours = (date.getTime() - now.getTime()) / 3_600_000;
+  if (hours > 0 && hours < 12 && Number.parseInt(time, 10) < 6) return time;
+  return `${dayFormat(lang).format(date)} ${time}`;
 }
 
 export function toOpeningStatus(
   hours: GooglePlace['currentOpeningHours'],
   now: Date = new Date(),
+  lang: Lang = 'fr',
 ): OpeningStatus | undefined {
   if (!hours || hours.openNow === undefined) return undefined;
   if (hours.openNow) {
     return {
       openNow: true,
-      closesAt: hours.nextCloseTime ? formatLocalTime(hours.nextCloseTime, now) : undefined,
+      closesAt: hours.nextCloseTime ? formatLocalTime(hours.nextCloseTime, now, lang) : undefined,
     };
   }
   return {
     openNow: false,
-    opensAt: hours.nextOpenTime ? formatLocalTime(hours.nextOpenTime, now) : undefined,
+    opensAt: hours.nextOpenTime ? formatLocalTime(hours.nextOpenTime, now, lang) : undefined,
   };
 }
 
@@ -275,7 +292,7 @@ export function pickRecentReviews(reviews: GoogleReview[] | undefined): Review[]
     }));
 }
 
-export function mapPlace(place: GooglePlace, now: Date = new Date()): RawPlace | null {
+export function mapPlace(place: GooglePlace, now: Date = new Date(), lang: Lang = 'fr'): RawPlace | null {
   if (!place.location || !place.displayName?.text) return null;
   const photo = place.photos?.[0];
   return {
@@ -286,14 +303,18 @@ export function mapPlace(place: GooglePlace, now: Date = new Date()): RawPlace |
     rating: place.rating,
     userRatingCount: place.userRatingCount,
     priceLevel: place.priceLevel ? PRICE_FROM_GOOGLE[place.priceLevel] : undefined,
-    opening: toOpeningStatus(place.currentOpeningHours, now),
+    opening: toOpeningStatus(place.currentOpeningHours, now, lang),
     photo: photo ? mapPhoto(photo) : undefined,
     ambiance: ambianceOf(place),
   };
 }
 
-export function mapDetails(place: GooglePlace, now: Date = new Date()): PlaceDetails | null {
-  const base = mapPlace(place, now);
+export function mapDetails(
+  place: GooglePlace,
+  now: Date = new Date(),
+  lang: Lang = 'fr',
+): PlaceDetails | null {
+  const base = mapPlace(place, now, lang);
   if (!base) return null;
   const { photo: _photo, ...rest } = base;
   return {
@@ -317,13 +338,15 @@ export async function textSearch(params: TextSearchParams): Promise<RawPlace[]> 
 
   const body = {
     textQuery: params.textQuery,
-    languageCode: 'fr',
+    languageCode: params.lang ?? 'fr',
     regionCode: 'FR',
     pageSize: 20,
-    locationBias: {
-      circle: {
-        center: { latitude: params.center.lat, longitude: params.center.lng },
-        radius: params.radiusMeters,
+    // Uniquement Lille intramuros : la recherche est limitée au rectangle de Lille,
+    // puis le contour exact de la commune trie les résultats (server/search.ts).
+    locationRestriction: {
+      rectangle: {
+        low: { latitude: LILLE_RECTANGLE.low.lat, longitude: LILLE_RECTANGLE.low.lng },
+        high: { latitude: LILLE_RECTANGLE.high.lat, longitude: LILLE_RECTANGLE.high.lng },
       },
     },
     ...(params.includedType ? { includedType: params.includedType } : {}),
@@ -346,12 +369,14 @@ export async function textSearch(params: TextSearchParams): Promise<RawPlace[]> 
     const detail = await res.text();
     console.error('[places] Text Search a échoué', res.status, detail);
     // Même un 400 de Google (clé invalide, type inconnu…) est un problème serveur, pas client.
-    throw new PlacesError('La recherche Google Places a échoué', 502);
+    throw new PlacesError(tx('La recherche Google Places a échoué'), 502);
   }
 
   const json = (await res.json()) as { places?: GooglePlace[] };
   const now = new Date();
-  return (json.places ?? []).map((p) => mapPlace(p, now)).filter((p): p is RawPlace => p !== null);
+  return (json.places ?? [])
+    .map((p) => mapPlace(p, now, params.lang))
+    .filter((p): p is RawPlace => p !== null);
 }
 
 export const PLACE_ID_PATTERN = /^[A-Za-z0-9_-]{10,300}$/;
@@ -359,11 +384,13 @@ export const PLACE_ID_PATTERN = /^[A-Za-z0-9_-]{10,300}$/;
 export async function placeDetails(
   id: string,
   mode: 'full' | 'summary',
+  lang: Lang = 'fr',
 ): Promise<PlaceDetails> {
-  if (!PLACE_ID_PATTERN.test(id)) throw new PlacesError('Identifiant de lieu invalide', 400);
+  if (!PLACE_ID_PATTERN.test(id)) throw new PlacesError(tx('Identifiant de lieu invalide'), 400);
 
   const url = new URL(`${PLACES_BASE}/places/${id}`);
-  url.searchParams.set('languageCode', 'fr');
+  // Avis, horaires et libellés dans la langue de l'utilisateur.
+  url.searchParams.set('languageCode', lang);
   url.searchParams.set('regionCode', 'FR');
 
   const res = await fetch(url, {
@@ -372,14 +399,37 @@ export async function placeDetails(
       'X-Goog-FieldMask': mode === 'full' ? DETAILS_FIELD_MASK : SUMMARY_FIELD_MASK,
     },
   });
-  if (res.status === 404) throw new PlacesError('Lieu introuvable', 404);
+  if (res.status === 404) throw new PlacesError(tx('Lieu introuvable'), 404);
   if (!res.ok) {
     console.error('[places] Place Details a échoué', res.status, await res.text());
-    throw new PlacesError('Impossible de charger ce lieu', 502);
+    throw new PlacesError(tx('Impossible de charger ce lieu'), 502);
   }
-  const details = mapDetails((await res.json()) as GooglePlace);
-  if (!details) throw new PlacesError('Lieu introuvable', 404);
+  const details = mapDetails((await res.json()) as GooglePlace, new Date(), lang);
+  if (!details) throw new PlacesError(tx('Lieu introuvable'), 404);
   return details;
+}
+
+// Photo principale d'une fiche Google : la référence change rarement, une journée de cache.
+const mainPhotoCache = new TtlCache<string | null>(24 * 3_600_000, 500);
+
+/** Référence de la 1re photo de la fiche Google (« places/…/photos/… »), ou null. */
+export async function mainPhotoName(id: string): Promise<string | null> {
+  if (!PLACE_ID_PATTERN.test(id)) return null;
+  const hit = mainPhotoCache.get(id);
+  if (hit !== undefined) return hit;
+  try {
+    const res = await fetch(`${PLACES_BASE}/places/${id}`, {
+      headers: { 'X-Goog-Api-Key': apiKey(), 'X-Goog-FieldMask': 'photos' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null; // pas mis en cache : nouvel essai plus tard
+    const body = (await res.json()) as { photos?: { name?: string }[] };
+    const name = body.photos?.[0]?.name ?? null;
+    mainPhotoCache.set(id, name);
+    return name;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -388,7 +438,7 @@ export async function placeDetails(
  */
 export async function photoUri(name: string, maxWidthPx: number): Promise<string> {
   if (!/^places\/[^/]+\/photos\/[^/]+$/.test(name)) {
-    throw new PlacesError('Référence de photo invalide', 400);
+    throw new PlacesError(tx('Référence de photo invalide'), 400);
   }
   const url = new URL(`${PLACES_BASE}/${name}/media`);
   url.searchParams.set('maxWidthPx', String(maxWidthPx));
@@ -397,9 +447,9 @@ export async function photoUri(name: string, maxWidthPx: number): Promise<string
   const res = await fetch(url, { headers: { 'X-Goog-Api-Key': apiKey() } });
   if (!res.ok) {
     console.error('[places] Photo a échoué', res.status, await res.text());
-    throw new PlacesError('Photo indisponible', res.status === 404 ? 404 : 502);
+    throw new PlacesError(tx('Photo indisponible'), res.status === 404 ? 404 : 502);
   }
   const json = (await res.json()) as { photoUri?: string };
-  if (!json.photoUri) throw new PlacesError('Photo indisponible', 502);
+  if (!json.photoUri) throw new PlacesError(tx('Photo indisponible'), 502);
   return json.photoUri;
 }

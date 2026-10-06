@@ -17,7 +17,7 @@ AdMob (react-native-google-mobile-ads) · Claude (reformulation optionnelle).
 | 1 | Recherche + liste de résultats + filtres + historique | ✅ testé avec les vraies données Google, à tester sur téléphone |
 | 2 | Fiche lieu + carte (MapView du Navigation SDK) + favoris | ✅ à tester sur téléphone (nouveau build nécessaire) |
 | 3 | Aperçu d'itinéraire (Routes API) | ✅ testé avec les vraies données Google, à tester sur téléphone |
-| 4 | Navigation guidée intégrée (Google Navigation SDK) | ✅ à tester sur téléphone (nouveau build nécessaire) |
+| 4 | Guidage : ouvert dans Google Maps (le guidage intégré a été retiré) | ✅ |
 | 5 | Publicité AdMob + consentement + lieux sponsorisés | ✅ à tester sur téléphone (nouveau build nécessaire) |
 
 ### Design « Lille la nuit »
@@ -35,11 +35,19 @@ AdMob (react-native-google-mobile-ads) · Claude (reformulation optionnelle).
   des vélos au départ, station avec des places libres près du lieu. Données GBFS ouvertes
   d'Ilévia (`VLILLE_GBFS_URL`, par défaut `https://media.ilevia.fr/opendata/gbfs.json`),
   rafraîchies chaque minute.
+- **Trajets en transports, façon Citymapper** (aperçu d'itinéraire → mode transports →
+  « Horaires et trajet détaillé ») : propositions avec heure de départ et d'arrivée,
+  lignes aux couleurs officielles (M1 jaune, M2 rouge…), marche, prix du ticket et départs
+  suivants ; étapes détaillées (arrêt de montée, direction, nombre d'arrêts, arrêt de
+  descente). « Y aller avec Google Maps » ouvre le trajet dans Google Maps. Données
+  Google Routes API (horaires prévus d'Ilévia, tarif indiqué par Google).
 - **Prochains passages Ilévia** (métro, tram, bus) : « Départs près de vous » en mode
   transports, et « Pour rentrer en transports » sur la fiche d'un lieu. Données temps réel
-  de l'open data de la MEL (`ILEVIA_PASSAGES_URL`), rafraîchies toutes les 30 s. Si l'API
-  exige une clé, créez un compte sur <https://data.lillemetropole.fr> et renseignez
-  `MEL_API_KEY` côté serveur.
+  de l'open data de la MEL, rafraîchies toutes les 30 s. Le serveur essaie les adresses
+  connues de la MEL (API Opendatasoft puis OGC) et garde celle qui répond ;
+  `ILEVIA_PASSAGES_URL` permet d'en imposer une. Si l'API exige une clé, créez un compte
+  sur <https://data.lillemetropole.fr> et renseignez `MEL_API_KEY` côté serveur. Si aucune
+  source ne répond, l'encart est simplement masqué.
 - **Filtres d'ambiance** : terrasse, musique live, en groupe, avec enfants, cocktails,
   végétarien, **accès fauteuil** (entrée accessible en fauteuil roulant) (panneau « Filtres », ou déduits de la phrase par Claude). Seuls les lieux
   pour lesquels Google confirme l'ambiance sont gardés. Ces champs Google ne sont demandés
@@ -54,6 +62,21 @@ AdMob (react-native-google-mobile-ads) · Claude (reformulation optionnelle).
 - **Partager un lieu** (bouton en haut de la fiche) : WhatsApp, SMS… avec le nom,
   l'adresse, la note et le lien Google Maps (ou le lien web de l'app si
   `EXPO_PUBLIC_API_URL` est défini).
+- **Ce soir à Lille** (accueil + écran « Agenda ») : concerts, soirées, expos… ce soir,
+  demain ou ce week-end, avec **filtres** (catégorie, style de musique : jazz, rock,
+  électro, rap, classique…, gratuit, à moins de 2 km) et une **fiche événement** dans
+  l'app (date, lieu, description, prix, billets, « Y aller », partage). Sources : les événements saisis dans l'espace partenaires
+  (option **« À la une »**, payante, affichée en premier avec un badge) et l'agenda
+  culturel de la **Ville de Lille** sur OpenAgenda (`OPENAGENDA_KEY`).
+- **Bons plans** (accueil, écran « Bons plans » et fiche du lieu) : offres des
+  établissements partenaires (« 2 bières pour le prix d'1 de 18 h à 20 h »), avec dates,
+  jours et créneau horaire.
+- **Espace partenaires** (`/admin`, dans un navigateur) : gérer bons plans, agenda,
+  lieux sponsorisés et liens partenaires sans toucher au code, et voir les clics sur les
+  liens partenaires. Voir « Espace partenaires » plus bas.
+- **Économies Google** : photos chargées seulement quand elles sont visibles (liste et
+  carrousel), fiches gardées 5 min dans l'app, cache de recherche partagé par quartier
+  (~500 m), et limite d'appels par appareil (429 au-delà de 30 recherches par minute).
 
 ### Choix techniques validés
 
@@ -63,8 +86,9 @@ AdMob (react-native-google-mobile-ads) · Claude (reformulation optionnelle).
 - **Carte** : le composant `MapView` du Navigation SDK remplace `react-native-maps`. Les deux
   embarquent le Maps SDK Google et ne peuvent pas cohabiter dans la même app (symboles
   dupliqués sur iOS, classes dupliquées sur Android).
-- **Modes de guidage** : marche (par défaut), vélo, voiture. Le Navigation SDK ne guide pas
-  en transports en commun : ce mode sera proposé en aperçu uniquement.
+- **Guidage** : l'app affiche temps de trajet, tracés et étapes, puis « Y aller avec Google
+  Maps » ouvre Google Maps (à pied, vélo, voiture ou transports). Pas de guidage intégré :
+  le Navigation SDK ne sert plus qu'à la carte.
 - **Avis Google** : chargés seulement dans la fiche lieu (Place Details). Les demander dans
   chaque recherche ferait passer toutes les recherches dans la tranche Places la plus chère.
 - **Temps à pied dans la liste** : estimation (distance × 1,3 à 4,8 km/h), affichée « ~12 min ».
@@ -85,8 +109,6 @@ app/                 écrans (Expo Router) + routes API (*+api.ts)
   api/vlille+api.ts  GET  /api/vlille?near=lat,lng → stations V'Lille proches (temps réel)
   api/transit+api.ts GET  /api/transit?near=lat,lng → prochains passages Ilévia
   route/[id].tsx     aperçu d'itinéraire : tracé, choix du mode, durée, « Démarrer »
-  navigate/[id].tsx  guidage plein écran (Navigation SDK), « Arrêter », aucune publicité
-  arrived/[id].tsx   « Vous êtes arrivé » : noter le lieu, nouvelle recherche
 plugins/withGoogleNavigation.js  plugin Expo : clés Maps, désugarage Android, Jetifier,
                      modes d'arrière-plan iOS (location, audio)
 server/              logique backend (testable seule)
@@ -98,13 +120,18 @@ server/              logique backend (testable seule)
   sponsored.ts       sélection des lieux sponsorisés (dates, zone, mots-clés)
   sponsored.json     campagnes actives (voir « Lieux sponsorisés »)
   affiliates.json    liens partenaires (voir « Liens d'affiliation »)
+  offers.json, events.json  bons plans et agenda sans base de données
+  content.ts         stockage (Supabase ou fichiers JSON), schemas.ts
   search.ts          orchestration
 shared/              types, géo et formatage communs à l'app et au serveur
 src/                 composants, localisation, historique, favoris, thème
   features/ads/      consentement UMP + ATT, bannière, pub native, interstitiel, règles
-  features/navigation/  guidage (Navigation SDK), état « guidage actif »
+  features/navigation/  contexte du Navigation SDK (carte), liens Google Maps
   features/lille/    V’Lille, Ilévia, pastilles d’ambiance
-  features/moment/   Surprends-moi, carte météo
+  features/moment/   Surprends-moi, carte météo, rubriques de l'accueil
+  features/admin/    espace partenaires (/admin)
+  features/offers/, features/agenda/  bons plans et agenda
+supabase/            schéma de la base de l'espace partenaires
 tests/               tests unitaires (vitest)
 ```
 
@@ -129,6 +156,14 @@ tests/               tests unitaires (vitest)
    [conditions EEE de Google Maps Platform](https://cloud.google.com/terms/maps-platform/eea)
    s'appliquent. Le Navigation SDK est facturé à la destination, avec 1 000 destinations
    gratuites par mois.
+5. **Protégez votre budget** (fortement recommandé) :
+   - *Facturation → Budgets et alertes → Créer un budget* : par exemple 20 €/mois, avec
+     des alertes par e-mail à 50 %, 90 % et 100 %. Une alerte **ne coupe rien** : elle
+     prévient seulement.
+   - *API et services → Places API (New) → Quotas et limites du système* : baissez les
+     « requêtes par jour » (par exemple 1 000 pour Text Search et Place Details). C'est
+     la **vraie limite dure** : au-delà, Google refuse les appels au lieu de les facturer
+     (l'app affiche alors une erreur). Faites de même pour la Routes API.
 
 ### Anthropic (optionnel)
 
@@ -142,6 +177,28 @@ requête Places plus des filtres (type, ouvert maintenant, prix).
 3. Le modèle est réglé par `ANTHROPIC_MODEL` (par défaut `claude-opus-5`, effort `low`).
    Pour une latence et un coût plus bas, vous pouvez essayer `claude-haiku-4-5`.
    Si Claude ne répond pas en 6 s ou échoue, l'app utilise la requête brute.
+
+### Langues (français, anglais, néerlandais, allemand, espagnol)
+
+Au premier lancement, l'app demande la langue (liste de drapeaux) et la mémorise ; le
+bouton drapeau de l'accueil permet d'en changer. Les langues proposées correspondent aux
+visiteurs étrangers les plus nombreux à Lille : Belges (néerlandais et français),
+Britanniques, Allemands, Néerlandais et Espagnols.
+
+- **Textes de l'app** : le français sert de clé (`t('Favoris')`). Les traductions sont dans
+  `shared/i18n/locales/*.json`. Après avoir ajouté ou modifié des textes, lancez
+  `npm run translate` : le script repère les nouveaux textes et les fait traduire par
+  Claude (clé `ANTHROPIC_API_KEY` dans `.env.local`). Les traductions existantes ne sont
+  jamais écrasées : vous pouvez les corriger à la main. `npm run translate:check` vérifie
+  qu'il ne manque rien (c'est aussi testé par `npm test`).
+- **Données Google** (noms, avis, horaires, jours) : demandées directement dans la langue
+  choisie.
+- **Agenda et bons plans** (textes saisis en français) : traduits automatiquement par le
+  serveur avec Claude (`claude-haiku-4-5`), gardés en mémoire 24 h. Les textes déjà rédigés
+  dans la langue sur OpenAgenda sont utilisés tels quels. Sans clé Anthropic, ils restent
+  en français. `ENABLE_AUTO_TRANSLATE=false` coupe cette traduction.
+- **Demandes d'autorisation iPhone** : `locales/ios/*.json` (nouveau build nécessaire).
+- L'espace partenaires reste en français.
 
 ### AdMob (publicité)
 
@@ -227,8 +284,8 @@ limite de **2 par recherche** et **seulement s'il respecte les filtres** choisis
 (ouvert maintenant, distance, prix, note). Pour trouver le `place_id` d'un lieu, utilisez le
 [Place ID Finder de Google](https://developers.google.com/maps/documentation/places/web-service/place-id).
 
-Modifier le fichier demande un redéploiement du backend ; une base de données
-(ex. Supabase) sera plus pratique quand il y aura plusieurs annonceurs.
+Sans base de données, modifier le fichier demande un redéploiement du backend : utilisez
+plutôt l'**espace partenaires** (ci-dessous).
 
 ### Liens d'affiliation (réservation, billetterie, VTC)
 
@@ -269,6 +326,69 @@ partenaire. Vous pouvez ainsi comparer vos clics avec les commissions du partena
 L'adresse de destination est toujours reconstruite à partir de `affiliates.json` :
 personne ne peut détourner `/api/go` vers un autre site.
 
+### Espace partenaires (bons plans, agenda, sponsorisés, liens)
+
+L'espace partenaires est une page web protégée par mot de passe, à l'adresse de votre
+serveur suivie de **`/admin`** (en local : <http://localhost:8081/admin>). Sans base de
+données, il fonctionne en **lecture seule** : il montre le contenu des fichiers
+`server/offers.json`, `events.json`, `sponsored.json` et `affiliates.json` (vides par
+défaut ; modèles dans les fichiers `*.example.json`).
+
+**1. Choisir un mot de passe** d'au moins 12 caractères et l'ajouter côté serveur :
+`ADMIN_PASSWORD=…` dans `.env.local` (et dans les variables d'environnement EAS pour le
+serveur en ligne). Sans ce réglage, l'espace reste fermé.
+
+**2. Créer la base de données** (gratuite pour démarrer) pour pouvoir modifier en ligne :
+
+1. Créez un compte sur <https://supabase.com>, puis un projet (région Europe, par
+   exemple Paris ou Francfort).
+2. Menu *SQL Editor → New query* : collez le contenu de `supabase/schema.sql`, puis
+   **Run**.
+3. Menu *Project Settings → API* : copiez l'**URL du projet** et la clé
+   **`service_role`** (secrète).
+4. Ajoutez-les côté serveur, **jamais** avec le préfixe `EXPO_PUBLIC_` :
+
+```
+SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_SECRET_KEY=sb_secret_...   # ou SUPABASE_SERVICE_ROLE_KEY=eyJ... (ancienne clé)
+```
+
+Relancez `npm start` : l'espace partenaires indique « Base de données connectée » et les
+boutons **Ajouter / Modifier / Supprimer** apparaissent. Les changements sont visibles
+dans l'app en moins d'une minute, sans redéploiement. Dès que la base est configurée,
+ce sont ses données qui comptent (les fichiers JSON sont ignorés).
+
+**Remplir un formulaire** : tapez le nom de l'établissement dans « Chercher le lieu » et
+choisissez-le dans la liste : le `place_id`, le nom et la position se remplissent seuls.
+Les dates sont au format `AAAA-MM-JJ`, les heures `HH:MM` (heure de Lille).
+
+**Statistiques** : l'onglet « Statistiques » montre les clics sur les liens partenaires
+des 30 derniers jours, par partenaire et par lieu. C'est utile pour montrer à un
+établissement ce que lui apporte l'app.
+
+### Agenda OpenAgenda (Ville de Lille)
+
+« Ce soir à Lille » reprend l'agenda officiel de la **Ville de Lille**
+(<https://openagenda.com/fr/ville-de-lille>, identifiant `57621068`), filtré pour ne garder
+que les **sorties culturelles** qui intéressent touristes et jeunes Lillois (concerts,
+expos, spectacles, festivals, cinéma, soirées, visites…). Les réunions, conseils de
+quartier, activités pour tout-petits ou seniors, collectes, inscriptions et événements
+annulés sont écartés. Il suffit d'une **clé API OpenAgenda** (gratuite) :
+
+1. Créez un compte sur <https://openagenda.com>, puis allez dans *Paramètres du compte →
+   Clé API* et copiez la **clé publique**.
+2. Ajoutez-la côté serveur (dans `.env.local`, et dans les variables d'environnement EAS
+   pour le serveur en ligne) :
+
+```
+OPENAGENDA_KEY=votre-cle
+```
+
+Pour ajouter d'autres agendas, listez leurs identifiants séparés par des virgules :
+`OPENAGENDA_AGENDAS=57621068,12345678`. Les réponses sont gardées 15 min en cache. Un
+événement présent à la fois chez un partenaire et dans OpenAgenda (même titre, même lieu)
+n'apparaît qu'une fois.
+
 ## 2. Configuration locale
 
 ```bash
@@ -296,7 +416,7 @@ npm run build:dev:ios                 # nécessite un compte Apple Developer ;
 ```
 
 Installez le build sur le téléphone (QR code / lien fourni par EAS), puis lancez le
-serveur de développement **sur le même réseau Wi-Fi** :
+serveur de développement **sur le même réseau Wi-Fi** (ou en mode tunnel, voir plus bas) :
 
 ```bash
 npm start
@@ -308,15 +428,51 @@ routes API (`/api/search`). La clé Google reste donc sur votre ordinateur.
 > Un nouveau build EAS n'est nécessaire que si on ajoute ou modifie un module natif
 > (ce sera le cas aux étapes 2, 4 et 5). Le reste se met à jour à chaud.
 
-### Mise en ligne du backend (plus tard)
+### Tester hors du Wi-Fi : mode tunnel
 
 ```bash
-npx expo export --platform web
-eas deploy                   # EAS Hosting, puis définissez les variables d'environnement serveur
+npx expo start --dev-client --tunnel
 ```
 
-Renseignez ensuite `EXPO_PUBLIC_API_URL` avec l'URL obtenue pour les builds preview et
-production.
+Le téléphone peut être en 4G : l'app et les routes API passent par le tunnel (l'ordinateur
+doit rester allumé).
+
+### Version autonome (sans ordinateur) : backend en ligne + APK « preview »
+
+1. Variables serveur dans EAS (une commande par variable, valeurs copiées depuis `.env.local`) :
+
+   ```bash
+   eas env:set --name GOOGLE_PLACES_API_KEY --value "…" --visibility sensitive --environment production
+   eas env:set --name OPENAGENDA_KEY --value "…" --visibility sensitive --environment production
+   ```
+
+   (idem pour `MEL_API_KEY`, `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`,
+   `ANTHROPIC_API_KEY` si vous les utilisez.)
+
+2. Mise en ligne du backend (EAS Hosting) :
+
+   ```bash
+   npm run deploy:api
+   ```
+
+   Au premier déploiement, choisissez le sous-domaine (ex. `sortir-a-lille` →
+   `https://sortir-a-lille.expo.app`). Vérifiez : `https://sortir-a-lille.expo.app/api/weather`.
+
+3. Variables de l'app (lues au moment du build, pour preview et production) :
+
+   ```bash
+   eas env:set --name EXPO_PUBLIC_API_URL --value "https://sortir-a-lille.expo.app" --visibility plaintext --environment preview --environment production
+   eas env:set --name GOOGLE_MAPS_ANDROID_API_KEY --value "…" --visibility sensitive --environment preview --environment production
+   ```
+
+4. APK installable sans ordinateur :
+
+   ```bash
+   npm run build:preview:android
+   ```
+
+Après une modification du code serveur, relancez `npm run deploy:api` ; après une
+modification de l'app, relancez le build preview.
 
 ## 4. Checklist de test : étape 1
 
@@ -365,26 +521,10 @@ Coût : chaque aperçu interroge Routes API pour les 4 modes (mis en cache 5 min
 
 ## 7. Checklist de test : étape 4
 
-Il faut **refaire un build** (`npm run build:dev:android`) : localisation en arrière-plan,
-guidage vocal et nouvelles autorisations. La clé Maps de l'app doit avoir **Navigation SDK**
-activé.
-
-Testez dehors, à pied, vers un lieu proche (quelques centaines de mètres).
-
-- [ ] « Démarrer » affiche d'abord (une seule fois) l'explication de l'utilisation de la position
-      pendant le guidage, puis les **conditions d'utilisation Google** à accepter.
-- [ ] Android 13+ : l'app demande l'autorisation d'afficher des notifications.
-- [ ] Le guidage démarre en plein écran : instructions en haut, voix en français, barre en bas
-      avec temps restant, distance et heure d'arrivée.
-- [ ] Écran verrouillé, les instructions vocales continuent (iOS : pastille bleue ;
-      Android : notification « guidage en cours »).
-- [ ] « Arrêter » (ou le bouton retour Android) demande confirmation puis revient à l'aperçu.
-- [ ] À l'arrivée : écran « Vous êtes arrivé ! », notation en étoiles, « Publier un avis sur
-      Google » (ouvert dans l'app), « Nouvelle recherche » revient à l'accueil.
-- [ ] Mode vélo et voiture : le guidage démarre aussi ; « Transports » n'a pas de bouton Démarrer.
-
-Coût : chaque guidage appelle une fois `setDestinations` (facturé à la destination,
-1 000 gratuites par mois) ; les recalculs en cours de route ne sont pas refacturés.
+- [ ] Aperçu d'itinéraire, mode à pied, vélo ou voiture : « Y aller avec Google Maps » ouvre
+      Google Maps avec le guidage vers le lieu (nom du lieu affiché).
+- [ ] « Horaires et trajet détaillé » (transports) : trajets, étapes et temps réel Ilévia ;
+      « Y aller avec Google Maps » ouvre le trajet en transports dans Google Maps.
 
 ## 8. Checklist de test : étape 5
 
@@ -397,7 +537,6 @@ Il faut **refaire un build** (`npm run build:dev:android`) : AdMob ajoute du cod
 - [ ] Résultats en liste : une **annonce native** (badge « Annonce ») après le 5e et le 10e lieu.
 - [ ] La 1re recherche n'affiche pas d'interstitiel ; la 2e en affiche un (test),
       les suivantes plus jamais pendant la session.
-- [ ] Pendant le guidage : aucune publicité.
 - [ ] « Confidentialité et publicité » (accueil) rouvre le formulaire de consentement.
 - [ ] Sponsorisé : copiez `server/sponsored.example.json` dans `server/sponsored.json`,
       mettez des dates qui incluent aujourd'hui, relancez `npm start` et cherchez
@@ -428,6 +567,25 @@ Pas besoin de nouveau build (aucun module natif ajouté) : relancez simplement `
 - [ ] Remettez `[]` dans `server/affiliates.json` tant que vous n'avez pas de vrais
       identifiants partenaires (les liens d'exemple ne mènent nulle part).
 
+## 8 quater. Checklist : économies, bons plans, espace partenaires, agenda
+
+Pas de nouveau build nécessaire : relancez simplement `npm start`.
+
+- [ ] Ajoutez `ADMIN_PASSWORD=` (12 caractères minimum) dans `.env.local`, relancez, puis
+      ouvrez <http://localhost:8081/admin> sur l'ordinateur : le mot de passe ouvre
+      l'espace, un mauvais mot de passe est refusé.
+- [ ] Avec Supabase configuré : ajoutez un **bon plan** pour un bar proche (bouton
+      « Chercher le lieu »), valable aujourd'hui. Dans l'app : il apparaît dans « Bons
+      plans » sur l'accueil et sur la fiche du lieu.
+- [ ] Ajoutez un **événement** ce soir, coché « À la une » : il apparaît en premier dans
+      « Ce soir à Lille » avec le badge ; un appui ouvre la fiche du lieu.
+- [ ] Onglet « Statistiques » : après un clic sur un lien partenaire dans l'app, il est
+      compté.
+- [ ] Économies : en faisant défiler les résultats, les photos se chargent au fur et à
+      mesure ; revenir sur une fiche déjà vue est instantané.
+- [ ] Dans Google Cloud : budget et quotas par jour réglés (voir « Protégez votre
+      budget »).
+
 ## 9. Avant la publication sur les stores
 
 - [ ] Clés Google **séparées** : clé serveur (Places + Routes, sans restriction d'app) et
@@ -435,8 +593,10 @@ Pas besoin de nouveau build (aucun module natif ajouté) : relancez simplement `
       Régénérez toute clé qui a été partagée.
 - [ ] Backend déployé (`eas deploy`) avec `GOOGLE_PLACES_API_KEY` en variable d'environnement
       EAS, puis `EXPO_PUBLIC_API_URL` renseignée pour les builds preview et production.
-- [ ] Limitation du nombre de requêtes par utilisateur sur `/api/*` (protège votre quota
-      Google).
+- [ ] Quotas par jour et budget Google Cloud réglés (la limite par appareil de l'app
+      n'est qu'un garde-fou).
+- [ ] Espace partenaires : `ADMIN_PASSWORD` long et unique, variables Supabase définies
+      dans EAS (environnement production).
 - [ ] Vrais IDs AdMob, message RGPD publié, app-ads.txt en ligne.
 - [ ] Justification de la localisation écran verrouillé dans les fiches App Store / Google Play.
 - [ ] Politique de confidentialité (position, publicité, identifiant publicitaire).

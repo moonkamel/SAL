@@ -1,13 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { View } from 'react-native';
 
-import { colors } from '@/src/theme';
+import { useT } from '@/src/i18n';
+import { useColors } from '@/src/theme/tone';
 
 export function Stars({ rating, size = 14 }: { rating: number; size?: number }) {
+  const colors = useColors();
+  const t = useT();
   return (
     <View
       style={{ flexDirection: 'row', gap: 1 }}
-      accessibilityLabel={`${rating} étoiles sur 5`}
+      accessibilityLabel={t('{n} étoiles sur 5', { n: rating })}
     >
       {[1, 2, 3, 4, 5].map((i) => (
         <Ionicons
